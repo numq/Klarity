@@ -30,7 +30,11 @@ class AudioSample private constructor(private val sourceDataLine: SourceDataLine
 
     fun setVolume(value: Double) {
         try {
-            volumeControl.value = (20.0 * log10(value)).toFloat()
+            if (value in 0.0..1.0) {
+                volumeControl.value = (20.0 * log10(value)).toFloat()
+            } else {
+                println("Invalid volume: $value")
+            }
         } catch (e: Exception) {
             println(e.localizedMessage)
         }
