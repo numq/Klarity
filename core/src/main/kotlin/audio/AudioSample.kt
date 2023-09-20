@@ -3,7 +3,7 @@ package audio
 import javax.sound.sampled.*
 import kotlin.math.log10
 
-class AudioSample private constructor(private val sourceDataLine: SourceDataLine) : AutoCloseable {
+class AudioSample private constructor(val sourceDataLine: SourceDataLine) : AutoCloseable {
 
     private val muteControl = sourceDataLine.getControl(BooleanControl.Type.MUTE) as BooleanControl
 
