@@ -12,7 +12,7 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
     companion object {
         private const val S16LE_FRAME_SIZE = 4096
 
-        fun create(audioFormat: AudioFormat): AudioSampler {
+        fun create(audioFormat: AudioFormat?): AudioSampler {
             val info = DataLine.Info(SourceDataLine::class.java, audioFormat)
             return (AudioSystem.getLine(info) as? SourceDataLine)?.apply {
                 open(audioFormat, S16LE_FRAME_SIZE)
