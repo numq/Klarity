@@ -6,30 +6,31 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import player.MediaInfo
+import player.controller.MediaInfo
 import java.util.*
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 interface BufferManager {
 
-    val audioBufferCapacity: Int
     val videoBufferCapacity: Int
+    val audioBufferCapacity: Int
     val info: MediaInfo
     val isCompleted: Boolean
     val bufferTimestampMillis: StateFlow<Long>
     val playbackTimestampMillis: StateFlow<Long>
 
-    val firstAudioFrame: StateFlow<BufferedFrame.Samples?>
-    val firstVideoFrame: StateFlow<BufferedFrame.Pixels?>
+    val firstVideoFrame: StateFlow<DecodedFrame.Video?>
+    val firstAudioFrame: StateFlow<DecodedFrame.Audio?>
 
-    val lastAudioFrame: StateFlow<BufferedFrame.Samples?>
-    val lastVideoFrame: StateFlow<BufferedFrame.Pixels?>
+    val lastVideoFrame: StateFlow<DecodedFrame.Video?>
+    val lastAudioFrame: StateFlow<DecodedFrame.Audio?>
 
-    fun audioBufferIsNotEmpty(): Boolean
     fun videoBufferIsNotEmpty(): Boolean
+    fun audioBufferIsNotEmpty(): Boolean
 
-    fun extractAudioFrame(): BufferedFrame.Samples?
-    fun extractVideoFrame(): BufferedFrame.Pixels?
+    fun extractVideoFrame(): DecodedFrame.Video?
+    fun extractAudioFrame(): DecodedFrame.Audio?
 
     suspend fun startBuffering()
     fun flush()
@@ -40,39 +41,60 @@ interface BufferManager {
 
         fun createAudioVideoBuffer(
             decoder: Decoder,
-            audioBufferCapacity: Int = (decoder.info.frameRate * DEFAULT_CAPACITY_FACTOR).toInt(),
             videoBufferCapacity: Int = (decoder.info.frameRate * DEFAULT_CAPACITY_FACTOR).toInt(),
-        ): BufferManager = Implementation(
-            decoder,
-            audioBufferCapacity = audioBufferCapacity,
-            videoBufferCapacity = videoBufferCapacity
-        )
+            audioBufferCapacity: Int = (decoder.info.frameRate * DEFAULT_CAPACITY_FACTOR).toInt(),
+        ): BufferManager = if (!decoder.hasVideo() && !decoder.hasAudio()) {
+            throw BufferException.FailedToCreate
+        } else {
+            Implementation(
+                decoder,
+                videoBufferCapacity = videoBufferCapacity,
+                audioBufferCapacity = audioBufferCapacity
+            )
+        }
 
         fun createVideoOnlyBuffer(
             decoder: Decoder,
             videoBufferCapacity: Int = (decoder.info.frameRate * DEFAULT_CAPACITY_FACTOR).toInt(),
-        ): BufferManager = Implementation(decoder, audioBufferCapacity = ZERO_CAPACITY_FACTOR, videoBufferCapacity)
+        ): BufferManager = if (!decoder.hasVideo() && !decoder.hasAudio()) {
+            throw BufferException.FailedToCreate
+        } else {
+            Implementation(
+                decoder,
+                videoBufferCapacity = videoBufferCapacity,
+                audioBufferCapacity = ZERO_CAPACITY_FACTOR
+            )
+        }
 
         fun createAudioOnlyBuffer(
             decoder: Decoder,
             audioBufferCapacity: Int = (decoder.info.frameRate * DEFAULT_CAPACITY_FACTOR).toInt(),
-        ): BufferManager = Implementation(decoder, audioBufferCapacity, videoBufferCapacity = ZERO_CAPACITY_FACTOR)
+        ): BufferManager = if (!decoder.hasVideo() && !decoder.hasAudio()) {
+            throw BufferException.FailedToCreate
+        } else {
+            Implementation(
+                decoder,
+                videoBufferCapacity = ZERO_CAPACITY_FACTOR,
+                audioBufferCapacity = audioBufferCapacity
+            )
+        }
     }
 
     class Implementation(
         private val decoder: Decoder,
-        override val audioBufferCapacity: Int,
         override val videoBufferCapacity: Int,
+        override val audioBufferCapacity: Int,
     ) : BufferManager {
 
         /**
          * Implementation
          */
 
-        private val audioBuffer = ArrayDeque<BufferedFrame.Samples>()
-
         private val videoBuffer =
-            if (decoder.hasVideo()) ArrayDeque<BufferedFrame.Pixels>() else null
+            if (decoder.hasVideo()) ArrayDeque<DecodedFrame.Video>() else null
+
+        private val audioBuffer =
+            if (decoder.hasAudio()) ArrayDeque<DecodedFrame.Audio>() else null
 
         private val _bufferTimestampMillis = MutableStateFlow(0L)
 
@@ -84,21 +106,17 @@ interface BufferManager {
         override val playbackTimestampMillis: StateFlow<Long>
             get() = _playbackTimestampMillis.asStateFlow()
 
-        private val _firstAudioFrame = MutableStateFlow<BufferedFrame.Samples?>(null)
-        override val firstAudioFrame: StateFlow<BufferedFrame.Samples?>
-            get() = _firstAudioFrame.asStateFlow()
+        private val _firstVideoFrame = MutableStateFlow<DecodedFrame.Video?>(null)
+        override val firstVideoFrame = _firstVideoFrame.asStateFlow()
 
-        private val _firstVideoFrame = MutableStateFlow<BufferedFrame.Pixels?>(null)
-        override val firstVideoFrame: StateFlow<BufferedFrame.Pixels?>
-            get() = _firstVideoFrame.asStateFlow()
+        private val _firstAudioFrame = MutableStateFlow<DecodedFrame.Audio?>(null)
+        override val firstAudioFrame = _firstAudioFrame.asStateFlow()
 
-        private val _lastAudioFrame = MutableStateFlow<BufferedFrame.Samples?>(null)
-        override val lastAudioFrame: StateFlow<BufferedFrame.Samples?>
-            get() = _lastAudioFrame.asStateFlow()
+        private val _lastVideoFrame = MutableStateFlow<DecodedFrame.Video?>(null)
+        override val lastVideoFrame = _lastVideoFrame.asStateFlow()
 
-        private val _lastVideoFrame = MutableStateFlow<BufferedFrame.Pixels?>(null)
-        override val lastVideoFrame: StateFlow<BufferedFrame.Pixels?>
-            get() = _lastVideoFrame.asStateFlow()
+        private val _lastAudioFrame = MutableStateFlow<DecodedFrame.Audio?>(null)
+        override val lastAudioFrame = _lastAudioFrame.asStateFlow()
 
         override val info: MediaInfo
             get() = decoder.info
@@ -106,18 +124,18 @@ interface BufferManager {
         override var isCompleted = false
             private set
 
-        override fun audioBufferIsNotEmpty() = audioBuffer.isNotEmpty()
-
         override fun videoBufferIsNotEmpty() = videoBuffer?.isNotEmpty() == true
 
-        override fun extractAudioFrame() = audioBuffer.poll()?.also {
-            _playbackTimestampMillis.value = it.timestampNanos.nanoseconds.inWholeMilliseconds
-            _firstAudioFrame.value = audioBuffer.firstOrNull()
-        }
+        override fun audioBufferIsNotEmpty() = audioBuffer?.isNotEmpty() == true
 
         override fun extractVideoFrame() = videoBuffer?.poll()?.also {
             _playbackTimestampMillis.value = it.timestampNanos.nanoseconds.inWholeMilliseconds
             _firstVideoFrame.value = videoBuffer.firstOrNull()
+        }
+
+        override fun extractAudioFrame() = audioBuffer?.poll()?.also {
+            _playbackTimestampMillis.value = it.timestampNanos.nanoseconds.inWholeMilliseconds
+            _firstAudioFrame.value = audioBuffer.firstOrNull()
         }
 
         override suspend fun startBuffering() {
@@ -129,48 +147,50 @@ interface BufferManager {
 
                     while (isActive) {
 
-                        val needMoreFrames = if (hasVideo()) {
-                            (audioBuffer.size < audioBufferCapacity) || (videoBuffer?.size?.let { it < videoBufferCapacity } == true)
-                        } else {
-                            audioBuffer.size < audioBufferCapacity
+                        val needMoreFrames = when {
+                            hasVideo() && hasAudio() -> {
+                                (audioBuffer?.size?.let { it < audioBufferCapacity } == true) || (videoBuffer?.size?.let { it < videoBufferCapacity } == true)
+                            }
+
+                            hasVideo() -> {
+                                (videoBuffer?.size?.let { it < videoBufferCapacity } == true)
+                            }
+
+                            hasAudio() -> {
+                                (audioBuffer?.size?.let { it < audioBufferCapacity } == true)
+                            }
+
+                            else -> return@launch
                         }
 
                         if (needMoreFrames) {
                             nextFrame()?.let { frame ->
                                 _bufferTimestampMillis.value = frame.timestampNanos.nanoseconds.inWholeMilliseconds
                                 when (frame) {
-                                    is DecodedFrame.Audio -> {
-                                        isCompleted = false
-
-                                        BufferedFrame.Samples(
-                                            frame.timestampNanos, frame.bytes
-                                        ).let { audioFrame ->
-                                            audioBuffer.add(audioFrame).also { _lastAudioFrame.value = audioFrame }
-                                        }
-                                    }
-
                                     is DecodedFrame.Video -> {
                                         isCompleted = false
 
-                                        BufferedFrame.Pixels(
-                                            frame.timestampNanos, frame.bytes
-                                        ).let { videoFrame ->
-                                            videoBuffer?.add(videoFrame).also { _lastVideoFrame.value = videoFrame }
-                                        }
+                                        videoBuffer?.add(frame).also { _lastVideoFrame.value = frame }
+                                    }
+
+                                    is DecodedFrame.Audio -> {
+                                        isCompleted = false
+
+                                        audioBuffer?.add(frame).also { _lastAudioFrame.value = frame }
                                     }
 
                                     is DecodedFrame.End -> isCompleted = true
                                 }
                             }
-                        } else delay(50L)
+                        } else delay((1 / info.frameRate * 1_000L).milliseconds)
                     }
                 }
             }.invokeOnCompletion { println("Buffering has been completed") }
         }
 
         override fun flush() {
-            audioBuffer.clear()
             videoBuffer?.clear()
+            audioBuffer?.clear()
             println("Buffer has been flushed")
         }
     }
