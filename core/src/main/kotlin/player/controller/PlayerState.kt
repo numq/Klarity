@@ -1,4 +1,4 @@
-package player
+package player.controller
 
 data class PlayerState(
     val volume: Double = 1.0,
