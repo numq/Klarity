@@ -25,12 +25,13 @@ interface Decoder : AutoCloseable {
     fun stop()
 
     companion object {
-        fun create(url: String, decodeVideo: Boolean, decodeAudio: Boolean): Decoder =
-            if (url.isNotBlank()) Implementation(
+        fun create(url: String, decodeVideo: Boolean, decodeAudio: Boolean): Decoder = runCatching {
+            Implementation(
                 url,
                 decodeVideo = decodeVideo,
                 decodeAudio = decodeAudio
-            ) else throw DecoderException.UnableToCreate
+            )
+        }.getOrElse { throw DecoderException.UnableToCreate }
     }
 
     class Implementation(
