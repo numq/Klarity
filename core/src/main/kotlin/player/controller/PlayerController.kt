@@ -40,10 +40,6 @@ interface PlayerController : AutoCloseable {
          * Coroutines
          */
 
-        private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-            if (throwable !is CancellationException) println(throwable.localizedMessage)
-        }
-
         private val playerContext = Dispatchers.Default + Job()
 
         private val playerScope = CoroutineScope(playerContext)
@@ -273,58 +269,56 @@ interface PlayerController : AutoCloseable {
         }
 
         init {
-            playerScope.launch(exceptionHandler) {
-                events.onEach(::println).collect { event ->
-                    when (event) {
-                        is PlayerEvent.Play -> {
-                            updateStatus(PlaybackStatus.LOADING)
-                            startPlayback()
-                        }
+            events.onEach(::println).onEach { event ->
+                when (event) {
+                    is PlayerEvent.Play -> {
+                        updateStatus(PlaybackStatus.LOADING)
+                        startPlayback()
+                    }
 
-                        is PlayerEvent.Pause -> {
-                            updateStatus(PlaybackStatus.LOADING)
-                            stopPlayback(flushBuffer = false)
-                            updateStatus(PlaybackStatus.PAUSED)
-                        }
+                    is PlayerEvent.Pause -> {
+                        updateStatus(PlaybackStatus.LOADING)
+                        stopPlayback(flushBuffer = false)
+                        updateStatus(PlaybackStatus.PAUSED)
+                    }
 
-                        is PlayerEvent.Stop -> {
-                            updateStatus(PlaybackStatus.LOADING)
-                            stopPlayback()
-                            decoder.stop()
-                            updateStatus(PlaybackStatus.STOPPED)
-                            updateState(
-                                state.value.copy(
-                                    bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
-                                )
+                    is PlayerEvent.Stop -> {
+                        updateStatus(PlaybackStatus.LOADING)
+                        stopPlayback()
+                        decoder.stop()
+                        updateStatus(PlaybackStatus.STOPPED)
+                        updateState(
+                            state.value.copy(
+                                bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
                             )
-                        }
+                        )
+                    }
 
-                        is PlayerEvent.Complete -> {
-                            updateStatus(PlaybackStatus.LOADING)
-                            decoder.stop()
-                            updateState(
-                                state.value.copy(
-                                    bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
-                                )
+                    is PlayerEvent.Complete -> {
+                        updateStatus(PlaybackStatus.LOADING)
+                        decoder.stop()
+                        updateState(
+                            state.value.copy(
+                                bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
                             )
-                            stopPlayback()
-                            updateStatus(PlaybackStatus.STOPPED)
-                        }
+                        )
+                        stopPlayback()
+                        updateStatus(PlaybackStatus.STOPPED)
+                    }
 
-                        is PlayerEvent.SeekTo -> {
-                            updateStatus(PlaybackStatus.LOADING)
-                            stopPlayback()
-                            updateStatus(PlaybackStatus.SEEKING)
-                            val timestampToSeekMicros = event.timestampMillis.milliseconds.inWholeNanoseconds.coerceIn(
-                                0L,
-                                info.durationNanos
-                            ).nanoseconds.inWholeMicroseconds
-                            decoder.seekTo(timestampToSeekMicros)
-                            startPlayback()
-                        }
+                    is PlayerEvent.SeekTo -> {
+                        updateStatus(PlaybackStatus.LOADING)
+                        stopPlayback()
+                        updateStatus(PlaybackStatus.SEEKING)
+                        val timestampToSeekMicros = event.timestampMillis.milliseconds.inWholeNanoseconds.coerceIn(
+                            0L,
+                            info.durationNanos
+                        ).nanoseconds.inWholeMicroseconds
+                        decoder.seekTo(timestampToSeekMicros)
+                        startPlayback()
                     }
                 }
-            }
+            }.launchIn(playerScope)
         }
     }
 }
