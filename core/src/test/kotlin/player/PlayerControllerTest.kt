@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
-import player.controller.PlaybackStatus
-import player.controller.PlayerController
 
 class PlayerControllerTest {
 

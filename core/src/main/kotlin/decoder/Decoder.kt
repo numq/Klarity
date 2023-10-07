@@ -10,7 +10,7 @@ import org.bytedeco.javacv.OpenCVFrameConverter
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import player.controller.MediaInfo
+import player.MediaInfo
 import java.io.File
 import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.microseconds

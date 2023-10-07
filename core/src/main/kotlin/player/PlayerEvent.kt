@@ -1,4 +1,4 @@
-package player.controller
+package player
 
 sealed class PlayerEvent private constructor() {
     object Play : PlayerEvent()

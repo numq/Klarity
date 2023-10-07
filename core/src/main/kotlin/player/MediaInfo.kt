@@ -1,4 +1,4 @@
-package player.controller
+package player
 
 import javax.sound.sampled.AudioFormat
 

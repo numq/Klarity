@@ -1,4 +1,4 @@
-package player.controller
+package player
 
 import audio.AudioSampler
 import buffer.BufferManager
