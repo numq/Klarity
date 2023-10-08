@@ -25,9 +25,9 @@ interface Decoder : AutoCloseable {
     fun stop()
 
     companion object {
-        fun create(url: String, decodeVideo: Boolean, decodeAudio: Boolean): Decoder = runCatching {
+        fun create(mediaUrl: String, decodeVideo: Boolean, decodeAudio: Boolean): Decoder = runCatching {
             Implementation(
-                url,
+                mediaUrl,
                 decodeVideo = decodeVideo,
                 decodeAudio = decodeAudio
             )
