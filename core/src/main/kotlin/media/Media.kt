@@ -1,8 +1,8 @@
-package player
+package media
 
 import javax.sound.sampled.AudioFormat
 
-data class MediaInfo(
+data class Media(
     val name: String,
     val durationNanos: Long,
     val audioFormat: AudioFormat? = null,

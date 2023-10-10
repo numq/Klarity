@@ -2,6 +2,9 @@ package decoder
 
 import extension.pixelBytes
 import extension.sampleBytes
+import media.ImageSize
+import media.Media
+import media.MediaSettings
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacpp.Loader
 import org.bytedeco.javacv.FFmpegFrameGrabber
@@ -10,14 +13,12 @@ import org.bytedeco.javacv.OpenCVFrameConverter
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import player.MediaInfo
-import java.io.File
 import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.microseconds
 
 interface Decoder : AutoCloseable {
 
-    val info: MediaInfo
+    val media: Media
     fun hasVideo(): Boolean
     fun hasAudio(): Boolean
     fun nextFrame(): DecodedFrame?
@@ -25,48 +26,45 @@ interface Decoder : AutoCloseable {
     fun stop()
 
     companion object {
-        fun create(mediaUrl: String, decodeVideo: Boolean, decodeAudio: Boolean): Decoder = runCatching {
-            Implementation(
-                mediaUrl,
-                decodeVideo = decodeVideo,
-                decodeAudio = decodeAudio
-            )
+        fun create(settings: MediaSettings): Decoder = runCatching {
+            Implementation(settings)
         }.getOrElse { throw DecoderException.UnableToCreate }
     }
 
-    class Implementation(
-        private val mediaUrl: String,
-        private val decodeVideo: Boolean,
-        private val decodeAudio: Boolean,
-    ) : Decoder {
+    class Implementation(private val settings: MediaSettings) : Decoder {
 
         init {
             Loader.load(org.bytedeco.opencv.opencv_java::class.java)
         }
 
-        private val grabber = FFmpegFrameGrabber(mediaUrl).apply {
-            if (decodeVideo) pixelFormat = avutil.AV_PIX_FMT_BGRA
-            sampleFormat = avutil.AV_SAMPLE_FMT_S16
+        private val grabber = FFmpegFrameGrabber(settings.mediaUrl).apply {
+            if (settings.hasVideo) pixelFormat = avutil.AV_PIX_FMT_BGRA
+            if (settings.hasAudio) sampleFormat = avutil.AV_SAMPLE_FMT_S16
+            settings.imageSize?.run {
+                imageWidth = width
+                imageHeight = height
+            }
+            settings.frameRate?.let(::setFrameRate)
             start()
         }
 
         private val converter = OpenCVFrameConverter.ToMat()
 
         private fun resizeVideoFrame(frame: Frame): Frame {
-            if (grabber.imageWidth != info.width || grabber.imageHeight != info.height) {
+            if (grabber.imageWidth != media.width || grabber.imageHeight != media.height) {
                 val output = Mat()
                 Imgproc.resize(
                     converter.convertToOrgOpenCvCoreMat(frame),
                     output,
-                    Size(info.width.toDouble(), info.height.toDouble())
+                    Size(media.width.toDouble(), media.height.toDouble())
                 )
                 return converter.convert(output)
             }
             return frame
         }
 
-        override val info = grabber.run {
-            val name = File(mediaUrl).takeIf { it.exists() }?.name ?: mediaUrl
+        override val media = grabber.run {
+            val name = settings.mediaUrl
 
             val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
 
@@ -93,25 +91,25 @@ interface Decoder : AutoCloseable {
                 size.width to size.height
             } else 0 to 0
 
-            MediaInfo(name, durationNanos, audioFormat, frameRate, width, height)
+            Media(name, durationNanos, audioFormat, frameRate, width, height)
         }
 
-        override fun hasVideo() = decodeVideo && grabber.run {
+        override fun hasVideo() = settings.hasVideo && grabber.run {
             hasVideo() && videoFrameRate > 0 && imageWidth > 0 && imageHeight > 0
         }
 
-        override fun hasAudio() = decodeAudio && grabber.hasAudio()
+        override fun hasAudio() = settings.hasAudio && grabber.hasAudio()
 
         override fun nextFrame(): DecodedFrame? = runCatching {
             val frame = grabber.grabFrame(
-                decodeAudio,
-                decodeVideo,
+                settings.hasAudio,
+                settings.hasVideo,
                 true,
                 false
-            ) ?: return DecodedFrame.End(info.durationNanos)
+            ) ?: return DecodedFrame.End(media.durationNanos)
             val timestamp = frame.timestamp.microseconds.inWholeNanoseconds
             return when (frame.type) {
-                Frame.Type.VIDEO -> info.takeIf { it.width > 0 && it.height > 0 }?.run {
+                Frame.Type.VIDEO -> media.takeIf { it.width > 0 && it.height > 0 }?.run {
                     resizeVideoFrame(frame).pixelBytes()?.let { bytes ->
                         frame.close()
                         return@let DecodedFrame.Video(timestamp, bytes)

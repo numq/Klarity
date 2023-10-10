@@ -1,5 +1,6 @@
 package decoder
 
+import media.MediaSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
@@ -15,14 +16,14 @@ class DecoderTest {
     @Test
     fun `creation with empty url`() {
         assertThrows<DecoderException.UnableToCreate> {
-            Decoder.create(EMPTY_URL, decodeAudio = false, decodeVideo = false).close()
+            Decoder.create(MediaSettings(EMPTY_URL, hasAudio = false, hasVideo = false)).close()
         }
     }
 
     @Test
     fun `creation with valid url`() {
         assertDoesNotThrow {
-            Decoder.create(MEDIA_URL, decodeAudio = false, decodeVideo = false).close()
+            Decoder.create(MediaSettings(MEDIA_URL, hasAudio = false, hasVideo = false)).close()
         }
     }
 }
