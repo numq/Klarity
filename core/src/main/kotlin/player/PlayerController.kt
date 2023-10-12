@@ -7,18 +7,20 @@ import decoder.Decoder
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import media.Media
+import media.MediaSettings
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 interface PlayerController : AutoCloseable {
 
-    val info: MediaInfo
     val events: Flow<PlayerEvent>
     val state: StateFlow<PlayerState>
     val status: StateFlow<PlaybackStatus>
+    val media: StateFlow<Media?>
     val pixels: StateFlow<ByteArray?>
-    fun updateState(newState: PlayerState)
+    fun load(settings: MediaSettings)
     fun play()
     fun pause()
     fun stop()
@@ -27,14 +29,14 @@ interface PlayerController : AutoCloseable {
     fun changeVolume(value: Double)
 
     companion object {
-        fun create(
-            url: String,
-            decodeVideo: Boolean,
-            decodeAudio: Boolean,
-        ): PlayerController = Implementation(Decoder.create(url, decodeVideo = decodeVideo, decodeAudio = decodeAudio))
+        fun create(audioBufferSize: Int? = null, videoBufferSize: Int? = null): PlayerController =
+            Implementation(audioBufferSize, videoBufferSize)
     }
 
-    class Implementation(private val decoder: Decoder) : PlayerController {
+    class Implementation(
+        private val audioBufferCapacity: Int?,
+        private val videoBufferCapacity: Int?,
+    ) : PlayerController {
 
         /**
          * Coroutines
@@ -44,25 +46,21 @@ interface PlayerController : AutoCloseable {
 
         private val playerScope = CoroutineScope(playerContext)
 
+        private var eventJob: Job? = null
+
         private var playbackJob: Job? = null
-
-        /**
-         * Info
-         */
-
-        override val info = decoder.info
 
         /**
          * Event
          */
 
-        private val _event = Channel<PlayerEvent>()
+        private val _events = Channel<PlayerEvent>(Channel.CONFLATED)
 
         private fun sendEvent(newEvent: PlayerEvent) {
-            _event.trySend(newEvent)
+            _events.trySend(newEvent)
         }
 
-        override val events = _event.receiveAsFlow()
+        override val events = _events.consumeAsFlow()
 
         /**
          * State
@@ -70,8 +68,8 @@ interface PlayerController : AutoCloseable {
 
         private val _state = MutableStateFlow(PlayerState())
 
-        override fun updateState(newState: PlayerState) {
-            _state.value = newState
+        private fun updateState(newState: PlayerState) {
+            _state.update { newState }
         }
 
         override val state = _state.asStateFlow()
@@ -80,124 +78,141 @@ interface PlayerController : AutoCloseable {
          * Status
          */
 
-        private val _status = MutableStateFlow(PlaybackStatus.STOPPED)
+        private val _status = MutableStateFlow(PlaybackStatus.EMPTY)
 
-        private fun updateStatus(newStatus: PlaybackStatus) {
-            if (status.value != newStatus) _status.value = newStatus
+        private fun setStatus(newStatus: PlaybackStatus) {
+            _status.value = newStatus
         }
 
         override val status = _status.asStateFlow()
 
         /**
+         * Media
+         */
+
+        private val _media = MutableStateFlow<Media?>(null)
+
+        override val media = _media.asStateFlow()
+
+        private fun setMedia(newMedia: Media) {
+            _media.value = newMedia
+        }
+
+        /**
          * Pixels
          */
 
-        private val _pixels = MutableStateFlow<ByteArray?>(null)
+        private var _pixels = MutableStateFlow<ByteArray?>(null)
+
         override val pixels = _pixels.asStateFlow()
+
+        private fun setPixels(newPixels: ByteArray?) {
+            _pixels.value = newPixels
+        }
 
         /**
          * Implementation
          */
 
-        private val buffer = when {
-            decoder.hasAudio() && decoder.hasVideo() -> BufferManager.createAudioVideoBuffer(decoder)
-            decoder.hasAudio() -> BufferManager.createAudioOnlyBuffer(decoder)
-            decoder.hasVideo() -> BufferManager.createVideoOnlyBuffer(decoder)
-            else -> throw Exception("Unable to load media")
-        }
+        private var decoder: Decoder? = null
 
-        private val audioSampler = AudioSampler.create(info.audioFormat)
+        private var buffer: BufferManager? = null
+
+        private var audioSampler: AudioSampler? = null
+
+        private var pausedTimestampNanos: Long? = null
+
+        override fun load(settings: MediaSettings) = sendEvent(PlayerEvent.Load(settings))
 
         override fun play() {
             when (status.value) {
-                PlaybackStatus.LOADING, PlaybackStatus.BUFFERING, PlaybackStatus.PLAYING, PlaybackStatus.SEEKING -> return
+                PlaybackStatus.EMPTY, PlaybackStatus.BUFFERING, PlaybackStatus.PLAYING, PlaybackStatus.SEEKING -> return
                 else -> sendEvent(PlayerEvent.Play)
             }
         }
 
         override fun pause() {
             when (status.value) {
-                PlaybackStatus.PAUSED -> return
+                PlaybackStatus.EMPTY, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING -> return
                 else -> sendEvent(PlayerEvent.Pause)
             }
         }
 
         override fun stop() {
             when (status.value) {
-                PlaybackStatus.STOPPED -> return
+                PlaybackStatus.EMPTY, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING -> return
                 else -> sendEvent(PlayerEvent.Stop)
             }
         }
 
         override fun seekTo(timestampMillis: Long) {
             when (status.value) {
-                PlaybackStatus.SEEKING -> return
+                PlaybackStatus.EMPTY, PlaybackStatus.SEEKING -> return
                 else -> sendEvent(PlayerEvent.SeekTo(timestampMillis))
             }
         }
 
         override fun toggleMute() {
-            playerScope.launch {
-                val isMuted = !state.value.isMuted
-                audioSampler.setMuted(isMuted)
-                updateState(state.value.copy(isMuted = isMuted))
-            }
+            val isMuted = !state.value.isMuted
+            audioSampler?.setMuted(isMuted)
+            updateState(state.value.copy(isMuted = isMuted))
         }
 
         override fun changeVolume(value: Double) {
-            playerScope.launch {
-                audioSampler.setVolume(value)
-                updateState(state.value.copy(volume = value))
-            }
+            audioSampler?.setVolume(value)
+            updateState(state.value.copy(volume = value))
         }
 
         override fun close() {
-            audioSampler.stop()
-            audioSampler.close()
+            audioSampler?.stop()
+            audioSampler?.close()
+            audioSampler = null
 
             playbackJob?.cancel()
             playbackJob = null
 
-            _event.close()
+            _events.cancel()
 
-            decoder.close()
+            buffer = null
+
+            decoder?.close()
+            decoder = null
+        }
+
+        private fun renderVideo(frame: DecodedFrame.Video) {
+            setPixels(frame.bytes)
+        }
+
+        private fun playAudio(frame: DecodedFrame.Audio) {
+            audioSampler?.play(frame.bytes)
         }
 
         private suspend fun startPlayback() {
-            playbackJob = CoroutineScope(currentCoroutineContext()).launch {
+            playbackJob = playerScope.launch {
 
-                audioSampler.apply {
+                val hasFramesToPlay = AtomicBoolean(false)
+
+                var currentAudioFrameTimestampNanos: Long? = null
+
+                audioSampler?.apply {
                     start()
                     setMuted(state.value.isMuted)
                     setVolume(state.value.volume)
                 }
 
-                buffer.apply {
+                buffer?.apply {
 
-                    buffer.startBuffering()
-
-                    val hasFramesToPlay = AtomicBoolean(false)
-
-                    var currentAudioFrameTimestampNanos: Long? = null
-
-                    fun renderVideo(frame: DecodedFrame.Video) {
-                        _pixels.value = frame.bytes
-                    }
-
-                    fun playAudio(frame: DecodedFrame.Audio) {
-                        audioSampler.play(frame.bytes)
-                        currentAudioFrameTimestampNanos = frame.timestampNanos
+                    launch {
+                        startBuffering()
                     }
 
                     when {
-                        decoder.hasVideo() && decoder.hasAudio() -> {
+                        decoder?.hasVideo() == true && decoder?.hasAudio() == true -> {
                             launch {
                                 while (isActive) {
                                     if (hasFramesToPlay.get()) extractVideoFrame()?.let { frame ->
                                         currentAudioFrameTimestampNanos?.let { currentTimestampNanos ->
-                                            (frame.timestampNanos - currentTimestampNanos)
-                                                .nanoseconds
-                                                .takeIf { it.isPositive() }
+                                            (frame.timestampNanos - currentTimestampNanos).nanoseconds.takeIf { it.isPositive() }
                                                 ?.let { delay(it) }
                                         }
                                         renderVideo(frame)
@@ -206,18 +221,19 @@ interface PlayerController : AutoCloseable {
                             }
                             launch {
                                 while (isActive) {
-                                    if (hasFramesToPlay.get()) extractAudioFrame()?.let { playAudio(it) }
+                                    if (hasFramesToPlay.get()) extractAudioFrame()?.let {
+                                        playAudio(it)
+                                        currentAudioFrameTimestampNanos = it.timestampNanos
+                                    }
                                 }
                             }
                         }
 
-                        decoder.hasVideo() -> launch {
+                        decoder?.hasVideo() == true -> launch {
                             while (isActive) {
                                 if (hasFramesToPlay.get()) extractVideoFrame()?.let { frame ->
-                                    buffer.firstVideoFrame.value?.timestampNanos?.let { nextTimestampNanos ->
-                                        (nextTimestampNanos - frame.timestampNanos)
-                                            .nanoseconds
-                                            .takeIf { it.isPositive() }
+                                    firstVideoFrame.value?.timestampNanos?.let { nextTimestampNanos ->
+                                        (nextTimestampNanos - frame.timestampNanos).nanoseconds.takeIf { it.isPositive() }
                                             ?.let { delay(it) }
                                     }
                                     renderVideo(frame)
@@ -225,21 +241,27 @@ interface PlayerController : AutoCloseable {
                             }
                         }
 
-                        decoder.hasAudio() -> launch {
+                        decoder?.hasAudio() == true -> launch {
                             while (isActive) {
-                                if (hasFramesToPlay.get()) extractAudioFrame()?.let { playAudio(it) }
+                                if (hasFramesToPlay.get()) extractAudioFrame()?.let {
+                                    playAudio(it)
+                                    currentAudioFrameTimestampNanos = it.timestampNanos
+                                }
                             }
                         }
                     }
 
                     while (isActive) {
                         when {
-                            decoder.hasAudio() && decoder.hasVideo() -> hasFramesToPlay.set(audioBufferIsNotEmpty() && videoBufferIsNotEmpty())
-                            decoder.hasAudio() -> hasFramesToPlay.set(audioBufferIsNotEmpty())
-                            decoder.hasVideo() -> hasFramesToPlay.set(videoBufferIsNotEmpty())
+                            decoder?.hasAudio() == true && decoder?.hasVideo() == true -> hasFramesToPlay.set(
+                                audioBufferIsNotEmpty() && videoBufferIsNotEmpty()
+                            )
+
+                            decoder?.hasAudio() == true -> hasFramesToPlay.set(audioBufferIsNotEmpty())
+                            decoder?.hasVideo() == true -> hasFramesToPlay.set(videoBufferIsNotEmpty())
                         }
                         if (hasFramesToPlay.get()) {
-                            if (status.value != PlaybackStatus.PLAYING) updateStatus(PlaybackStatus.PLAYING)
+                            if (status.value != PlaybackStatus.PLAYING) setStatus(PlaybackStatus.PLAYING)
                             currentAudioFrameTimestampNanos?.run {
                                 updateState(state.value.copy(bufferTimestampMillis = maxOf(
                                     lastAudioFrame.value?.timestampNanos ?: -1L,
@@ -251,71 +273,112 @@ interface PlayerController : AutoCloseable {
                             if (isCompleted) {
                                 joinAll()
                                 return@launch sendEvent(PlayerEvent.Complete)
-                            } else updateStatus(PlaybackStatus.BUFFERING)
+                            } else setStatus(PlaybackStatus.BUFFERING)
                         }
 
-                        delay((1 / info.frameRate * 1_000L).milliseconds)
+                        delay((1_000L / media.frameRate).milliseconds)
                     }
                 }
             }
         }
 
-        private suspend fun stopPlayback(flushBuffer: Boolean = true) {
-            audioSampler.stop()
+        private suspend fun stopPlayback() {
+            audioSampler?.stop()
 
             playbackJob?.cancelAndJoin().also { println("Playback job has been cancelled") }
-            playbackJob = null
-            if (flushBuffer) buffer.flush()
+
+            buffer?.flush()
         }
 
         init {
             events.onEach(::println).onEach { event ->
-                when (event) {
-                    is PlayerEvent.Play -> {
-                        updateStatus(PlaybackStatus.LOADING)
-                        startPlayback()
-                    }
+                if (event !in arrayOf(PlayerEvent.Play, PlayerEvent.Pause)) pausedTimestampNanos = null
 
-                    is PlayerEvent.Pause -> {
-                        updateStatus(PlaybackStatus.LOADING)
-                        stopPlayback(flushBuffer = false)
-                        updateStatus(PlaybackStatus.PAUSED)
-                    }
+                eventJob?.cancelAndJoin()
+                eventJob = playerScope.launch {
+                    when (event) {
+                        is PlayerEvent.Load -> {
+                            stopPlayback()
+                            decoder = Decoder.create(event.settings)
+                            decoder?.run {
+                                buffer = when {
+                                    hasAudio() && hasVideo() -> BufferManager.createAudioVideoBuffer(
+                                        this,
+                                        audioBufferCapacity = audioBufferCapacity,
+                                        videoBufferCapacity = videoBufferCapacity
+                                    )
 
-                    is PlayerEvent.Stop -> {
-                        updateStatus(PlaybackStatus.LOADING)
-                        stopPlayback()
-                        decoder.stop()
-                        updateStatus(PlaybackStatus.STOPPED)
-                        updateState(
-                            state.value.copy(
-                                bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
+                                    hasAudio() -> BufferManager.createAudioOnlyBuffer(
+                                        this,
+                                        audioBufferCapacity = audioBufferCapacity
+                                    )
+
+                                    hasVideo() -> BufferManager.createVideoOnlyBuffer(
+                                        this,
+                                        videoBufferCapacity = videoBufferCapacity
+                                    )
+
+                                    else -> throw Exception("Unable to load media")
+                                }
+                                audioSampler = AudioSampler.create(media.audioFormat)
+                                setMedia(media.also(::println))
+                                setStatus(PlaybackStatus.STOPPED)
+                            }
+                        }
+
+                        is PlayerEvent.Play -> {
+                            pausedTimestampNanos?.let { timestampNanos ->
+                                sendEvent(PlayerEvent.SeekTo(timestampNanos.nanoseconds.inWholeMilliseconds))
+                                pausedTimestampNanos = null
+                            } ?: startPlayback()
+                        }
+
+                        is PlayerEvent.Pause -> {
+                            stopPlayback()
+                            pausedTimestampNanos =
+                                state.value.playbackTimestampMillis.milliseconds.inWholeNanoseconds.let { playbackTimestampNanos ->
+                                    minOf(
+                                        buffer?.firstVideoFrame?.value?.timestampNanos ?: playbackTimestampNanos,
+                                        buffer?.firstAudioFrame?.value?.timestampNanos ?: playbackTimestampNanos
+                                    )
+                                }
+                            setStatus(PlaybackStatus.PAUSED)
+                        }
+
+                        is PlayerEvent.Stop -> {
+                            stopPlayback()
+                            decoder?.stop()
+                            setStatus(PlaybackStatus.STOPPED)
+                            updateState(
+                                state.value.copy(
+                                    bufferTimestampMillis = 0L,
+                                    playbackTimestampMillis = 0L
+                                )
                             )
-                        )
-                    }
+                            setPixels(null)
+                        }
 
-                    is PlayerEvent.Complete -> {
-                        updateStatus(PlaybackStatus.LOADING)
-                        decoder.stop()
-                        updateState(
-                            state.value.copy(
-                                bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
+                        is PlayerEvent.Complete -> {
+                            decoder?.stop()
+                            updateState(
+                                state.value.copy(
+                                    bufferTimestampMillis = 0L,
+                                    playbackTimestampMillis = 0L
+                                )
                             )
-                        )
-                        stopPlayback()
-                        updateStatus(PlaybackStatus.STOPPED)
-                    }
+                            setStatus(PlaybackStatus.STOPPED)
+                            stopPlayback()
+                        }
 
-                    is PlayerEvent.SeekTo -> {
-                        updateStatus(PlaybackStatus.LOADING)
-                        stopPlayback()
-                        updateStatus(PlaybackStatus.SEEKING)
-                        val timestampToSeekMicros = event.timestampMillis.milliseconds.inWholeNanoseconds.coerceIn(
-                            0L,
-                            info.durationNanos
-                        ).nanoseconds.inWholeMicroseconds
-                        decoder.seekTo(timestampToSeekMicros)
-                        startPlayback()
+                        is PlayerEvent.SeekTo -> {
+                            stopPlayback()
+                            val timestampToSeekMicros = event.timestampMillis.milliseconds.inWholeNanoseconds.coerceIn(
+                                0L, media.value?.durationNanos ?: 0L
+                            ).nanoseconds.inWholeMicroseconds
+                            decoder?.seekTo(timestampToSeekMicros)
+                            setStatus(PlaybackStatus.SEEKING)
+                            startPlayback()
+                        }
                     }
                 }
             }.launchIn(playerScope)
