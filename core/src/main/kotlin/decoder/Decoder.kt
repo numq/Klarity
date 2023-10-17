@@ -37,23 +37,18 @@ interface Decoder : AutoCloseable {
             Loader.load(org.bytedeco.opencv.opencv_java::class.java)
         }
 
-        private fun isAudioFile(fileName: String): Boolean {
-            val audioExtensions =
-                setOf("mp3", "wav", "aac", "ogg", "wma", "flac", "m4a", "amr", "ac3", "ape", "mid", "ra")
+        private val audioExtensions =
+            setOf("mp3", "wav", "aac", "ogg", "wma", "flac", "m4a", "amr", "ac3", "ape", "mid", "ra")
 
-            val fileExtension = fileName.substringAfterLast(".", "").lowercase()
+        private val videoExtensions =
+            setOf("mp4", "avi", "mkv", "mov", "flv", "wmv", "mpg", "mpeg", "m4v", "webm", "ts", "3gp", "ogv")
 
-            return audioExtensions.contains(fileExtension)
-        }
-
-        private fun isVideoFile(fileName: String): Boolean {
-            val videoExtensions =
-                setOf("mp4", "avi", "mkv", "mov", "flv", "wmv", "mpg", "mpeg", "m4v", "webm", "ts", "3gp", "ogv")
-
-            val fileExtension = fileName.substringAfterLast(".", "").lowercase()
-
-            return videoExtensions.contains(fileExtension)
-        }
+        private fun hasCompatibleFormat(fileName: String) = fileName
+            .substringAfterLast(".", "")
+            .lowercase()
+            .let { extension ->
+                audioExtensions.contains(extension) || videoExtensions.contains(extension)
+            }
 
         private val grabber = FFmpegFrameGrabber(settings.mediaUrl).apply {
             if (settings.hasVideo) {
@@ -114,9 +109,9 @@ interface Decoder : AutoCloseable {
             Media(name, durationNanos, audioFormat, frameRate, width, height)
         }
 
-        override fun hasVideo() = isVideoFile(settings.mediaUrl) && settings.hasVideo && grabber.hasVideo()
+        override fun hasVideo() = hasCompatibleFormat(settings.mediaUrl) && settings.hasVideo && grabber.hasVideo()
 
-        override fun hasAudio() = isAudioFile(settings.mediaUrl) && settings.hasAudio && grabber.hasAudio()
+        override fun hasAudio() = hasCompatibleFormat(settings.mediaUrl) && settings.hasAudio && grabber.hasAudio()
 
         override fun nextFrame(): DecodedFrame? = runCatching {
             val frame = grabber.grabFrame(
