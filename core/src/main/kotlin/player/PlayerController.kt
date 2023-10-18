@@ -133,7 +133,7 @@ interface PlayerController : AutoCloseable {
 
         override fun pause() {
             when (status.value) {
-                PlaybackStatus.EMPTY, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING -> return
+                PlaybackStatus.EMPTY, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING, PlaybackStatus.COMPLETED -> return
                 else -> sendEvent(PlayerEvent.Pause)
             }
         }
@@ -299,8 +299,12 @@ interface PlayerController : AutoCloseable {
                     when (event) {
                         is PlayerEvent.Load -> {
                             stopPlayback()
+                            setStatus(PlaybackStatus.EMPTY)
+                            updateState(PlayerState(volume = state.value.volume, isMuted = state.value.isMuted))
+                            decoder?.close()
                             decoder = Decoder.create(event.settings)
                             decoder?.run {
+                                if (hasAudio()) audioSampler = AudioSampler.create(media.audioFormat)
                                 buffer = when {
                                     hasAudio() && hasVideo() -> BufferManager.createAudioVideoBuffer(
                                         this,
@@ -320,7 +324,6 @@ interface PlayerController : AutoCloseable {
 
                                     else -> throw Exception("Unable to load media")
                                 }
-                                audioSampler = AudioSampler.create(media.audioFormat)
                                 setMedia(media.also(::println))
                                 setStatus(PlaybackStatus.STOPPED)
                             }
@@ -360,14 +363,8 @@ interface PlayerController : AutoCloseable {
 
                         is PlayerEvent.Complete -> {
                             decoder?.stop()
-                            updateState(
-                                state.value.copy(
-                                    bufferTimestampMillis = 0L,
-                                    playbackTimestampMillis = 0L
-                                )
-                            )
-                            setStatus(PlaybackStatus.STOPPED)
                             stopPlayback()
+                            setStatus(PlaybackStatus.COMPLETED)
                         }
 
                         is PlayerEvent.SeekTo -> {
