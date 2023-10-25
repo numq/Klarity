@@ -4,10 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.DragInteraction
-import androidx.compose.foundation.interaction.HoverInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,17 +27,14 @@ fun VideoOverlay(
     content: @Composable () -> Unit = {},
 ) {
 
-    val interaction by interactionSources.map{ it.interactions }.merge().collectAsState(null)
+    val interaction by interactionSources
+        .map { it.interactions }
+        .merge()
+        .collectAsState(null)
 
-    val interacting by remember(interaction) {
+    val canBeHidden by remember(status, visibilityDelay) {
         derivedStateOf {
-            interaction is DragInteraction.Start || interaction is HoverInteraction.Enter || interaction is PressInteraction.Press
-        }
-    }
-
-    val canBeHidden by remember(interacting, status, visibilityDelay) {
-        derivedStateOf {
-            !interacting && status == PlaybackStatus.PLAYING && visibilityDelay > 0L
+            status == PlaybackStatus.PLAYING && visibilityDelay > 0L
         }
     }
 
@@ -58,9 +52,9 @@ fun VideoOverlay(
         }.also(setInteractionJob)
     }
 
-    DisposableEffect(interacting) {
+    DisposableEffect(interaction) {
         interactionJob?.cancel()
-        onDispose { hide() }
+        onDispose(::hide)
     }
 
     val isVisible by remember(canBeHidden, interactionVisibility) {

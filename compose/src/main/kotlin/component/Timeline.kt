@@ -9,6 +9,7 @@ import androidx.compose.material.SliderColors
 import androidx.compose.material.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -18,7 +19,7 @@ fun Timeline(
     timestampMillis: Long,
     durationMillis: Long,
     seekTo: (Long) -> Unit,
-    interactionSource: MutableInteractionSource = MutableInteractionSource(),
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     seekBarColors: SliderColors = SliderDefaults.colors(
         thumbColor = Color.Gray,
         disabledThumbColor = Color.LightGray,

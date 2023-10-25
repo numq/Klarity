@@ -6,6 +6,7 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,11 +27,11 @@ fun Controls(
     stop: () -> Unit,
     toggleMute: () -> Unit,
     changeVolume: (Double) -> Unit,
-    playInteractionSource: MutableInteractionSource = MutableInteractionSource(),
-    pauseInteractionSource: MutableInteractionSource = MutableInteractionSource(),
-    stopInteractionSource: MutableInteractionSource = MutableInteractionSource(),
-    muteInteractionSource: MutableInteractionSource = MutableInteractionSource(),
-    volumeInteractionSource: MutableInteractionSource = MutableInteractionSource(),
+    playInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    pauseInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    stopInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    muteInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    volumeInteractionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     volumeBarColors: SliderColors = SliderDefaults.colors(
         thumbColor = Color.Gray,
         disabledThumbColor = Color.LightGray,
@@ -51,15 +52,13 @@ fun Controls(
         ) {
             when (status) {
                 PlaybackStatus.BUFFERING, PlaybackStatus.PLAYING, PlaybackStatus.SEEKING -> IconButton(
-                    pause,
-                    interactionSource = pauseInteractionSource
+                    pause, interactionSource = pauseInteractionSource
                 ) {
                     Icon(Icons.Rounded.Pause, "pause")
                 }
 
                 PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> IconButton(
-                    play,
-                    interactionSource = playInteractionSource
+                    play, interactionSource = playInteractionSource
                 ) {
                     Icon(Icons.Rounded.PlayArrow, "play")
                 }

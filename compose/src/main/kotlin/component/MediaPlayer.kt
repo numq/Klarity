@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import component.video.VideoOverlay
 import component.video.VideoRenderer
+import interaction.ControlsInteraction
 import media.ImageSize
 import media.MediaSettings
 import player.PlaybackStatus
@@ -85,41 +86,43 @@ fun MediaPlayer(
 
     Box(modifier, contentAlignment = Alignment.Center) {
         media?.run {
-            val timeline: @Composable (MutableInteractionSource) -> Unit = { interactionSource ->
-                Timeline(
-                    timestampMillis = state.playbackTimestampMillis,
-                    durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                    seekTo = player::seekTo,
-                    interactionSource = interactionSource
-                )
-            }
-            val controls: @Composable (MutableInteractionSource) -> Unit = { interactionSource ->
-                Controls(
-                    timestampMillis = state.playbackTimestampMillis,
-                    durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                    state = state,
-                    status = status,
-                    play = player::play,
-                    pause = player::pause,
-                    stop = player::stop,
-                    toggleMute = player::toggleMute,
-                    changeVolume = player::changeVolume,
-                    volumeInteractionSource = interactionSource
-                )
-            }
             val audio: @Composable () -> Unit = {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    timeline(MutableInteractionSource())
-                    controls(MutableInteractionSource())
+                    Timeline(
+                        timestampMillis = state.playbackTimestampMillis,
+                        durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
+                        seekTo = player::seekTo
+                    )
+                    Controls(
+                        timestampMillis = state.playbackTimestampMillis,
+                        durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
+                        state = state,
+                        status = status,
+                        play = player::play,
+                        pause = player::pause,
+                        stop = player::stop,
+                        toggleMute = player::toggleMute,
+                        changeVolume = player::changeVolume
+                    )
                 }
             }
             val video: @Composable () -> Unit = {
 
                 val pixels by player.pixels.collectAsState()
+
+                val timelineInteractionSource = remember { MutableInteractionSource() }
+
+                val playInteractionSource = remember { MutableInteractionSource() }
+
+                val pauseInteractionSource = remember { MutableInteractionSource() }
+
+                val stopInteractionSource = remember { MutableInteractionSource() }
+
+                val muteInteractionSource = remember { MutableInteractionSource() }
 
                 val volumeInteractionSource = remember { MutableInteractionSource() }
 
@@ -127,7 +130,14 @@ fun MediaPlayer(
                     status = status,
                     toggleable = toggleableOverlay,
                     visibilityDelay = overlayVisibilityDelay,
-                    interactionSources = listOf(volumeInteractionSource),
+                    interactionSources = listOf(
+                        timelineInteractionSource,
+                        playInteractionSource,
+                        pauseInteractionSource,
+                        stopInteractionSource,
+                        muteInteractionSource,
+                        volumeInteractionSource
+                    ),
                     topPanel = {
                         Box(
                             Modifier.fillMaxWidth().background(Color.White.copy(alpha = .5f)).padding(8.dp),
@@ -141,8 +151,38 @@ fun MediaPlayer(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            timeline(volumeInteractionSource)
-                            controls(volumeInteractionSource)
+                            Timeline(
+                                timestampMillis = state.playbackTimestampMillis,
+                                durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
+                                seekTo = player::seekTo,
+                                interactionSource = timelineInteractionSource
+                            )
+                            Controls(
+                                timestampMillis = state.playbackTimestampMillis,
+                                durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
+                                state = state,
+                                status = status,
+                                play = player::play.also {
+                                    playInteractionSource.tryEmit(ControlsInteraction)
+                                },
+                                pause = player::pause.also {
+                                    pauseInteractionSource.tryEmit(ControlsInteraction)
+                                },
+                                stop = player::stop.also {
+                                    stopInteractionSource.tryEmit(ControlsInteraction)
+                                },
+                                toggleMute = player::toggleMute.also {
+                                    muteInteractionSource.tryEmit(ControlsInteraction)
+                                },
+                                changeVolume = player::changeVolume.also {
+                                    volumeInteractionSource.tryEmit(ControlsInteraction)
+                                },
+                                playInteractionSource = playInteractionSource,
+                                pauseInteractionSource = pauseInteractionSource,
+                                stopInteractionSource = stopInteractionSource,
+                                muteInteractionSource = muteInteractionSource,
+                                volumeInteractionSource = volumeInteractionSource
+                            )
                         }
                     }) {
                     VideoRenderer(

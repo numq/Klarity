@@ -126,29 +126,61 @@ interface PlayerController : AutoCloseable {
 
         override fun play() {
             when (status.value) {
-                PlaybackStatus.EMPTY, PlaybackStatus.BUFFERING, PlaybackStatus.PLAYING, PlaybackStatus.SEEKING -> return
-                else -> sendEvent(PlayerEvent.Play)
+                PlaybackStatus.EMPTY,
+                PlaybackStatus.BUFFERING,
+                PlaybackStatus.PLAYING,
+                PlaybackStatus.SEEKING,
+                -> return
+
+                PlaybackStatus.PAUSED,
+                PlaybackStatus.STOPPED,
+                PlaybackStatus.COMPLETED,
+                -> sendEvent(PlayerEvent.Play)
             }
         }
 
         override fun pause() {
             when (status.value) {
-                PlaybackStatus.EMPTY, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING, PlaybackStatus.COMPLETED -> return
-                else -> sendEvent(PlayerEvent.Pause)
+                PlaybackStatus.EMPTY,
+                PlaybackStatus.PAUSED,
+                PlaybackStatus.STOPPED,
+                PlaybackStatus.SEEKING,
+                PlaybackStatus.COMPLETED,
+                -> return
+
+                PlaybackStatus.BUFFERING,
+                PlaybackStatus.PLAYING,
+                -> sendEvent(PlayerEvent.Pause)
             }
         }
 
         override fun stop() {
             when (status.value) {
-                PlaybackStatus.EMPTY, PlaybackStatus.STOPPED, PlaybackStatus.SEEKING -> return
-                else -> sendEvent(PlayerEvent.Stop)
+                PlaybackStatus.EMPTY,
+                PlaybackStatus.STOPPED,
+                PlaybackStatus.SEEKING,
+                -> return
+
+                PlaybackStatus.BUFFERING,
+                PlaybackStatus.PLAYING,
+                PlaybackStatus.PAUSED,
+                PlaybackStatus.COMPLETED,
+                -> sendEvent(PlayerEvent.Stop)
             }
         }
 
         override fun seekTo(timestampMillis: Long) {
             when (status.value) {
-                PlaybackStatus.EMPTY, PlaybackStatus.SEEKING -> return
-                else -> sendEvent(PlayerEvent.SeekTo(timestampMillis))
+                PlaybackStatus.EMPTY,
+                PlaybackStatus.SEEKING,
+                -> return
+
+                PlaybackStatus.BUFFERING,
+                PlaybackStatus.PLAYING,
+                PlaybackStatus.PAUSED,
+                PlaybackStatus.STOPPED,
+                PlaybackStatus.COMPLETED,
+                -> sendEvent(PlayerEvent.SeekTo(timestampMillis))
             }
         }
 
@@ -294,7 +326,7 @@ interface PlayerController : AutoCloseable {
             events.onEach(::println).onEach { event ->
                 if (event !in arrayOf(PlayerEvent.Play, PlayerEvent.Pause)) pausedTimestampNanos = null
 
-                eventJob?.cancelAndJoin()
+                eventJob?.join()
                 eventJob = playerScope.launch {
                     when (event) {
                         is PlayerEvent.Load -> {
