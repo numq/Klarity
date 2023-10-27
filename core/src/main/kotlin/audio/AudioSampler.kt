@@ -24,6 +24,8 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
         .onFailure { println(it.localizedMessage) }
         .getOrNull() ?: throw AudioSamplerException.FailedToInteract(object {}.javaClass.enclosingMethod.name)
 
+    fun isNotEmpty() = sourceDataLine.run { available() > 0 }
+
     fun setMuted(state: Boolean) = interact {
         muteControl.value = state
     }
@@ -38,6 +40,10 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
 
     fun play(bytes: ByteArray) = interact {
         sourceDataLine.write(bytes, 0, bytes.size)
+    }
+
+    fun pause() = interact {
+        sourceDataLine.stop()
     }
 
     fun stop() = interact {

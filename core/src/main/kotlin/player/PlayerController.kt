@@ -54,7 +54,7 @@ interface PlayerController : AutoCloseable {
          * Event
          */
 
-        private val _events = Channel<PlayerEvent>(Channel.CONFLATED)
+        private val _events = Channel<PlayerEvent>(Channel.BUFFERED)
 
         private fun sendEvent(newEvent: PlayerEvent) {
             _events.trySend(newEvent)
@@ -81,7 +81,7 @@ interface PlayerController : AutoCloseable {
         private val _status = MutableStateFlow(PlaybackStatus.EMPTY)
 
         private fun setStatus(newStatus: PlaybackStatus) {
-            _status.value = newStatus
+            if (status.value != newStatus) _status.value = newStatus
         }
 
         override val status = _status.asStateFlow()
@@ -220,11 +220,12 @@ interface PlayerController : AutoCloseable {
         }
 
         private suspend fun startPlayback() {
-            playbackJob = playerScope.launch {
+            playbackJob = playerScope.launch playback@{
 
                 val hasFramesToPlay = AtomicBoolean(false)
 
                 var currentAudioFrameTimestampNanos: Long? = null
+                var currentVideoFrameTimestampNanos: Long? = null
 
                 audioSampler?.apply {
                     start()
@@ -234,12 +235,18 @@ interface PlayerController : AutoCloseable {
 
                 buffer?.apply {
 
-                    launch {
-                        startBuffering()
-                    }
+                    launch { startBuffering() }
 
                     when {
                         decoder?.hasVideo() == true && decoder?.hasAudio() == true -> {
+                            launch {
+                                while (isActive) {
+                                    if (hasFramesToPlay.get()) extractAudioFrame()?.let { frame ->
+                                        playAudio(frame)
+                                        currentAudioFrameTimestampNanos = frame.timestampNanos
+                                    }
+                                }
+                            }
                             launch {
                                 while (isActive) {
                                     if (hasFramesToPlay.get()) extractVideoFrame()?.let { frame ->
@@ -248,15 +255,17 @@ interface PlayerController : AutoCloseable {
                                                 ?.let { delay(it) }
                                         }
                                         renderVideo(frame)
+                                        currentVideoFrameTimestampNanos = frame.timestampNanos
                                     }
                                 }
                             }
-                            launch {
-                                while (isActive) {
-                                    if (hasFramesToPlay.get()) extractAudioFrame()?.let {
-                                        playAudio(it)
-                                        currentAudioFrameTimestampNanos = it.timestampNanos
-                                    }
+                        }
+
+                        decoder?.hasAudio() == true -> launch {
+                            while (isActive) {
+                                if (hasFramesToPlay.get()) extractAudioFrame()?.let { frame ->
+                                    playAudio(frame)
+                                    currentAudioFrameTimestampNanos = frame.timestampNanos
                                 }
                             }
                         }
@@ -268,16 +277,8 @@ interface PlayerController : AutoCloseable {
                                         (nextTimestampNanos - frame.timestampNanos).nanoseconds.takeIf { it.isPositive() }
                                             ?.let { delay(it) }
                                     }
+                                    currentVideoFrameTimestampNanos = frame.timestampNanos
                                     renderVideo(frame)
-                                }
-                            }
-                        }
-
-                        decoder?.hasAudio() == true -> launch {
-                            while (isActive) {
-                                if (hasFramesToPlay.get()) extractAudioFrame()?.let {
-                                    playAudio(it)
-                                    currentAudioFrameTimestampNanos = it.timestampNanos
                                 }
                             }
                         }
@@ -286,38 +287,49 @@ interface PlayerController : AutoCloseable {
                     while (isActive) {
                         when {
                             decoder?.hasAudio() == true && decoder?.hasVideo() == true -> hasFramesToPlay.set(
-                                audioBufferIsNotEmpty() && videoBufferIsNotEmpty()
+                                (audioBufferIsNotEmpty() || audioSampler?.isNotEmpty() == true) && videoBufferIsNotEmpty()
                             )
 
-                            decoder?.hasAudio() == true -> hasFramesToPlay.set(audioBufferIsNotEmpty())
+                            decoder?.hasAudio() == true -> hasFramesToPlay.set(audioBufferIsNotEmpty() || audioSampler?.isNotEmpty() == true)
                             decoder?.hasVideo() == true -> hasFramesToPlay.set(videoBufferIsNotEmpty())
                         }
                         if (hasFramesToPlay.get()) {
-                            if (status.value != PlaybackStatus.PLAYING) setStatus(PlaybackStatus.PLAYING)
-                            currentAudioFrameTimestampNanos?.run {
-                                updateState(state.value.copy(bufferTimestampMillis = maxOf(
-                                    lastAudioFrame.value?.timestampNanos ?: -1L,
-                                    lastVideoFrame.value?.timestampNanos ?: -1L
-                                ).takeIf { it >= 0L } ?: state.value.bufferTimestampMillis,
-                                    playbackTimestampMillis = nanoseconds.inWholeMilliseconds))
+                            setStatus(PlaybackStatus.PLAYING)
+                            (currentAudioFrameTimestampNanos ?: currentVideoFrameTimestampNanos)?.run {
+                                updateState(state.value.copy(playbackTimestampMillis = nanoseconds.inWholeMilliseconds))
                             }
                         } else {
-                            if (isCompleted) {
-                                joinAll()
-                                return@launch sendEvent(PlayerEvent.Complete)
-                            } else setStatus(PlaybackStatus.BUFFERING)
+                            if (isCompleted) return@playback sendEvent(PlayerEvent.Complete)
+                            setStatus(PlaybackStatus.BUFFERING)
                         }
-
+                        updateState(
+                            state.value.copy(
+                                bufferTimestampMillis = maxOf(
+                                    lastAudioFrame.value?.timestampNanos ?: -1L,
+                                    lastVideoFrame.value?.timestampNanos ?: -1L
+                                ).takeIf { it >= 0L } ?: state.value.bufferTimestampMillis
+                            )
+                        )
                         delay((1_000L / media.frameRate).milliseconds)
                     }
                 }
             }
         }
 
+        private suspend fun pausePlayback() {
+            playbackJob?.cancelAndJoin().also { println("Playback job has been cancelled") }
+
+            audioSampler?.pause()
+
+            decoder?.stop()
+        }
+
         private suspend fun stopPlayback() {
+            playbackJob?.cancelAndJoin().also { println("Playback job has been cancelled") }
+
             audioSampler?.stop()
 
-            playbackJob?.cancelAndJoin().also { println("Playback job has been cancelled") }
+            decoder?.stop()
 
             buffer?.flush()
         }
@@ -369,7 +381,7 @@ interface PlayerController : AutoCloseable {
                         }
 
                         is PlayerEvent.Pause -> {
-                            stopPlayback()
+                            pausePlayback()
                             pausedTimestampNanos =
                                 state.value.playbackTimestampMillis.milliseconds.inWholeNanoseconds.let { playbackTimestampNanos ->
                                     minOf(
@@ -382,7 +394,6 @@ interface PlayerController : AutoCloseable {
 
                         is PlayerEvent.Stop -> {
                             stopPlayback()
-                            decoder?.stop()
                             setStatus(PlaybackStatus.STOPPED)
                             updateState(
                                 state.value.copy(
@@ -394,8 +405,8 @@ interface PlayerController : AutoCloseable {
                         }
 
                         is PlayerEvent.Complete -> {
-                            decoder?.stop()
                             stopPlayback()
+
                             setStatus(PlaybackStatus.COMPLETED)
                         }
 
