@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import component.MediaPlayer
-import format.MediaFormat
 import extension.log
+import format.FileFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -64,31 +64,25 @@ fun MainScreen() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    inputUrl,
-                    setInputUrl,
-                    modifier = Modifier.padding(8.dp).weight(1f),
-                    leadingIcon = {
-                        IconButton(
-                            onClick = {
-                                setUploading(true)
-                            },
-                            modifier = Modifier.padding(4.dp)
-                        ) {
-                            Icon(Icons.Rounded.UploadFile, "upload file")
-                        }
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { setInputUrl("") },
-                            enabled = inputUrl.isNotBlank(),
-                            modifier = Modifier.padding(4.dp)
-                        ) {
-                            Icon(Icons.Rounded.Clear, "clear mediaUrl")
-                        }
-                    }, placeholder = {
-                        Text("Upload file or type media url here")
-                    })
+                OutlinedTextField(inputUrl, setInputUrl, modifier = Modifier.padding(8.dp).weight(1f), leadingIcon = {
+                    IconButton(
+                        onClick = {
+                            setUploading(true)
+                        }, modifier = Modifier.padding(4.dp)
+                    ) {
+                        Icon(Icons.Rounded.UploadFile, "upload file")
+                    }
+                }, trailingIcon = {
+                    IconButton(
+                        onClick = { setInputUrl("") },
+                        enabled = inputUrl.isNotBlank(),
+                        modifier = Modifier.padding(4.dp)
+                    ) {
+                        Icon(Icons.Rounded.Clear, "clear mediaUrl")
+                    }
+                }, placeholder = {
+                    Text("Upload file or type media url here")
+                })
                 IconToggleButton(playAudio, setPlayAudio) {
                     Icon(Icons.Rounded.Audiotrack, "audio", tint = if (playAudio) Color.Green else Color.Red)
                 }
@@ -99,9 +93,7 @@ fun MainScreen() {
         }
 
         if (uploading) UploadingDialog(
-            MediaFormat.audio
-                .plus(MediaFormat.video)
-                .map(String::lowercase)
+            FileFormat.media.map(String::lowercase)
         ) { url ->
             url.takeIf { it.isNotBlank() }?.let(setInputUrl)
             setUploading(false)
