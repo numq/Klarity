@@ -31,9 +31,8 @@ fun MediaPlayer(
     mediaUrl: String?,
     playAudio: Boolean,
     playVideo: Boolean,
-    loopCount: Int = 1,
+    loopCount: Int = 0,
     size: Pair<Width, Height>? = null,
-    frameRate: Double? = null,
     audioBufferSize: Int? = null,
     videoBufferSize: Int? = null,
     toggleableOverlay: Boolean = true,
@@ -51,14 +50,13 @@ fun MediaPlayer(
         onDispose { player.close() }
     }
 
-    val settings = remember(mediaUrl, playAudio, playVideo, size, frameRate) {
+    val settings = remember(mediaUrl, playAudio, playVideo, size) {
         mediaUrl?.takeIf { it.isNotBlank() }?.let { url ->
             MediaSettings(
                 mediaUrl = url,
                 hasAudio = playAudio,
                 hasVideo = playVideo,
-                imageSize = size?.let { (w, h) -> ImageSize(w, h) },
-                frameRate = frameRate
+                imageSize = size?.let { (w, h) -> ImageSize(w, h) }
             )
         }
     }
