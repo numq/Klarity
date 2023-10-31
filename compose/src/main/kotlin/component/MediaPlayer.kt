@@ -75,7 +75,7 @@ fun MediaPlayer(
 
     LaunchedEffect(status == PlaybackStatus.COMPLETED) {
         setPlaysLeft((playsLeft - 1).coerceAtLeast(0))
-        if (loopCount == 0 || playsLeft > 0) {
+        if (loopCount < 0 || playsLeft > 0) {
             player.play()
         }
     }
