@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import component.MediaPlayer
 import extension.log
-import format.FileFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -66,9 +65,8 @@ fun MainScreen() {
             ) {
                 OutlinedTextField(inputUrl, setInputUrl, modifier = Modifier.padding(8.dp).weight(1f), leadingIcon = {
                     IconButton(
-                        onClick = {
-                            setUploading(true)
-                        }, modifier = Modifier.padding(4.dp)
+                        onClick = { setUploading(true) },
+                        modifier = Modifier.padding(4.dp)
                     ) {
                         Icon(Icons.Rounded.UploadFile, "upload file")
                     }
@@ -92,9 +90,7 @@ fun MainScreen() {
             }
         }
 
-        if (uploading) UploadingDialog(
-            FileFormat.media.map(String::lowercase)
-        ) { url ->
+        if (uploading) UploadingDialog { url ->
             url.takeIf { it.isNotBlank() }?.let(setInputUrl)
             setUploading(false)
         }

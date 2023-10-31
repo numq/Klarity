@@ -20,7 +20,7 @@ interface PlayerController : AutoCloseable {
     val status: StateFlow<PlaybackStatus>
     val media: StateFlow<Media?>
     val pixels: StateFlow<ByteArray?>
-    fun load(settings: MediaSettings)
+    fun load(settings: MediaSettings, displayFirstFrame: Boolean = true)
     fun play()
     fun pause()
     fun stop()
@@ -122,7 +122,8 @@ interface PlayerController : AutoCloseable {
 
         private var pausedTimestampNanos: Long? = null
 
-        override fun load(settings: MediaSettings) = sendEvent(PlayerEvent.Load(settings))
+        override fun load(settings: MediaSettings, displayFirstFrame: Boolean) =
+            sendEvent(PlayerEvent.Load(settings, displayFirstFrame))
 
         override fun play() {
             when (status.value) {
@@ -302,14 +303,10 @@ interface PlayerController : AutoCloseable {
                             if (isCompleted) return@playback sendEvent(PlayerEvent.Complete)
                             setStatus(PlaybackStatus.BUFFERING)
                         }
-                        updateState(
-                            state.value.copy(
-                                bufferTimestampMillis = maxOf(
-                                    lastAudioFrame.value?.timestampNanos ?: -1L,
-                                    lastVideoFrame.value?.timestampNanos ?: -1L
-                                ).takeIf { it >= 0L } ?: state.value.bufferTimestampMillis
-                            )
-                        )
+                        updateState(state.value.copy(bufferTimestampMillis = maxOf(
+                            lastAudioFrame.value?.timestampNanos ?: -1L,
+                            lastVideoFrame.value?.timestampNanos ?: -1L
+                        ).takeIf { it >= 0L } ?: state.value.bufferTimestampMillis))
                         delay((1_000L / media.frameRate).milliseconds)
                     }
                 }
@@ -357,19 +354,20 @@ interface PlayerController : AutoCloseable {
                                     )
 
                                     hasAudio() -> BufferManager.createAudioOnlyBuffer(
-                                        this,
-                                        audioBufferCapacity = audioBufferCapacity
+                                        this, audioBufferCapacity = audioBufferCapacity
                                     )
 
                                     hasVideo() -> BufferManager.createVideoOnlyBuffer(
-                                        this,
-                                        videoBufferCapacity = videoBufferCapacity
+                                        this, videoBufferCapacity = videoBufferCapacity
                                     )
 
                                     else -> throw Exception("Unable to load media")
                                 }
                                 setMedia(media.also(::println))
                                 setStatus(PlaybackStatus.STOPPED)
+                                if (hasVideo() && event.displayFirstFrame) {
+                                    decoder?.firstVideoFrame()?.bytes?.let(::setPixels)
+                                }
                             }
                         }
 
@@ -397,8 +395,7 @@ interface PlayerController : AutoCloseable {
                             setStatus(PlaybackStatus.STOPPED)
                             updateState(
                                 state.value.copy(
-                                    bufferTimestampMillis = 0L,
-                                    playbackTimestampMillis = 0L
+                                    bufferTimestampMillis = 0L, playbackTimestampMillis = 0L
                                 )
                             )
                             setPixels(null)

@@ -2,7 +2,6 @@ package decoder
 
 import extension.pixelBytes
 import extension.sampleBytes
-import format.MediaFormat
 import media.ImageSize
 import media.Media
 import media.MediaSettings
@@ -23,6 +22,7 @@ interface Decoder : AutoCloseable {
     val media: Media
     fun hasVideo(): Boolean
     fun hasAudio(): Boolean
+    fun firstVideoFrame(): DecodedFrame.Video?
     fun nextFrame(): DecodedFrame?
     fun seekTo(timestampMicros: Long): Long
     fun stop()
@@ -44,12 +44,11 @@ interface Decoder : AutoCloseable {
         private val grabber = FFmpegFrameGrabber(settings.mediaUrl).apply {
             sampleFormat = avutil.AV_SAMPLE_FMT_S16
             pixelFormat = avutil.AV_PIX_FMT_BGRA
-            frameRate = minOf(settings.frameRate ?: frameRate, 60.0)
             settings.imageSize?.run {
                 imageWidth = width
                 imageHeight = height
             }
-        }.also(FFmpegFrameGrabber::start)
+        }.apply(FFmpegFrameGrabber::start)
 
         private fun resizeVideoFrame(frame: Frame) = OpenCVFrameConverter.ToMat().use { converter ->
             if (grabber.imageWidth != media.width || grabber.imageHeight != media.height) {
@@ -91,27 +90,35 @@ interface Decoder : AutoCloseable {
             Media(name, durationNanos, audioFormat, frameRate, width, height)
         }
 
-        override fun hasVideo() =
-            settings.hasVideo && grabber.format.lowercase() in MediaFormat.video && grabber.hasVideo()
+        override fun hasVideo() = settings.hasVideo && grabber.hasVideo() && grabber.videoFrameRate in (1.0..60.0)
 
-        override fun hasAudio() =
-            settings.hasAudio && grabber.format.lowercase() in MediaFormat.audio && grabber.hasAudio()
+        override fun hasAudio() = settings.hasAudio && grabber.hasAudio() && grabber.audioFrameRate > 0.0
+
+        override fun firstVideoFrame(): DecodedFrame.Video? = runCatching {
+            grabber.restart()
+            grabber.grabImage()?.let { frame ->
+                resizeVideoFrame(frame).pixelBytes()?.let { bytes ->
+                    frame.close()
+                    DecodedFrame.Video(0L, bytes)
+                }
+            }?.also { grabber.restart() }
+        }.onFailure { println(it.localizedMessage) }.getOrNull()
 
         override fun nextFrame(): DecodedFrame? = runCatching {
             val frame = grabber.grabFrame(
                 hasAudio(), hasVideo(), true, false
             ) ?: return DecodedFrame.End(media.durationNanos)
-            val timestamp = frame.timestamp.microseconds.inWholeNanoseconds
+            val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
             return when (frame.type) {
                 Frame.Type.AUDIO -> frame.sampleBytes()?.let { bytes ->
                     frame.close()
-                    return@let DecodedFrame.Audio(timestamp, bytes)
+                    return@let DecodedFrame.Audio(timestampNanos, bytes)
                 }
 
                 Frame.Type.VIDEO -> media.takeIf { it.width > 0 && it.height > 0 }?.run {
                     resizeVideoFrame(frame).pixelBytes()?.let { bytes ->
                         frame.close()
-                        return@let DecodedFrame.Video(timestamp, bytes)
+                        return@let DecodedFrame.Video(timestampNanos, bytes)
                     }
                 }
 

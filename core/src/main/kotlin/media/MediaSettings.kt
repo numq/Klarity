@@ -5,5 +5,4 @@ data class MediaSettings(
     val hasAudio: Boolean,
     val hasVideo: Boolean,
     val imageSize: ImageSize? = null,
-    val frameRate: Double? = null,
 )
