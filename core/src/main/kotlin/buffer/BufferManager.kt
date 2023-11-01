@@ -16,7 +16,7 @@ interface BufferManager {
     val videoBufferCapacity: Int
     val audioBufferCapacity: Int
     val media: Media
-    val isCompleted: Boolean
+    val completionTimestampMillis: Long
     val bufferTimestampMillis: StateFlow<Long>
     val playbackTimestampMillis: StateFlow<Long>
 
@@ -122,7 +122,7 @@ interface BufferManager {
 
         override val media = decoder.media
 
-        override var isCompleted = false
+        override var completionTimestampMillis = -1L
             private set
 
         override fun audioBufferIsNotEmpty() = audioBuffer?.isNotEmpty() == true
@@ -141,7 +141,7 @@ interface BufferManager {
 
         override suspend fun startBuffering() {
 
-            isCompleted = false
+            completionTimestampMillis = -1L
 
             while (currentCoroutineContext().isActive) {
                 decoder.apply {
@@ -166,18 +166,19 @@ interface BufferManager {
                             _bufferTimestampMillis.value = frame.timestampNanos.nanoseconds.inWholeMilliseconds
                             when (frame) {
                                 is DecodedFrame.Audio -> {
-                                    isCompleted = false
+                                    completionTimestampMillis = -1L
 
                                     audioBuffer?.add(frame).also { _lastAudioFrame.value = frame }
                                 }
 
                                 is DecodedFrame.Video -> {
-                                    isCompleted = false
+                                    completionTimestampMillis = -1L
 
                                     videoBuffer?.add(frame).also { _lastVideoFrame.value = frame }
                                 }
 
-                                is DecodedFrame.End -> isCompleted = true
+                                is DecodedFrame.End -> completionTimestampMillis =
+                                    frame.timestampNanos.nanoseconds.inWholeMilliseconds
                             }
                         }
                     }
