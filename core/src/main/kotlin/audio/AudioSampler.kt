@@ -1,7 +1,6 @@
 package audio
 
 import javax.sound.sampled.*
-import kotlin.math.log10
 
 class AudioSampler private constructor(private val sourceDataLine: SourceDataLine) : AutoCloseable {
 
@@ -12,26 +11,32 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
     companion object {
         private const val S16LE_FRAME_SIZE = 4096
 
-        fun create(audioFormat: AudioFormat?): AudioSampler {
-            val info = DataLine.Info(SourceDataLine::class.java, audioFormat)
-            return (AudioSystem.getLine(info) as? SourceDataLine)?.apply {
+        fun create(audioFormat: AudioFormat?) = DataLine.Info(SourceDataLine::class.java, audioFormat).let { info ->
+            (AudioSystem.getLine(info) as? SourceDataLine)?.apply {
                 open(audioFormat, S16LE_FRAME_SIZE)
-            }?.let(::AudioSampler) ?: throw AudioSamplerException.FailedToCreate
+            }?.let(::AudioSampler)
         }
     }
 
-    private fun interact(action: () -> Unit) = runCatching { action() }
-        .onFailure { println(it.localizedMessage) }
-        .getOrNull() ?: throw AudioSamplerException.FailedToInteract(object {}.javaClass.enclosingMethod.name)
+    private fun <T> interact(action: () -> T) = runCatching { action() }.onFailure(::println).getOrNull()
 
-    fun isNotEmpty() = sourceDataLine.run { available() > 0 }
+    fun isEmpty() = sourceDataLine.run { available() == 0 }
 
     fun setMuted(state: Boolean) = interact {
         muteControl.value = state
+        muteControl.value
     }
 
     fun setVolume(value: Double) = interact {
-        if (value in 0.0..1.0) volumeControl.value = (20.0 * log10(value)).toFloat()
+        if (value in 0.0..1.0) {
+            val min = volumeControl.minimum
+            val max = volumeControl.maximum
+            val range = max - min
+            val volume = min + value * range
+            volumeControl.value = volume.toFloat()
+            return@interact if (range == 0f) 0.0 else ((volumeControl.value - min) / range).toDouble()
+        }
+        null
     }
 
     fun start() = interact {
@@ -51,7 +56,7 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
         sourceDataLine.flush()
     }
 
-    override fun close() = interact {
+    override fun close() {
         sourceDataLine.drain()
         sourceDataLine.close()
     }
