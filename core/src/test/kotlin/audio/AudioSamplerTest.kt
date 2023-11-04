@@ -1,85 +1,86 @@
 package audio
 
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertThrows
+import java.text.DecimalFormat
 import javax.sound.sampled.AudioFormat
+import kotlin.random.Random
 
 class AudioSamplerTest {
 
-    @Test
-    fun `instance creation success`() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
-        var audioSampler: AudioSampler?
+    companion object {
+        @Test
+        fun `valid format instance creation`() {
+            val audioFormat = AudioFormat(44100F, 8, 2, true, false)
 
-        assertDoesNotThrow {
-            audioSampler = AudioSampler.create(audioFormat)
+            assertNotNull(AudioSampler.create(audioFormat))
+        }
 
-            assertNotNull(audioSampler)
+        @Test
+        fun `invalid format null creation`() {
+            val audioFormat = AudioFormat(0F, 0, 0, true, false)
+
+            assertEquals(null, AudioSampler.create(audioFormat)?.also(AudioSampler::close))
         }
     }
 
-    @Test
-    fun `instance creation fail`() {
-        val audioFormat = AudioFormat(0F, 0, 0, true, false)
+    private var audioSampler: AudioSampler? = null
 
-        assertThrows<Exception> {
-            AudioSampler.create(audioFormat)
+    @BeforeEach
+    fun beforeEach() {
+        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
+        audioSampler = AudioSampler.create(audioFormat)
+    }
+
+    @AfterEach
+    fun afterEach() {
+        audioSampler?.close()
+    }
+
+    @Test
+    fun `playback cycle`() {
+        audioSampler!!.apply {
+            assertNotNull(start())
+
+            assertNotNull(play(byteArrayOf()))
+
+            assertNotNull(stop())
         }
     }
 
     @Test
     fun `mute toggling`() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
-
-        AudioSampler.create(audioFormat).use { sampler ->
-            sampler.apply {
-                start()
-
-                assertDoesNotThrow {
-                    setMuted(true)
-                    setMuted(false)
-                    setMuted(false)
-                    setMuted(true)
+        audioSampler!!.apply {
+            assertDoesNotThrow {
+                repeat(5) {
+                    val newState = arrayOf(true, false).random()
+                    assertEquals(newState, setMuted(newState))
                 }
-
-                stop()
             }
         }
     }
 
     @Test
     fun `volume changing`() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
-        AudioSampler.create(audioFormat).use { sampler ->
-            sampler.apply {
-                start()
+        audioSampler!!.apply {
 
-                assertDoesNotThrow {
-                    setVolume(.0)
-                    setVolume(.5)
-                    setVolume(.33333)
-                    setVolume(1.0)
-                }
+            assertEquals(null, setVolume(-1.0))
 
-                stop()
-            }
-        }
-    }
+            val decimalFormat = DecimalFormat(buildString {
+                append("#.")
+                repeat(2) { append("#") }
+            })
 
-    @Test
-    fun `playback cycle`() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
-        AudioSampler.create(audioFormat).use { sampler ->
-            sampler.apply {
-                start()
-
-                assertDoesNotThrow {
-                    play(byteArrayOf())
-                }
-
-                stop()
+            repeat(10) {
+                val newVolume = Random.nextDouble(0.0, 1.0)
+                assertEquals(
+                    decimalFormat.format(newVolume),
+                    decimalFormat.format(setVolume(newVolume))
+                )
             }
         }
     }
