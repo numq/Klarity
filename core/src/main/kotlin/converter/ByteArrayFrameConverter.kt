@@ -31,7 +31,7 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
 
                 if (audioChannels <= 0 || sampleRate <= 0) return null
 
-                val dataSize = capacity() * audioChannels
+                val dataSize = remaining() * audioChannels
 
                 val bytes = ByteArray(dataSize)
 
