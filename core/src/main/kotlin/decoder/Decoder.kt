@@ -1,16 +1,14 @@
 package decoder
 
-import extension.pixelBytes
-import extension.sampleBytes
+import converter.ByteArrayFrameConverter
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import media.ImageSize
 import media.Media
-import media.MediaSettings
+import org.bytedeco.ffmpeg.global.avcodec
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacpp.Loader
-import org.bytedeco.javacv.FFmpegFrameGrabber
-import org.bytedeco.javacv.FFmpegLogCallback
-import org.bytedeco.javacv.Frame
-import org.bytedeco.javacv.OpenCVFrameConverter
+import org.bytedeco.javacv.*
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
@@ -20,20 +18,19 @@ import kotlin.time.Duration.Companion.microseconds
 interface Decoder : AutoCloseable {
 
     val media: Media
-    fun hasVideo(): Boolean
-    fun hasAudio(): Boolean
-    fun firstVideoFrame(): DecodedFrame.Video?
-    fun nextFrame(): DecodedFrame?
-    fun seekTo(timestampMicros: Long): Long
-    fun stop()
+    fun timestampMicros(): Long
+    suspend fun snapshot(): DecodedFrame.Video?
+    suspend fun nextFrame(): DecodedFrame?
+    suspend fun seekTo(timestampMicros: Long): Long
+    suspend fun restart()
 
     companion object {
-        fun create(settings: MediaSettings): Decoder = runCatching {
-            Implementation(settings)
-        }.getOrElse { throw DecoderException.UnableToCreate }
+        fun create(mediaUrl: String): Decoder? = runCatching {
+            Implementation(mediaUrl)
+        }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
 
-    class Implementation(private val settings: MediaSettings) : Decoder {
+    class Implementation(private val mediaUrl: String) : Decoder {
 
         init {
             Loader.load(org.bytedeco.opencv.opencv_java::class.java)
@@ -41,104 +38,129 @@ interface Decoder : AutoCloseable {
             FFmpegLogCallback.set()
         }
 
-        private val grabber = FFmpegFrameGrabber(settings.mediaUrl).apply {
-            sampleFormat = avutil.AV_SAMPLE_FMT_S16
-            pixelFormat = avutil.AV_PIX_FMT_BGRA
-            settings.imageSize?.run {
-                imageWidth = width
-                imageHeight = height
-            }
-        }.apply(FFmpegFrameGrabber::start)
+        private val mutex = Mutex()
 
-        private fun resizeVideoFrame(frame: Frame) = OpenCVFrameConverter.ToMat().use { converter ->
-            if (grabber.imageWidth != media.width || grabber.imageHeight != media.height) {
-                val output = Mat()
-                Imgproc.resize(
-                    converter.convertToOrgOpenCvCoreMat(frame),
-                    output,
-                    Size(media.width.toDouble(), media.height.toDouble())
-                )
-                return@use converter.convert(output)
+        private val openCvFrameConverter by lazy { OpenCVFrameConverter.ToMat() }
+
+        private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
+
+        private val mediaGrabber = FFmpegFrameGrabber(mediaUrl).apply {
+            audioCodec = avcodec.AV_CODEC_ID_AAC
+            sampleMode = FrameGrabber.SampleMode.SHORT
+            sampleFormat = avutil.AV_SAMPLE_FMT_S16
+
+            videoCodec = avcodec.AV_CODEC_ID_H264
+            imageMode = FrameGrabber.ImageMode.COLOR
+            pixelFormat = avutil.AV_PIX_FMT_BGRA
+
+            setOption("preset", "veryfast")
+        }.also(FFmpegFrameGrabber::start)
+
+        private val snapshotGrabber = FFmpegFrameGrabber(mediaUrl).apply {
+            audioCodec = avcodec.AV_CODEC_ID_AAC
+            sampleMode = FrameGrabber.SampleMode.SHORT
+            sampleFormat = avutil.AV_SAMPLE_FMT_S16
+
+            videoCodec = avcodec.AV_CODEC_ID_H264
+            imageMode = FrameGrabber.ImageMode.COLOR
+            pixelFormat = avutil.AV_PIX_FMT_BGRA
+
+            setOption("preset", "veryfast")
+        }.also(FFmpegFrameGrabber::start)
+
+        private fun resizeVideoFrame(frame: Frame) = runCatching {
+            media.size?.let { (width, height) ->
+                if (mediaGrabber.imageWidth != width || mediaGrabber.imageHeight != height) {
+                    val output = Mat()
+                    Imgproc.resize(
+                        openCvFrameConverter.convertToOrgOpenCvCoreMat(frame),
+                        output,
+                        Size(width.toDouble(), height.toDouble())
+                    )
+                    return@runCatching openCvFrameConverter.convert(output)
+                }
             }
             frame
-        }
+        }.onFailure { println(it.localizedMessage) }.getOrNull()
 
-        override val media = grabber.run {
-            val name = settings.mediaUrl
-
+        override val media = mediaGrabber.run {
             val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
 
-            val audioFormat = if (this@Implementation.hasAudio()) AudioFormat(
+            val audioFormat = if (hasAudio()) AudioFormat(
                 sampleRate.toFloat(), avutil.av_get_bytes_per_sample(sampleFormat) * 8, audioChannels, true, false
             ) else null
 
-            val frameRate = when {
-                this@Implementation.hasAudio() && this@Implementation.hasVideo() -> frameRate
-                this@Implementation.hasVideo() -> videoFrameRate
-                this@Implementation.hasAudio() -> audioFrameRate
-                else -> 0.0
-            }
-
-            val (width, height) = if (this@Implementation.hasVideo()) {
-                val size: ImageSize = if (grabber.imageWidth > 1920 || grabber.imageHeight > 1080) {
-                    ImageSize((1920 * grabber.aspectRatio).toInt(), (1080 * grabber.aspectRatio).toInt())
-                } else ImageSize(grabber.imageWidth, grabber.imageHeight)
+            val size = if (hasVideo()) {
+                val size: ImageSize = if (imageWidth > 1920 || imageHeight > 1080) {
+                    ImageSize((1920 * aspectRatio).toInt(), (1080 * aspectRatio).toInt())
+                } else ImageSize(imageWidth, imageHeight)
 
                 size.width to size.height
-            } else 0 to 0
+            } else null
 
-            Media(name, durationNanos, audioFormat, frameRate, width, height)
+            Media(
+                name = mediaUrl,
+                durationNanos = durationNanos,
+                audioFrameRate = audioFrameRate,
+                videoFrameRate = videoFrameRate,
+                audioFormat = audioFormat,
+                size = size
+            )
         }
 
-        override fun hasVideo() = settings.hasVideo && grabber.hasVideo() && grabber.videoFrameRate in (1.0..60.0)
+        override fun timestampMicros() = mediaGrabber.timestamp
 
-        override fun hasAudio() = settings.hasAudio && grabber.hasAudio() && grabber.audioFrameRate > 0.0
-
-        override fun firstVideoFrame(): DecodedFrame.Video? = runCatching {
-            grabber.restart()
-            grabber.grabImage()?.let { frame ->
-                resizeVideoFrame(frame).pixelBytes()?.let { bytes ->
-                    frame.close()
-                    DecodedFrame.Video(0L, bytes)
-                }
-            }?.also { grabber.restart() }
-        }.onFailure { println(it.localizedMessage) }.getOrNull()
-
-        override fun nextFrame(): DecodedFrame? = runCatching {
-            val frame = grabber.grabFrame(
-                hasAudio(), hasVideo(), true, false
-            ) ?: return DecodedFrame.End(media.durationNanos)
-            val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
-            return when (frame.type) {
-                Frame.Type.AUDIO -> frame.sampleBytes()?.let { bytes ->
-                    frame.close()
-                    return@let DecodedFrame.Audio(timestampNanos, bytes)
-                }
-
-                Frame.Type.VIDEO -> media.takeIf { it.width > 0 && it.height > 0 }?.run {
-                    resizeVideoFrame(frame).pixelBytes()?.let { bytes ->
-                        frame.close()
-                        return@let DecodedFrame.Video(timestampNanos, bytes)
+        override suspend fun snapshot(): DecodedFrame.Video? = snapshotGrabber.runCatching {
+            mutex.withLock {
+                val initialTimestampMicros = timestamp
+                val frame = grabImage()?.use { frame ->
+                    ByteArrayFrameConverter().convert(frame)?.let { bytes ->
+                        DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
                     }
                 }
-
-                else -> null
+                timestamp = initialTimestampMicros
+                frame
             }
         }.onFailure { println(it.localizedMessage) }.getOrNull()
 
-        override fun seekTo(timestampMicros: Long): Long {
-            grabber.setTimestamp(timestampMicros, true)
-            return grabber.timestamp
+        override suspend fun nextFrame(): DecodedFrame? = mediaGrabber.runCatching {
+            mutex.withLock {
+                when (val grabbedFrame = grabFrame(
+                    hasAudio(), hasVideo(), true, false
+                )) {
+                    null -> return DecodedFrame.End(media.durationNanos)
+                    else -> grabbedFrame.use { frame ->
+                        val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
+                        when (frame.type) {
+                            Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)?.let { bytes ->
+                                DecodedFrame.Audio(timestampNanos, bytes)
+                            }
+
+                            Frame.Type.VIDEO -> resizeVideoFrame(frame)
+                                ?.let(byteArrayFrameConverter::convert)
+                                ?.let { bytes ->
+                                    DecodedFrame.Video(timestampNanos, bytes)
+                                }
+
+                            else -> null
+                        }
+                    }
+                }
+            }
+        }.onFailure { println(it.localizedMessage) }.getOrNull()
+
+        override suspend fun seekTo(timestampMicros: Long) = mutex.withLock {
+            mediaGrabber.setTimestamp(timestampMicros, true)
+            mediaGrabber.timestamp
         }
 
-        override fun stop() {
-            grabber.restart()
+        override suspend fun restart() = mutex.withLock {
+            mediaGrabber.restart()
         }
 
         override fun close() {
-            grabber.stop()
-            grabber.close()
-            grabber.release()
+            snapshotGrabber.close()
+            mediaGrabber.close()
         }
     }
 }
