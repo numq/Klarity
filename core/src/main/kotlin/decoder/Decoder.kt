@@ -52,20 +52,6 @@ interface Decoder : AutoCloseable {
             videoCodec = avcodec.AV_CODEC_ID_H264
             imageMode = FrameGrabber.ImageMode.COLOR
             pixelFormat = avutil.AV_PIX_FMT_BGRA
-
-            setOption("preset", "veryfast")
-        }.also(FFmpegFrameGrabber::start)
-
-        private val snapshotGrabber = FFmpegFrameGrabber(mediaUrl).apply {
-            audioCodec = avcodec.AV_CODEC_ID_AAC
-            sampleMode = FrameGrabber.SampleMode.SHORT
-            sampleFormat = avutil.AV_SAMPLE_FMT_S16
-
-            videoCodec = avcodec.AV_CODEC_ID_H264
-            imageMode = FrameGrabber.ImageMode.COLOR
-            pixelFormat = avutil.AV_PIX_FMT_BGRA
-
-            setOption("preset", "veryfast")
         }.also(FFmpegFrameGrabber::start)
 
         private fun resizeVideoFrame(frame: Frame) = runCatching {
@@ -110,7 +96,7 @@ interface Decoder : AutoCloseable {
 
         override fun timestampMicros() = mediaGrabber.timestamp
 
-        override suspend fun snapshot(): DecodedFrame.Video? = snapshotGrabber.runCatching {
+        override suspend fun snapshot(): DecodedFrame.Video? = mediaGrabber.runCatching {
             mutex.withLock {
                 val initialTimestampMicros = timestamp
                 val frame = grabImage()?.use { frame ->
@@ -136,8 +122,7 @@ interface Decoder : AutoCloseable {
                                 DecodedFrame.Audio(timestampNanos, bytes)
                             }
 
-                            Frame.Type.VIDEO -> resizeVideoFrame(frame)
-                                ?.let(byteArrayFrameConverter::convert)
+                            Frame.Type.VIDEO -> resizeVideoFrame(frame)?.let(byteArrayFrameConverter::convert)
                                 ?.let { bytes ->
                                     DecodedFrame.Video(timestampNanos, bytes)
                                 }
@@ -159,7 +144,6 @@ interface Decoder : AutoCloseable {
         }
 
         override fun close() {
-            snapshotGrabber.close()
             mediaGrabber.close()
         }
     }
