@@ -20,11 +20,8 @@ class AudioSampler private constructor(private val sourceDataLine: SourceDataLin
     companion object {
         fun create(audioFormat: AudioFormat) = runCatching {
             val info = DataLine.Info(SourceDataLine::class.java, audioFormat)
-
-            val bufferSizeBytes = with(audioFormat) { 0.01 * frameRate * frameSize }.toInt()
-
             (AudioSystem.getLine(info) as? SourceDataLine)?.apply {
-                open(audioFormat, bufferSizeBytes)
+                open(audioFormat, 8192)
             }?.let(::AudioSampler)
         }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
