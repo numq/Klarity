@@ -1,12 +1,12 @@
 package audio
 
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
-import java.text.DecimalFormat
 import javax.sound.sampled.AudioFormat
 import kotlin.random.Random
 
@@ -42,7 +42,7 @@ class AudioSamplerTest {
     }
 
     @Test
-    fun `playback cycle`() {
+    fun `playback cycle`() = runTest {
         audioSampler!!.apply {
             assertNotNull(start())
 
@@ -53,7 +53,7 @@ class AudioSamplerTest {
     }
 
     @Test
-    fun `mute toggling`() {
+    fun `mute toggling`() = runTest {
         audioSampler!!.apply {
             assertDoesNotThrow {
                 repeat(5) {
@@ -65,21 +65,16 @@ class AudioSamplerTest {
     }
 
     @Test
-    fun `volume changing`() {
+    fun `volume changing`() = runTest {
         audioSampler!!.apply {
 
-            assertEquals(null, setVolume(-1.0))
-
-            val decimalFormat = DecimalFormat(buildString {
-                append("#.")
-                repeat(2) { append("#") }
-            })
+            assertEquals(null, setVolume(-1.0f))
 
             repeat(10) {
-                val newVolume = Random.nextDouble(0.0, 1.0)
+                val newVolume = Random.nextDouble(0.0, 1.0).toFloat()
                 assertEquals(
-                    decimalFormat.format(newVolume),
-                    decimalFormat.format(setVolume(newVolume))
+                    newVolume,
+                    setVolume(newVolume)
                 )
             }
         }
