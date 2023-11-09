@@ -3,10 +3,11 @@ package media
 import javax.sound.sampled.AudioFormat
 
 data class Media(
-    val name: String,
+    val url: String,
+    val name: String?,
     val durationNanos: Long,
+    val audioFrameRate: Double = 0.0,
+    val videoFrameRate: Double = 0.0,
     val audioFormat: AudioFormat? = null,
-    val frameRate: Double = 0.0,
-    val width: Int = 0,
-    val height: Int = 0,
+    val size: Pair<Int, Int>? = null,
 )
