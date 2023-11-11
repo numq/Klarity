@@ -1,104 +1,137 @@
 package buffer
 
+import decoder.DecodedFrame
 import decoder.Decoder
 import io.mockk.*
+import kotlinx.coroutines.test.runTest
 import media.Media
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import javax.sound.sampled.AudioFormat
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class BufferManagerTest {
 
-    private val decoder = mockk<Decoder>()
+    companion object {
 
-    @BeforeEach
-    fun beforeEach() {
-        every {
-            decoder.media
-        } returns Media("name", 1_000L)
+        private val decoder = mockk<Decoder>()
 
-        mockkObject(Decoder) {
-            every {
-                Decoder.create(any())
-            } returns decoder
+        @Test
+        fun `static creation`() {
+            assertNotNull(
+                BufferManager.create(
+                    decoder = decoder, bufferDurationSeconds = 10
+                )
+            )
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun afterAll() {
+            unmockkAll()
         }
     }
 
+    private val decoder = mockkClass(Decoder::class)
+
     @AfterEach
     fun afterEach() {
-        unmockkAll()
         clearAllMocks()
     }
 
     @Test
-    fun `return error if there is no audio and video`() {
-        every {
-            decoder.hasAudio()
-        } returns false
+    fun `buffering frames`() = runTest {
+
+        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
+
+        val audioFrameRate = 4.0
+        val videoFrameRate = 2.0
+
+        val durationSeconds = 2
+
+        val durationNanos = durationSeconds.seconds.inWholeNanoseconds
 
         every {
-            decoder.hasVideo()
-        } returns false
-
-        assertThrows<BufferException.FailedToCreate> {
-            BufferManager.createAudioVideoBuffer(decoder, 0, 0)
-        }
-    }
-
-    @Test
-    fun `audio video buffer creation`() {
-        every {
-            decoder.hasAudio()
-        } returns true
-
-        every {
-            decoder.hasVideo()
-        } returns true
-
-        val audioBufferCapacity = (1..100).random()
-        val videoBufferCapacity = (1..100).random()
-
-        val buffer = BufferManager.createAudioVideoBuffer(
-            decoder, audioBufferCapacity = audioBufferCapacity, videoBufferCapacity = videoBufferCapacity
+            decoder.media
+        } returns Media(
+            url = "url",
+            name = "name",
+            durationNanos = durationNanos,
+            audioFormat = audioFormat,
+            audioFrameRate = audioFrameRate,
+            videoFrameRate = videoFrameRate
         )
 
-        assertEquals(audioBufferCapacity, buffer.audioBufferCapacity)
-        assertEquals(videoBufferCapacity, buffer.videoBufferCapacity)
-    }
+        BufferManager.Implementation(
+            decoder = decoder, bufferDurationSeconds = 2
+        ).run {
+            val inputFrames = buildList {
+                repeat(durationSeconds) { second ->
+                    repeat(audioFrameRate.toInt()) { frameNumber ->
+                        add(
+                            DecodedFrame.Audio(
+                                ((1_000L / audioFrameRate) * frameNumber + (second * 1_000L)).milliseconds.inWholeNanoseconds,
+                                byteArrayOf()
+                            )
+                        )
+                    }
+                    repeat(videoFrameRate.toInt()) { frameNumber ->
+                        add(
+                            DecodedFrame.Video(
+                                ((1_000L / videoFrameRate) * frameNumber + (second * 1_000L)).milliseconds.inWholeNanoseconds,
+                                byteArrayOf()
+                            )
+                        )
+                    }
+                }
+                add(DecodedFrame.End(durationNanos))
+            }
 
-    @Test
-    fun `audio buffer creation`() {
-        every {
-            decoder.hasAudio()
-        } returns true
+            coEvery {
+                decoder.nextFrame()
+            } returnsMany inputFrames
 
-        every {
-            decoder.hasVideo()
-        } returns false
+            val bufferedTimestamps = mutableListOf<Long?>()
 
-        val audioBufferCapacity = 10
-        val buffer = BufferManager.createAudioOnlyBuffer(decoder, audioBufferCapacity)
+            val outputFrames = mutableListOf<DecodedFrame>()
 
-        assertEquals(0, buffer.videoBufferCapacity)
-        assertEquals(audioBufferCapacity, buffer.audioBufferCapacity)
-    }
+            startBuffering().collect { bufferTimestampNanos ->
+                bufferedTimestamps.add(bufferTimestampNanos)
+            }
 
-    @Test
-    fun `video buffer creation`() {
-        every {
-            decoder.hasAudio()
-        } returns false
+            while (true) {
+                extractAudioFrame()?.let(outputFrames::add) ?: break
+            }
 
-        every {
-            decoder.hasVideo()
-        } returns true
+            while (true) {
+                extractVideoFrame()?.let(outputFrames::add) ?: break
+            }
 
-        val videoBufferCapacity = 10
-        val buffer = BufferManager.createVideoOnlyBuffer(decoder, videoBufferCapacity)
+            assertEquals(
+                inputFrames.map { it.timestampNanos }, bufferedTimestamps
+            )
 
-        assertEquals(videoBufferCapacity, buffer.videoBufferCapacity)
-        assertEquals(0, buffer.audioBufferCapacity)
+            assertEquals(inputFrames, outputFrames.filterNot { it is DecodedFrame.End })
+
+            assertFalse(bufferIsEmpty())
+
+            assertEquals(
+                audioBufferCapacity, outputFrames.filterIsInstance<DecodedFrame.Audio>().size
+            )
+
+            assertEquals(
+                videoBufferCapacity, outputFrames.filterIsInstance<DecodedFrame.Video>().size
+            )
+
+            flush()
+
+            assertTrue(audioBufferSize() == 0)
+            assertTrue(videoBufferSize() == 0)
+
+            assertTrue(bufferIsEmpty())
+        }
     }
 }
