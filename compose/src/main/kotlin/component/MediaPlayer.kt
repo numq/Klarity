@@ -1,200 +1,182 @@
 package component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.PauseCircle
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import component.video.VideoOverlay
 import component.video.VideoRenderer
-import interaction.ControlsInteraction
-import media.ImageSize
-import media.MediaSettings
+import extension.formatTimestamp
+import kotlinx.coroutines.launch
 import player.PlaybackStatus
 import player.PlayerController
 import player.PlayerState
 import kotlin.time.Duration.Companion.nanoseconds
 
-typealias Width = Int
-typealias Height = Int
-
 @Composable
 fun MediaPlayer(
     mediaUrl: String?,
-    playAudio: Boolean,
-    playVideo: Boolean,
-    loopCount: Int = 0,
-    size: Pair<Width, Height>? = null,
-    audioBufferSize: Int? = null,
-    videoBufferSize: Int? = null,
-    toggleableOverlay: Boolean = true,
-    overlayVisibilityDelay: Long = 2_000L,
+    loopCount: Int,
+    blurredBackground: Boolean,
+    showTimestamp: Boolean = true,
+    showVolume: Boolean = true,
+    bufferDurationSeconds: Int? = null,
     modifier: Modifier = Modifier,
-    placeholder: (@Composable () -> Unit)? = null,
+    onError: (Exception) -> Unit = {},
     onState: (PlayerState) -> Unit = {},
     onStatus: (PlaybackStatus) -> Unit = {},
+    placeholder: @Composable () -> Unit = {},
 ) {
-    val player = remember(audioBufferSize, videoBufferSize) {
-        PlayerController.create(audioBufferSize, videoBufferSize)
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val player = remember(bufferDurationSeconds) {
+        PlayerController.create(bufferDurationSeconds)
     }
 
     DisposableEffect(Unit) {
         onDispose { player.close() }
     }
 
-    val settings = remember(mediaUrl, playAudio, playVideo, size) {
+    val error by player.error.collectAsState(null)
+    val state by player.state.collectAsState()
+    val status by player.status.collectAsState()
+
+    LaunchedEffect(error) { error?.let { onError(it) } }
+    LaunchedEffect(state) { onState(state) }
+    LaunchedEffect(status) { onStatus(status) }
+
+    LaunchedEffect(mediaUrl) {
         mediaUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            MediaSettings(
+            player.load(
                 mediaUrl = url,
-                hasAudio = playAudio,
-                hasVideo = playVideo,
-                imageSize = size?.let { (w, h) -> ImageSize(w, h) }
+                loopCount = loopCount
             )
         }
     }
 
-    LaunchedEffect(settings) {
-        settings?.let(player::load)
-    }
+    state.media?.run {
 
-    val state by player.state.collectAsState().apply { onState(value) }
+        val (contentOffset, setContentOffset) = remember { mutableStateOf(DpOffset.Zero) }
 
-    val status by player.status.collectAsState().apply { onStatus(value) }
+        val (contentSize, setContentSize) = remember { mutableStateOf(DpSize.Zero) }
 
-    val (playsLeft, setPlaysLeft) = remember {
-        mutableStateOf(loopCount)
-    }
+        val (overlayVisible, setOverlayVisible) = remember { mutableStateOf(true) }
 
-    LaunchedEffect(status == PlaybackStatus.COMPLETED) {
-        setPlaysLeft((playsLeft - 1).coerceAtLeast(0))
-        if (loopCount < 0 || playsLeft > 0) {
-            player.play()
-        }
-    }
+        Box(modifier.clickable { setOverlayVisible(!overlayVisible) }) {
+            VideoRenderer(
+                media = this@run,
+                videoFrame = player.videoFrame.collectAsState().value,
+                blurredBackground = blurredBackground,
+                onContentOffset = setContentOffset,
+                onContentSize = setContentSize,
+                modifier = Modifier.fillMaxSize()
+            )
 
-    val media by player.media.collectAsState()
-
-    Box(modifier, contentAlignment = Alignment.Center) {
-        media?.run {
-            val audio: @Composable () -> Unit = {
+            AnimatedVisibility(
+                overlayVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .size(contentSize.width, contentSize.height)
+                    .offset(contentOffset.x, contentOffset.y)
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Timeline(
-                        timestampMillis = state.playbackTimestampMillis,
-                        durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                        seekTo = player::seekTo
-                    )
-                    Controls(
-                        timestampMillis = state.playbackTimestampMillis,
-                        durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                        state = state,
-                        status = status,
-                        play = player::play,
-                        pause = player::pause,
-                        stop = player::stop,
-                        toggleMute = player::toggleMute,
-                        changeVolume = player::changeVolume
-                    )
-                }
-            }
-            val video: @Composable () -> Unit = {
-
-                val pixels by player.pixels.collectAsState()
-
-                val timelineInteractionSource = remember { MutableInteractionSource() }
-
-                val playInteractionSource = remember { MutableInteractionSource() }
-
-                val pauseInteractionSource = remember { MutableInteractionSource() }
-
-                val stopInteractionSource = remember { MutableInteractionSource() }
-
-                val muteInteractionSource = remember { MutableInteractionSource() }
-
-                val volumeInteractionSource = remember { MutableInteractionSource() }
-
-                VideoOverlay(
-                    status = status,
-                    toggleable = toggleableOverlay,
-                    visibilityDelay = overlayVisibilityDelay,
-                    interactionSources = listOf(
-                        timelineInteractionSource,
-                        playInteractionSource,
-                        pauseInteractionSource,
-                        stopInteractionSource,
-                        muteInteractionSource,
-                        volumeInteractionSource
-                    ),
-                    topPanel = {
-                        Box(
-                            Modifier.fillMaxWidth().background(Color.White.copy(alpha = .5f)).padding(8.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Text(name)
-                        }
-                    }, bottomPanel = {
-                        Column(
-                            Modifier.fillMaxWidth().background(Color.White.copy(alpha = .5f)).padding(4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Timeline(
-                                timestampMillis = state.playbackTimestampMillis,
-                                durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                                seekTo = player::seekTo,
-                                interactionSource = timelineInteractionSource
-                            )
-                            Controls(
-                                timestampMillis = state.playbackTimestampMillis,
-                                durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
-                                state = state,
-                                status = status,
-                                play = player::play.also {
-                                    playInteractionSource.tryEmit(ControlsInteraction)
-                                },
-                                pause = player::pause.also {
-                                    pauseInteractionSource.tryEmit(ControlsInteraction)
-                                },
-                                stop = player::stop.also {
-                                    stopInteractionSource.tryEmit(ControlsInteraction)
-                                },
-                                toggleMute = player::toggleMute.also {
-                                    muteInteractionSource.tryEmit(ControlsInteraction)
-                                },
-                                changeVolume = player::changeVolume.also {
-                                    volumeInteractionSource.tryEmit(ControlsInteraction)
-                                },
-                                playInteractionSource = playInteractionSource,
-                                pauseInteractionSource = pauseInteractionSource,
-                                stopInteractionSource = stopInteractionSource,
-                                muteInteractionSource = muteInteractionSource,
-                                volumeInteractionSource = volumeInteractionSource
-                            )
-                        }
-                    }) {
-                    VideoRenderer(
-                        media = this, pixels = pixels, modifier = Modifier.fillMaxSize()
+                    Box(
+                        Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .5f)).padding(8.dp),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        Icon(Icons.Rounded.BrokenImage, "unable to draw pixels")
+                        Text(name ?: url)
+                    }
+                    Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = status == PlaybackStatus.PLAYING,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    player.pause()
+                                }
+                            }) {
+                                Icon(
+                                    Icons.Rounded.PauseCircle, "pause", modifier = Modifier.size(64.dp)
+                                )
+                            }
+                        }
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = status != PlaybackStatus.PLAYING,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    player.play()
+                                }
+                                setOverlayVisible(false)
+                            }) {
+                                Icon(
+                                    Icons.Rounded.PlayCircle, "play", modifier = Modifier.size(64.dp)
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = .5f)).padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showTimestamp) {
+                            Text("${state.playbackTimestampMillis.formatTimestamp()}/${durationNanos.nanoseconds.inWholeMilliseconds.formatTimestamp()}")
+                        }
+                        Timeline(
+                            timestampMillis = state.playbackTimestampMillis,
+                            durationMillis = durationNanos.nanoseconds.inWholeMilliseconds,
+                            seekTo = { timestampMillis ->
+                                coroutineScope.launch {
+                                    player.seekTo(timestampMillis)
+                                }
+                            },
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                        if (showVolume) {
+                            Volume(
+                                volume = state.volume,
+                                isMuted = state.isMuted,
+                                toggleMute = {
+                                    coroutineScope.launch {
+                                        player.toggleMute()
+                                    }
+                                },
+                                changeVolume = { volume ->
+                                    coroutineScope.launch {
+                                        player.changeVolume(volume)
+                                    }
+                                },
+                                modifier = Modifier.weight(.3f).padding(horizontal = 8.dp)
+                            )
+                        }
                     }
                 }
             }
-            when {
-                settings?.hasAudio == true && settings.hasVideo -> video()
-                settings?.hasVideo == true -> video()
-                settings?.hasAudio == true -> audio()
-            }
-        } ?: placeholder ?: CircularProgressIndicator()
-    }
+        }
+    } ?: placeholder()
 }
