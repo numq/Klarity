@@ -1,5 +1,5 @@
 package player
 
 enum class PlaybackStatus {
-    EMPTY, BUFFERING, PLAYING, SEEKING, PAUSED, STOPPED, COMPLETED
+    EMPTY, LOADED, PLAYING, SEEKING, PAUSED, STOPPED
 }
