@@ -25,8 +25,8 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
     /**
      * S16LE audio bytes conversion
      */
-    private fun getDecodedSamples(frame: Frame) =
-        frame.takeIf { it.type == Frame.Type.AUDIO && it.samples != null }?.runCatching {
+    private fun getDecodedSamples(frame: Frame) = runCatching {
+        frame.takeIf { it.type == Frame.Type.AUDIO && it.samples != null }?.clone()?.run {
             (samples?.firstOrNull() as? ShortBuffer)?.run {
 
                 if (audioChannels <= 0 || sampleRate <= 0) return null
@@ -41,13 +41,14 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
 
                 bytes
             }
-        }?.onFailure { println(it.localizedMessage) }?.getOrNull()
+        }
+    }.onFailure { println(it.localizedMessage) }.getOrNull()
 
     /**
      * BGRA image bytes conversion
      */
-    private fun getDecodedImage(frame: Frame) =
-        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.runCatching {
+    private fun getDecodedImage(frame: Frame) = runCatching {
+        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.clone()?.run {
             (image?.firstOrNull() as? ByteBuffer)?.run {
 
                 if (imageDepth != Frame.DEPTH_UBYTE && imageDepth != Frame.DEPTH_BYTE) return null
@@ -78,8 +79,8 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
                         bytes[dstIndex + 3] = alpha.toByte()
                     }
                 }
-
                 bytes
             }
-        }?.onFailure { println(it.localizedMessage) }?.getOrNull()
+        }
+    }.onFailure { println(it.localizedMessage) }.getOrNull()
 }
