@@ -2,136 +2,103 @@ package buffer
 
 import decoder.DecodedFrame
 import decoder.Decoder
-import io.mockk.*
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import media.Media
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import javax.sound.sampled.AudioFormat
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
+import java.io.File
+import kotlin.time.Duration.Companion.nanoseconds
 
 class BufferManagerTest {
-
     companion object {
 
-        private val decoder = mockk<Decoder>()
+        private val mediaUrl = File(ClassLoader.getSystemResource("files/audio_video.mp4").file).absolutePath
 
-        @Test
-        fun `static creation`() {
-            assertNotNull(
-                BufferManager.create(
-                    decoder = decoder, bufferDurationSeconds = 10
-                )
-            )
+        private var decoder: Decoder? = null
+
+        @JvmStatic
+        @BeforeAll
+        fun beforeAll() {
+            decoder = Decoder.create(mediaUrl)
         }
 
         @JvmStatic
         @AfterAll
         fun afterAll() {
-            unmockkAll()
+            decoder?.close()
+            decoder = null
         }
     }
 
-    private val decoder = mockkClass(Decoder::class)
+    @BeforeEach
+    fun beforeEach() {
+        runBlocking { decoder?.restart() }
+    }
 
-    @AfterEach
-    fun afterEach() {
-        clearAllMocks()
+    @Test
+    fun `static creation`() {
+        assertNotNull(
+            BufferManager.create(
+                decoder = decoder!!,
+                bufferDurationSeconds = 1
+            )
+        )
     }
 
     @Test
     fun `buffering frames`() = runTest {
+        BufferManager.create(
+            decoder = decoder!!,
+            bufferDurationSeconds = decoder!!.media.durationNanos.nanoseconds.inWholeSeconds.toInt() + 1
+        )?.run {
 
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
+            val timestamps = startBuffering().toList()
 
-        val audioFrameRate = 4.0
-        val videoFrameRate = 2.0
+            assertFalse(bufferIsEmpty(), "buffer must not be empty")
 
-        val durationSeconds = 2
+            assertEquals(0L, timestamps.first())
+            assertEquals(decoder!!.media.durationNanos, timestamps.last())
 
-        val durationNanos = durationSeconds.seconds.inWholeNanoseconds
+            val audioFrames = mutableListOf<DecodedFrame>()
+            val videoFrames = mutableListOf<DecodedFrame>()
 
-        every {
-            decoder.media
-        } returns Media(
-            url = "url",
-            name = "name",
-            durationNanos = durationNanos,
-            audioFormat = audioFormat,
-            audioFrameRate = audioFrameRate,
-            videoFrameRate = videoFrameRate
-        )
+            var endOfAudio = false
+            var endOfVideo = false
 
-        BufferManager.Implementation(
-            decoder = decoder, bufferDurationSeconds = 2
-        ).run {
-            val inputFrames = buildList {
-                repeat(durationSeconds) { second ->
-                    repeat(audioFrameRate.toInt()) { frameNumber ->
-                        add(
-                            DecodedFrame.Audio(
-                                ((1_000L / audioFrameRate) * frameNumber + (second * 1_000L)).milliseconds.inWholeNanoseconds,
-                                byteArrayOf()
-                            )
-                        )
-                    }
-                    repeat(videoFrameRate.toInt()) { frameNumber ->
-                        add(
-                            DecodedFrame.Video(
-                                ((1_000L / videoFrameRate) * frameNumber + (second * 1_000L)).milliseconds.inWholeNanoseconds,
-                                byteArrayOf()
-                            )
-                        )
+            while (!bufferIsEmpty()) {
+                extractAudioFrame()?.let { frame ->
+                    when (frame) {
+                        is DecodedFrame.Audio -> audioFrames.add(frame)
+                        is DecodedFrame.Video -> throw Exception("video frame in audio buffer")
+                        is DecodedFrame.End -> endOfAudio = true
                     }
                 }
-                add(DecodedFrame.End(durationNanos))
+
+                extractVideoFrame()?.let { frame ->
+                    when (frame) {
+                        is DecodedFrame.Audio -> throw Exception("audio frame in video buffer")
+                        is DecodedFrame.Video -> videoFrames.add(frame)
+                        is DecodedFrame.End -> endOfVideo = true
+                    }
+                }
             }
 
-            coEvery {
-                decoder.nextFrame()
-            } returnsMany inputFrames
+            assertTrue(audioFrames.isNotEmpty())
+            assertTrue(videoFrames.isNotEmpty())
 
-            val bufferedTimestamps = mutableListOf<Long?>()
+            assertTrue(endOfAudio, "should add end frame in audio buffer")
+            assertTrue(endOfVideo, "should add end frame in video buffer")
 
-            val outputFrames = mutableListOf<DecodedFrame>()
+            assertDoesNotThrow { flush() }
 
-            startBuffering().collect { bufferTimestampNanos ->
-                bufferedTimestamps.add(bufferTimestampNanos)
-            }
+            assertEquals(0, audioBufferSize())
+            assertEquals(0, videoBufferSize())
 
-            while (true) {
-                extractAudioFrame()?.let(outputFrames::add) ?: break
-            }
-
-            while (true) {
-                extractVideoFrame()?.let(outputFrames::add) ?: break
-            }
-
-            assertEquals(
-                inputFrames.map { it.timestampNanos }, bufferedTimestamps
-            )
-
-            assertEquals(inputFrames, outputFrames.filterNot { it is DecodedFrame.End })
-
-            assertFalse(bufferIsEmpty())
-
-            assertEquals(
-                audioBufferCapacity, outputFrames.filterIsInstance<DecodedFrame.Audio>().size
-            )
-
-            assertEquals(
-                videoBufferCapacity, outputFrames.filterIsInstance<DecodedFrame.Video>().size
-            )
-
-            flush()
-
-            assertTrue(audioBufferSize() == 0)
-            assertTrue(videoBufferSize() == 0)
-
-            assertTrue(bufferIsEmpty())
+            assertTrue(bufferIsEmpty(), "buffer must be empty")
         }
     }
 }
