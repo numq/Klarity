@@ -2,11 +2,11 @@ package buffer
 
 import decoder.DecodedFrame
 import decoder.Decoder
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.yield
 import java.util.*
 import kotlin.math.ceil
 
@@ -17,6 +17,7 @@ interface BufferManager {
     fun audioBufferSize(): Int
     fun videoBufferSize(): Int
     fun bufferIsEmpty(): Boolean
+    fun bufferIsFull(): Boolean
     suspend fun firstAudioFrame(): DecodedFrame?
     suspend fun firstVideoFrame(): DecodedFrame?
     suspend fun extractAudioFrame(): DecodedFrame?
@@ -30,7 +31,8 @@ interface BufferManager {
             bufferDurationSeconds: Int,
         ) = runCatching {
             Implementation(
-                decoder = decoder, bufferDurationSeconds = bufferDurationSeconds
+                decoder = decoder,
+                bufferDurationSeconds = bufferDurationSeconds
             )
         }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
@@ -55,7 +57,10 @@ interface BufferManager {
         override fun videoBufferSize() = videoBuffer.size
 
         override fun bufferIsEmpty() =
-            (audioBufferCapacity > 0 && audioBuffer.size <= 0) && (videoBufferCapacity > 0 && videoBuffer.size <= 0)
+            (audioBufferCapacity > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity > 0 && videoBuffer.isEmpty())
+
+        override fun bufferIsFull() =
+            (audioBufferCapacity > 0 && audioBuffer.size >= audioBufferCapacity) && (videoBufferCapacity > 0 && videoBuffer.size >= videoBufferCapacity)
 
         override suspend fun firstAudioFrame(): DecodedFrame? = audioBuffer.peek()
 
@@ -66,23 +71,23 @@ interface BufferManager {
         override suspend fun extractVideoFrame(): DecodedFrame? = videoBuffer.poll()
 
         override suspend fun startBuffering() = flow {
-            while (currentCoroutineContext().isActive) {
-                yield()
+            coroutineScope {
+                while (isActive) {
+                    if (audioBuffer.size < audioBufferCapacity || videoBuffer.size < videoBufferCapacity) {
+                        decoder.nextFrame()?.let { frame ->
 
-                val hasAudioBuffer = audioBufferCapacity > 0
-                val hasVideoBuffer = videoBufferCapacity > 0
+                            emit(frame.timestampNanos)
 
-                if ((hasAudioBuffer && audioBuffer.size < audioBufferCapacity) || (hasVideoBuffer && videoBuffer.size < videoBufferCapacity)) {
-                    decoder.nextFrame()?.let { frame ->
-                        emit(frame.timestampNanos)
+                            when (frame) {
+                                is DecodedFrame.Audio -> audioBuffer.add(frame)
 
-                        when (frame) {
-                            is DecodedFrame.Audio -> if (hasAudioBuffer) audioBuffer.add(frame)
-                            is DecodedFrame.Video -> if (hasVideoBuffer) videoBuffer.add(frame)
-                            is DecodedFrame.End -> {
-                                audioBuffer.add(frame)
-                                videoBuffer.add(frame)
-                                return@flow println("Buffering has been completed")
+                                is DecodedFrame.Video -> videoBuffer.add(frame)
+
+                                is DecodedFrame.End -> {
+                                    audioBuffer.add(frame)
+                                    videoBuffer.add(frame)
+                                    return@coroutineScope println("Buffering has been completed")
+                                }
                             }
                         }
                     }
