@@ -25,55 +25,56 @@ interface Decoder : AutoCloseable {
 
     companion object {
         fun create(mediaUrl: String): Decoder? = runCatching {
-            val grabber = FFmpegFrameGrabber(mediaUrl).apply {
+            FFmpegFrameGrabber(mediaUrl).apply {
                 audioCodec = avcodec.AV_CODEC_ID_AAC
                 sampleMode = FrameGrabber.SampleMode.SHORT
                 sampleFormat = avutil.AV_SAMPLE_FMT_S16
+                sampleRate = 44100
+
                 videoCodec = avcodec.AV_CODEC_ID_H264
                 imageMode = FrameGrabber.ImageMode.COLOR
                 pixelFormat = avutil.AV_PIX_FMT_BGRA
+
                 start()
+            }.use { grabber ->
+                with(grabber) {
+                    val media = with(grabber) {
+                        val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
+
+                        val audioFormat = if (hasAudio()) AudioFormat(
+                            sampleRate.toFloat(),
+                            avutil.av_get_bytes_per_sample(sampleFormat) * 8,
+                            audioChannels,
+                            true,
+                            false
+                        ) else null
+
+                        val size = if (hasVideo()) {
+                            val size: ImageSize = if (imageWidth > 1920 || imageHeight > 1080) {
+                                ImageSize((1920 * aspectRatio).toInt(), (1080 * aspectRatio).toInt())
+                            } else ImageSize(imageWidth, imageHeight)
+
+                            size.width to size.height
+                        } else null
+
+                        val (audioFrameRate, videoFrameRate) =
+                            audioFrameRate.coerceAtLeast(0.0) to videoFrameRate.coerceIn(0.0, 60.0)
+
+                        val media = Media(
+                            url = mediaUrl,
+                            name = File(mediaUrl).takeIf(File::exists)?.name,
+                            durationNanos = durationNanos,
+                            audioFrameRate = audioFrameRate,
+                            videoFrameRate = videoFrameRate,
+                            audioFormat = audioFormat,
+                            size = size
+                        ).also(::println)
+
+                        media
+                    }
+                    Implementation(grabber, media)
+                }
             }
-            val media = grabber.run {
-                restart()
-
-                val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
-
-                val audioFormat = if (hasAudio()) AudioFormat(
-                    sampleRate.toFloat(),
-                    avutil.av_get_bytes_per_sample(sampleFormat) * 8,
-                    audioChannels,
-                    true,
-                    false
-                ) else null
-
-                val size = if (hasVideo()) {
-                    val size: ImageSize = if (imageWidth > 1920 || imageHeight > 1080) {
-                        ImageSize((1920 * aspectRatio).toInt(), (1080 * aspectRatio).toInt())
-                    } else ImageSize(imageWidth, imageHeight)
-
-                    size.width to size.height
-                } else null
-
-                val audioFrameRate = audioFrameRate.coerceIn(0.0, 60.0).also { restart() }
-
-                val videoFrameRate = videoFrameRate.coerceIn(0.0, 60.0).also { restart() }
-
-                val media = Media(
-                    url = mediaUrl,
-                    name = File(mediaUrl).takeIf { it.exists() }?.name,
-                    durationNanos = durationNanos,
-                    audioFrameRate = audioFrameRate,
-                    videoFrameRate = videoFrameRate,
-                    audioFormat = audioFormat,
-                    size = size
-                )
-
-                stop()
-
-                media
-            }
-            Implementation(grabber, media)
         }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
 
@@ -96,13 +97,15 @@ interface Decoder : AutoCloseable {
         private fun resizeVideoFrame(frame: Frame) = runCatching {
             media.size?.let { (width, height) ->
                 if (mediaGrabber.imageWidth != width || mediaGrabber.imageHeight != height) {
-                    val output = Mat()
-                    Imgproc.resize(
-                        openCvFrameConverter.convertToOrgOpenCvCoreMat(frame),
-                        output,
-                        Size(width.toDouble(), height.toDouble())
-                    )
-                    return openCvFrameConverter.convert(output)
+                    with(openCvFrameConverter) {
+                        val output = Mat()
+                        Imgproc.resize(
+                            convertToOrgOpenCvCoreMat(frame),
+                            output,
+                            Size(width.toDouble(), height.toDouble())
+                        )
+                        convert(output)
+                    }
                 }
             }
             frame
@@ -118,14 +121,12 @@ interface Decoder : AutoCloseable {
                         grabbedFrame.use { frame ->
                             val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
                             when (frame.type) {
-                                Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)?.let { bytes ->
-                                    DecodedFrame.Audio(timestampNanos, bytes)
-                                }
+                                Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
+                                    ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
 
-                                Frame.Type.VIDEO -> resizeVideoFrame(frame)?.let(byteArrayFrameConverter::convert)
-                                    ?.let { bytes ->
-                                        DecodedFrame.Video(timestampNanos, bytes)
-                                    }
+                                Frame.Type.VIDEO -> resizeVideoFrame(frame)
+                                    ?.let(byteArrayFrameConverter::convert)
+                                    ?.let { bytes -> DecodedFrame.Video(timestampNanos, bytes) }
 
                                 else -> null
                             }
@@ -136,8 +137,10 @@ interface Decoder : AutoCloseable {
         }.onFailure { println(it.localizedMessage) }.getOrNull()
 
         override suspend fun seekTo(timestampMicros: Long) = grabberMutex.withLock {
-            mediaGrabber.setTimestamp(timestampMicros, true)
-            mediaGrabber.timestamp
+            with(mediaGrabber) {
+                setTimestamp(timestampMicros, true)
+                timestamp
+            }
         }
 
         override suspend fun restart() = grabberMutex.withLock {
@@ -145,9 +148,8 @@ interface Decoder : AutoCloseable {
         }
 
         override fun close() {
-            openCvFrameConverter.close()
             byteArrayFrameConverter.close()
-            mediaGrabber.close()
+            openCvFrameConverter.close()
         }
     }
 }
