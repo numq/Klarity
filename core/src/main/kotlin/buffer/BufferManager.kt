@@ -3,7 +3,6 @@ package buffer
 import decoder.DecodedFrame
 import decoder.Decoder
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
@@ -28,24 +27,24 @@ interface BufferManager {
     companion object {
         fun create(
             decoder: Decoder,
-            bufferDurationSeconds: Int,
+            bufferDurationMillis: Long,
         ) = runCatching {
             Implementation(
                 decoder = decoder,
-                bufferDurationSeconds = bufferDurationSeconds
+                bufferDurationMillis = bufferDurationMillis
             )
         }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
 
     class Implementation(
         private val decoder: Decoder,
-        bufferDurationSeconds: Int,
+        bufferDurationMillis: Long,
     ) : BufferManager {
 
-        override val audioBufferCapacity = ceil(bufferDurationSeconds * decoder.media.audioFrameRate).toInt()
+        override val audioBufferCapacity = ceil(bufferDurationMillis * decoder.media.audioFrameRate / 1_000L).toInt()
             .also { println("audio buffer capacity: $it") }
 
-        override val videoBufferCapacity = ceil(bufferDurationSeconds * decoder.media.videoFrameRate).toInt()
+        override val videoBufferCapacity = ceil(bufferDurationMillis * decoder.media.videoFrameRate / 1_000L).toInt()
             .also { println("video buffer capacity: $it") }
 
         private val audioBuffer = LinkedList<DecodedFrame>()
