@@ -29,13 +29,13 @@ interface Decoder : AutoCloseable {
                 audioCodec = avcodec.AV_CODEC_ID_AAC
                 sampleMode = FrameGrabber.SampleMode.SHORT
                 sampleFormat = avutil.AV_SAMPLE_FMT_S16
-
                 videoCodec = avcodec.AV_CODEC_ID_H264
                 imageMode = FrameGrabber.ImageMode.COLOR
                 pixelFormat = avutil.AV_PIX_FMT_BGRA
+                start()
             }
             val media = grabber.run {
-                start()
+                restart()
 
                 val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
 
