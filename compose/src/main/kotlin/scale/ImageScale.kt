@@ -1,67 +1,129 @@
 package scale
 
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 
-abstract class ImageScale {
-    object Fit : ImageScale() {
-        override fun scaleDp(
-            srcWidth: Dp,
-            srcHeight: Dp,
-            dstWidth: Dp,
-            dstHeight: Dp,
-        ): Pair<DpOffset, DpSize> {
+/**
+ * An interface for defining image scaling operations.
+ */
+interface ImageScale {
 
-            require(srcWidth > 0.dp && srcHeight > 0.dp) { "Source dimensions must be positive." }
+    /**
+     * Scales the source image dimensions to match the destination image dimensions.
+     *
+     * @param srcSize The dimensions of the source image.
+     * @param dstSize The dimensions of the destination image.
+     * @return The scaled dimensions of the source image.
+     */
+    fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize
 
-            require(dstWidth > 0.dp && dstHeight > 0.dp) { "Destination dimensions must be positive." }
+    companion object {
 
-            val scaleX = dstWidth / srcWidth
-            val scaleY = dstHeight / srcHeight
-
-            val scale = minOf(scaleX, scaleY)
-
-            val resizedWidth = srcWidth * scale
-            val resizedHeight = srcHeight * scale
-
-            val offsetX = (dstWidth - resizedWidth) / 2
-            val offsetY = (dstHeight - resizedHeight) / 2
-
-            val offset = DpOffset(offsetX, offsetY)
-            val size = DpSize(resizedWidth, resizedHeight)
-
-            return offset to size
+        /**
+         * Validates that source and destination dimensions are positive.
+         *
+         * @param srcSize The dimensions of the source image.
+         * @param dstSize The dimensions of the destination image.
+         * @throws IllegalArgumentException if either source or destination dimensions are not positive.
+         */
+        private fun validateDimensions(
+            srcSize: DpSize,
+            dstSize: DpSize,
+        ) {
+            require(srcSize.width > 0.dp && srcSize.height > 0.dp) { "Source dimensions must be positive." }
+            require(dstSize.width > 0.dp && dstSize.height > 0.dp) { "Destination dimensions must be positive." }
         }
     }
 
-    object Fill : ImageScale() {
-        override fun scaleDp(
-            srcWidth: Dp,
-            srcHeight: Dp,
-            dstWidth: Dp,
-            dstHeight: Dp,
-        ): Pair<DpOffset, DpSize> {
+    /**
+     * No scaling. Returns the destination dimensions unchanged.
+     */
+    object None : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize) = dstSize
+    }
 
-            require(srcWidth > 0.dp && srcHeight > 0.dp) { "Source dimensions must be positive." }
+    /**
+     * Scales the source uniformly to completely fill the destination.
+     */
+    object Crop : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize {
+            validateDimensions(srcSize = srcSize, dstSize = dstSize)
 
-            require(dstWidth > 0.dp && dstHeight > 0.dp) { "Destination dimensions must be positive." }
+            val scale = maxOf(dstSize.width / srcSize.width, dstSize.height / srcSize.height)
 
-            val scale = if (dstWidth / dstHeight > srcWidth / srcHeight) dstWidth / srcWidth else dstHeight / srcHeight
+            val scaledWidth = ceil(srcSize.width.value * scale).dp
+            val scaledHeight = ceil(srcSize.height.value * scale).dp
 
-            val resizedWidth = srcWidth * scale
-            val resizedHeight = srcHeight * scale
-
-            val offsetX = (dstWidth - resizedWidth) / 2
-            val offsetY = (dstHeight - resizedHeight) / 2
-
-            val offset = DpOffset(offsetX, offsetY)
-            val size = DpSize(resizedWidth, resizedHeight)
-
-            return offset to size
+            return DpSize(scaledWidth, scaledHeight)
         }
     }
 
-    abstract fun scaleDp(srcWidth: Dp, srcHeight: Dp, dstWidth: Dp, dstHeight: Dp): Pair<DpOffset, DpSize>
+    /**
+     * Scales the source to match the largest destination side while preserving aspect ratio.
+     */
+    object Fill : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize {
+            validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
+            val scale = if (dstSize.width / dstSize.height > srcSize.width / srcSize.height) {
+                dstSize.width / srcSize.width
+            } else {
+                dstSize.height / srcSize.height
+            }
+
+            val scaledWidth = ceil(srcSize.width.value * scale).dp
+            val scaledHeight = ceil(srcSize.height.value * scale).dp
+
+            return DpSize(scaledWidth, scaledHeight)
+        }
+    }
+
+    /**
+     * Scales the source to match the largest destination side while preserving aspect ratio.
+     */
+    object Fit : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize {
+            validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
+            val scale = minOf(dstSize.width / srcSize.width, dstSize.height / srcSize.height)
+
+            val scaledWidth = ceil(srcSize.width.value * scale).dp
+            val scaledHeight = ceil(srcSize.height.value * scale).dp
+
+            return DpSize(scaledWidth, scaledHeight)
+        }
+    }
+
+    /**
+     * Scales the source to match the destination width while preserving aspect ratio.
+     */
+    object FitWidth : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize {
+            validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
+            val scale = dstSize.width / srcSize.width
+
+            val scaledWidth = ceil(srcSize.width.value * scale).dp
+            val scaledHeight = ceil(srcSize.height.value * scale).dp
+
+            return DpSize(scaledWidth, scaledHeight)
+        }
+    }
+
+    /**
+     * Scales the source to match the destination height while preserving aspect ratio.
+     */
+    object FitHeight : ImageScale {
+        override fun scaleDp(srcSize: DpSize, dstSize: DpSize): DpSize {
+            validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
+            val scale = dstSize.height / srcSize.height
+
+            val scaledWidth = ceil(srcSize.width.value * scale).dp
+            val scaledHeight = ceil(srcSize.height.value * scale).dp
+
+            return DpSize(scaledWidth, scaledHeight)
+        }
+    }
 }
