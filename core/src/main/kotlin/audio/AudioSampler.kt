@@ -5,56 +5,68 @@ import kotlinx.coroutines.sync.withLock
 import javax.sound.sampled.*
 import kotlin.math.log10
 
-class AudioSampler private constructor(private val sourceDataLine: SourceDataLine) : AutoCloseable {
+interface AudioSampler : AutoCloseable {
 
-    private val mutex = Mutex()
-
-    private val muteControl = if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
-        sourceDataLine.getControl(BooleanControl.Type.MUTE) as? BooleanControl
-    } else null
-
-    private val gainControl = if (sourceDataLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-        sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
-    } else null
+    suspend fun setMuted(state: Boolean): Boolean
+    suspend fun setVolume(value: Float): Float
+    suspend fun start()
+    suspend fun play(bytes: ByteArray)
+    suspend fun stop()
 
     companion object {
-        fun create(audioFormat: AudioFormat) = runCatching {
-            val info = DataLine.Info(SourceDataLine::class.java, audioFormat)
-            (AudioSystem.getLine(info) as? SourceDataLine)?.apply {
-                open(audioFormat, 8192)
-            }?.let(::AudioSampler)
-        }.onFailure { println(it.localizedMessage) }.getOrNull()
+        fun create(audioFormat: AudioFormat): AudioSampler =
+            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, audioFormat)) as SourceDataLine)
+                .apply { open(audioFormat, 8192) }
+                .let(AudioSampler::Implementation)
     }
 
-    suspend fun setMuted(state: Boolean) = mutex.withLock {
-        muteControl?.value = state
-        muteControl?.value ?: false
-    }
+    private class Implementation(private val sourceDataLine: SourceDataLine) : AudioSampler {
+        private val mutex = Mutex()
 
-    suspend fun setVolume(value: Float) = mutex.withLock {
-        gainControl?.run {
-            if (value in 0.0..1.0) {
+        private val muteControl = if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
+            sourceDataLine.getControl(BooleanControl.Type.MUTE) as? BooleanControl
+        } else null
 
-                this.value = (20.0f * log10(value)).coerceIn(minimum, maximum)
+        private val gainControl = if (sourceDataLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
+        } else null
 
-                return@withLock value
-            }
-            null
+        override suspend fun setMuted(state: Boolean) = mutex.withLock {
+            muteControl?.value = state
+            muteControl?.value ?: false
         }
-    }
 
-    suspend fun start() = mutex.withLock {
-        sourceDataLine.start()
-    }
+        override suspend fun setVolume(value: Float) = mutex.withLock {
+            gainControl?.run {
+                if (value in 0.0..1.0) {
 
-    suspend fun play(bytes: ByteArray) = mutex.withLock {
-        sourceDataLine.write(bytes, 0, bytes.size)
-    }
+                    this.value = (20.0f * log10(value)).coerceIn(minimum, maximum)
 
-    suspend fun stop() = mutex.withLock {
-        sourceDataLine.stop()
-        sourceDataLine.flush()
-    }
+                    return@withLock value
+                }
+                null
+            } ?: value
+        }
 
-    override fun close() = sourceDataLine.close()
+        override suspend fun start() {
+            mutex.withLock {
+                sourceDataLine.start()
+            }
+        }
+
+        override suspend fun play(bytes: ByteArray) {
+            mutex.withLock {
+                sourceDataLine.write(bytes, 0, bytes.size)
+            }
+        }
+
+        override suspend fun stop() {
+            mutex.withLock {
+                sourceDataLine.stop()
+                sourceDataLine.flush()
+            }
+        }
+
+        override fun close() = sourceDataLine.close()
+    }
 }

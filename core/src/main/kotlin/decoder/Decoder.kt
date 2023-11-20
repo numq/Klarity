@@ -24,7 +24,7 @@ interface Decoder : AutoCloseable {
     suspend fun restart()
 
     companion object {
-        fun create(mediaUrl: String): Decoder? = runCatching {
+        fun create(mediaUrl: String): Decoder =
             FFmpegFrameGrabber(mediaUrl).apply {
                 audioCodec = avcodec.AV_CODEC_ID_AAC
                 sampleMode = FrameGrabber.SampleMode.SHORT
@@ -75,10 +75,9 @@ interface Decoder : AutoCloseable {
                     Implementation(grabber, media)
                 }
             }
-        }.onFailure { println(it.localizedMessage) }.getOrNull()
     }
 
-    class Implementation(private val mediaGrabber: FFmpegFrameGrabber, override val media: Media) : Decoder {
+    private class Implementation(private val mediaGrabber: FFmpegFrameGrabber, override val media: Media) : Decoder {
 
         init {
             Loader.load(org.bytedeco.opencv.opencv_java::class.java)

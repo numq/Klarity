@@ -28,15 +28,13 @@ interface BufferManager {
         fun create(
             decoder: Decoder,
             bufferDurationMillis: Long,
-        ) = runCatching {
-            Implementation(
-                decoder = decoder,
-                bufferDurationMillis = bufferDurationMillis
-            )
-        }.onFailure { println(it.localizedMessage) }.getOrNull()
+        ): BufferManager = Implementation(
+            decoder = decoder,
+            bufferDurationMillis = bufferDurationMillis
+        )
     }
 
-    class Implementation(
+    private class Implementation(
         private val decoder: Decoder,
         bufferDurationMillis: Long,
     ) : BufferManager {
