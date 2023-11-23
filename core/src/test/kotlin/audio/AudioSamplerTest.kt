@@ -1,44 +1,44 @@
 package audio
 
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertDoesNotThrow
 import javax.sound.sampled.AudioFormat
 import kotlin.random.Random
 
 class AudioSamplerTest {
 
-    companion object {
-        @Test
-        fun `valid format instance creation`() {
-            val audioFormat = AudioFormat(44100F, 8, 2, true, false)
+    @Test
+    fun `valid format instance creation`() {
+        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
 
-            assertNotNull(AudioSampler.create(audioFormat))
-        }
-
-        @Test
-        fun `invalid format null creation`() {
-            val audioFormat = AudioFormat(0F, 0, 0, true, false)
-
-            assertEquals(null, AudioSampler.create(audioFormat)?.also(AudioSampler::close))
+        AudioSampler.create(audioFormat).use { audioSampler ->
+            assertNotNull(audioSampler)
         }
     }
 
+    @Test
+    fun `invalid format null creation`() {
+        val audioFormat = AudioFormat(0F, 0, 0, true, false)
+
+        assertThrows<Exception> {
+            AudioSampler.create(audioFormat).close()
+        }
+    }
+
+    private val audioFormat = AudioFormat(44100F, 8, 2, true, false)
     private var audioSampler: AudioSampler? = null
 
     @BeforeEach
     fun beforeEach() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
         audioSampler = AudioSampler.create(audioFormat)
     }
 
     @AfterEach
     fun afterEach() {
         audioSampler?.close()
+        audioSampler = null
     }
 
     @Test
