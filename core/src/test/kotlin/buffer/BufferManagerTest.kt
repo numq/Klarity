@@ -36,15 +36,16 @@ class BufferManagerTest {
 
     @BeforeEach
     fun beforeEach() {
-        runBlocking { decoder?.restart() }
+        runBlocking {
+            decoder?.restart()
+        }
     }
 
     @Test
     fun `static creation`() {
         assertNotNull(
             BufferManager.create(
-                decoder = decoder!!,
-                bufferDurationSeconds = 1
+                decoder = decoder!!, bufferDurationMillis = 1_000L
             )
         )
     }
@@ -53,8 +54,8 @@ class BufferManagerTest {
     fun `buffering frames`() = runTest {
         BufferManager.create(
             decoder = decoder!!,
-            bufferDurationSeconds = decoder!!.media.durationNanos.nanoseconds.inWholeSeconds.toInt() + 1
-        )?.run {
+            bufferDurationMillis = decoder!!.media.durationNanos.nanoseconds.inWholeMilliseconds * 2
+        ).run {
 
             val timestamps = startBuffering().toList()
 

@@ -9,22 +9,88 @@ import kotlinx.coroutines.isActive
 import java.util.*
 import kotlin.math.ceil
 
+/**
+ * Interface representing a buffer manager for handling audio and video frames.
+ */
 interface BufferManager {
 
+    /**
+     * Gets the capacity of the audio buffer.
+     */
     val audioBufferCapacity: Int
+
+    /**
+     * Gets the capacity of the video buffer.
+     */
     val videoBufferCapacity: Int
+
+    /**
+     * Gets the current size of the audio buffer.
+     */
     fun audioBufferSize(): Int
+
+    /**
+     * Gets the current size of the video buffer.
+     */
     fun videoBufferSize(): Int
+
+    /**
+     * Checks if both the audio and video buffers are empty.
+     * @return `true` if both audio and video buffers are empty, `false` otherwise.
+     */
     fun bufferIsEmpty(): Boolean
+
+    /**
+     * Checks if both the audio and video buffers are full.
+     * @return `true` if both audio and video buffers are full, `false` otherwise.
+     */
     fun bufferIsFull(): Boolean
+
+    /**
+     * Retrieves the first audio frame in the buffer without removing it.
+     * @return The first audio frame in the buffer, or `null` if the buffer is empty.
+     */
     suspend fun firstAudioFrame(): DecodedFrame?
+
+    /**
+     * Retrieves the first video frame in the buffer without removing it.
+     * @return The first video frame in the buffer, or `null` if the buffer is empty.
+     */
     suspend fun firstVideoFrame(): DecodedFrame?
+
+    /**
+     * Extracts and removes the next audio frame from the buffer.
+     * @return The next audio frame in the buffer, or `null` if the buffer is empty.
+     */
     suspend fun extractAudioFrame(): DecodedFrame?
+
+    /**
+     * Extracts and removes the next video frame from the buffer.
+     * @return The next video frame in the buffer, or `null` if the buffer is empty.
+     */
     suspend fun extractVideoFrame(): DecodedFrame?
+
+    /**
+     * Starts buffering frames from the associated [Decoder].
+     * @return A [Flow] emitting the timestamps of buffered frames.
+     */
     suspend fun startBuffering(): Flow<Long>
+
+    /**
+     * Flushes the audio and video buffers, discarding all frames.
+     */
     fun flush()
 
+    /**
+     * Companion object providing a factory method to create a [BufferManager] instance.
+     */
     companion object {
+        /**
+         * Creates a [BufferManager] instance with the specified [decoder] and buffer duration.
+         * @param decoder The [Decoder] used to decode frames.
+         * @param bufferDurationMillis The duration, in milliseconds, for which the buffer should store frames.
+         * @return A [BufferManager] instance.
+         */
         fun create(
             decoder: Decoder,
             bufferDurationMillis: Long,
