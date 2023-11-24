@@ -1,107 +1,98 @@
 package decoder
 
-import io.mockk.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.bytedeco.javacv.FFmpegFrameGrabber
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertDoesNotThrow
+import java.io.File
+import java.net.URL
 import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 class DecoderTest {
-    companion object {
-        @Test
-        fun `static creation`() {
-            val grabber: FFmpegFrameGrabber = mockk<FFmpegFrameGrabber>(relaxUnitFun = true)
 
-            assertNotNull(Decoder.Implementation("any media url", grabber))
+    private val fileUrls = ClassLoader.getSystemResources("/files")
+        .toList()
+        .map(URL::getFile)
+        .map(::File)
+        .filter(File::exists)
+        .map(File::getAbsolutePath)
+
+    @Test
+    fun `static creation`() {
+        fileUrls.forEach { file ->
+            assertNotNull(Decoder.create(file))
         }
-
-        @JvmStatic
-        @AfterAll
-        fun afterAll() {
-            unmockkAll()
-        }
-    }
-
-    private val grabber = mockkClass(FFmpegFrameGrabber::class)
-
-    @AfterEach
-    fun afterEach() {
-        clearAllMocks()
     }
 
     @Test
     fun `decoding process`() = runTest {
-        every { grabber.setTimestamp(any()) } returns Unit
+        fileUrls.forEach { file ->
+            FFmpegFrameGrabber(file).use { grabber ->
+                Decoder.create(file).use { decoder ->
+                    with(decoder.media) {
+                        assertEquals(url, url)
+                        assertEquals("test.mp4", name)
+                        assertEquals(
+                            AudioFormat(
+                                48000F,
+                                16,
+                                2,
+                                true,
+                                false
+                            ).toString(),
+                            audioFormat.toString()
+                        )
 
-        every { grabber.setTimestamp(any(), any()) } returns Unit
+                        grabber.restart()
 
-        every { grabber.start() } returns Unit
+                        assertEquals(grabber.lengthInTime.microseconds.inWholeNanoseconds, durationNanos)
+                        assertEquals(grabber.audioFrameRate, audioFrameRate)
+                        assertEquals(grabber.videoFrameRate, videoFrameRate)
+                        assertEquals(grabber.imageWidth to grabber.imageHeight, size)
+                    }
 
-        every { grabber.stop() } returns Unit
+                    val audioFrames = mutableListOf<DecodedFrame.Audio>()
 
-        every { grabber.restart() } returns Unit
+                    val videoFrames = mutableListOf<DecodedFrame.Video>()
 
-        every { grabber.close() } returns Unit
+                    var endFrame: DecodedFrame.End? = null
 
-        every { grabber.timestamp } returns (0..100).random().toLong()
+                    while (true) {
+                        when (val frame = decoder.nextFrame()) {
+                            is DecodedFrame.Audio -> audioFrames.add(frame)
+                            is DecodedFrame.Video -> videoFrames.add(frame)
+                            is DecodedFrame.End -> {
+                                endFrame = frame
+                                break
+                            }
 
-        every { grabber.lengthInTime } returns 0L
+                            else -> break
+                        }
+                    }
 
-        every { grabber.hasAudio() } returns true
+                    assertEquals(grabber.lengthInAudioFrames, audioFrames.size)
+                    assertEquals(grabber.lengthInVideoFrames, videoFrames.size)
+                    assertEquals(DecodedFrame.End(grabber.lengthInTime.microseconds.inWholeNanoseconds), endFrame!!)
 
-        every { grabber.hasVideo() } returns true
+                    repeat(5) {
+                        val randomTimestampMicros =
+                            (0L..decoder.media.durationNanos).random().nanoseconds.inWholeMicroseconds
 
-        every { grabber.audioFrameRate } returns (0..60).random().toDouble()
+                        assertEquals(grabber.timestamp, decoder.seekTo(randomTimestampMicros))
+                    }
 
-        every { grabber.videoFrameRate } returns (0..60).random().toDouble()
+                    assertDoesNotThrow {
+                        runBlocking {
+                            decoder.restart()
+                        }
+                    }
 
-        every { grabber.sampleRate } returns (0..100).random()
-
-        every { grabber.sampleFormat } returns 0
-
-        every { grabber.audioChannels } returns (0..100).random()
-
-        every { grabber.imageWidth } returns (0..100).random()
-
-        every { grabber.imageHeight } returns (0..100).random()
-
-        every { grabber.grabFrame(any(), any(), any(), any(), any()) } returns null
-
-        val format = AudioFormat(
-            grabber.sampleRate.toFloat(),
-            8,
-            grabber.audioChannels,
-            true,
-            false
-        )
-
-        val url = "test"
-
-        Decoder.Implementation(url, grabber).use { decoder ->
-            with(decoder.media) {
-                assertEquals(url, url)
-                assertEquals(grabber.lengthInTime.microseconds.inWholeNanoseconds, durationNanos)
-                assertEquals(audioFrameRate, grabber.audioFrameRate)
-                assertEquals(videoFrameRate, grabber.videoFrameRate)
-                assertEquals(format, format)
-                assertEquals(grabber.imageWidth to grabber.imageHeight, size)
+                    assertEquals(grabber.timestamp, 0L)
+                }
             }
-
-            assertEquals(null, decoder.snapshot())
-
-            assertEquals(null, decoder.snapshot())
-
-            assertEquals(DecodedFrame.End(grabber.lengthInTime.microseconds.inWholeNanoseconds), decoder.nextFrame()!!)
-
-            assertDoesNotThrow { decoder.seekTo(0L) }
-
-            assertDoesNotThrow { decoder.restart() }
         }
     }
 }

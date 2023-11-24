@@ -16,14 +16,43 @@ import java.io.File
 import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.microseconds
 
+/**
+ * Interface representing a decoder for handling media frames.
+ */
 interface Decoder : AutoCloseable {
 
+    /**
+     * Gets the associated [Media] information for the decoder.
+     */
     val media: Media
+
+    /**
+     * Retrieves the next decoded frame from the media.
+     * @return The next decoded frame, or `null` if the frame cannot be grabbed for any reason.
+     */
     suspend fun nextFrame(): DecodedFrame?
+
+    /**
+     * Seeks to the specified timestamp in microseconds.
+     * @param timestampMicros The timestamp to seek to, in microseconds.
+     * @return The actual timestamp after seeking.
+     */
     suspend fun seekTo(timestampMicros: Long): Long
+
+    /**
+     * Restarts the media decoding process.
+     */
     suspend fun restart()
 
+    /**
+     * Companion object providing a factory method to create a [Decoder] instance.
+     */
     companion object {
+        /**
+         * Creates a [Decoder] instance for the specified media url.
+         * @param mediaUrl The url of the media to decode.
+         * @return A [Decoder] instance.
+         */
         fun create(mediaUrl: String): Decoder =
             FFmpegFrameGrabber(mediaUrl).apply {
                 audioCodec = avcodec.AV_CODEC_ID_AAC
@@ -58,7 +87,7 @@ interface Decoder : AutoCloseable {
                         } else null
 
                         val (audioFrameRate, videoFrameRate) =
-                            audioFrameRate.coerceAtLeast(0.0) to videoFrameRate.coerceIn(0.0, 60.0)
+                            audioFrameRate.coerceIn(0.0, 192.0) to videoFrameRate.coerceIn(0.0, 60.0)
 
                         val media = Media(
                             url = mediaUrl,
