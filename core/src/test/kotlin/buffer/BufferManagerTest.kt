@@ -23,6 +23,8 @@ class BufferManagerTest {
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
+            require(File(mediaUrl).exists())
+
             decoder = Decoder.create(mediaUrl)
         }
 
@@ -45,7 +47,8 @@ class BufferManagerTest {
     fun `static creation`() {
         assertNotNull(
             BufferManager.create(
-                decoder = decoder!!, bufferDurationMillis = 1_000L
+                decoder = decoder!!,
+                bufferDurationMillis = 1_000L
             )
         )
     }
