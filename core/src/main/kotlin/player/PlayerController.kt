@@ -5,6 +5,7 @@ import buffer.BufferManager
 import decoder.DecodedFrame
 import decoder.Decoder
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -14,63 +15,139 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
+/**
+ * Interface representing a player controller for managing media playback.
+ */
 interface PlayerController : AutoCloseable {
 
+    /**
+     * Flow emitting exceptions that occur during playback.
+     */
     val error: Flow<Exception>
+
+    /**
+     * StateFlow representing the current state of the player.
+     */
     val state: StateFlow<PlayerState>
+
+    /**
+     * StateFlow representing the current playback status.
+     */
     val status: StateFlow<PlaybackStatus>
+
+    /**
+     * StateFlow representing the current video frame being displayed.
+     */
     val videoFrame: StateFlow<DecodedFrame.Video?>
+
+    /**
+     * Toggles the mute state of the audio.
+     */
     suspend fun toggleMute()
+
+    /**
+     * Changes the volume of the audio.
+     * @param value The new volume level, ranging from 0.0 to 1.0.
+     */
     suspend fun changeVolume(value: Float)
+
+    /**
+     * Loads and prepares the player for playback of the specified media.
+     * @param mediaUrl The url of the media to load.
+     * @param bufferDurationMillis The duration, in milliseconds, for which to buffer frames.
+     */
     suspend fun load(mediaUrl: String, bufferDurationMillis: Long? = null)
+
+    /**
+     * Seeks to the specified timestamp in milliseconds.
+     * @param timestampMillis The timestamp to seek to, in milliseconds.
+     */
     suspend fun seekTo(timestampMillis: Long)
+
+    /**
+     * Resumes or starts playback.
+     */
     suspend fun play()
+
+    /**
+     * Pauses the current playback.
+     */
     suspend fun pause()
+
+    /**
+     * Stops the current playback.
+     */
     suspend fun stop()
 
+    /**
+     * Companion object providing a factory method to create a [PlayerController] instance.
+     */
     companion object {
         private const val DEFAULT_BUFFER_DURATION_MILLIS = 1_000L
 
+        /**
+         * Creates a [PlayerController] instance.
+         * @return A [PlayerController] instance.
+         */
         fun create(): PlayerController = Implementation()
     }
 
     private class Implementation : PlayerController {
 
         private val playerContext = Dispatchers.Default + SupervisorJob()
+
         private val playerScope = CoroutineScope(playerContext)
+
         private var bufferingJob: Job? = null
+
         private var playbackJob: Job? = null
 
-        private val _error = Channel<Exception>(Channel.BUFFERED)
-        private val _state = MutableStateFlow(PlayerState())
-        private val _status = MutableStateFlow(PlaybackStatus.EMPTY)
-        private var _videoFrame = MutableStateFlow<DecodedFrame.Video?>(null)
+        private val _error = Channel<Exception>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-        override val error: Flow<Exception> = _error.consumeAsFlow().onEach { println(it.localizedMessage) }
+        override val error: Flow<Exception> = _error.consumeAsFlow()
+
+        private val _state = MutableStateFlow(PlayerState())
+
         override val state: StateFlow<PlayerState> = _state.asStateFlow()
-        override val status: StateFlow<PlaybackStatus> = _status.asStateFlow()
-        override val videoFrame: StateFlow<DecodedFrame.Video?> = _videoFrame.asStateFlow()
+
+        private val _status = Channel<PlaybackStatus>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+        override val status: StateFlow<PlaybackStatus> = _status.consumeAsFlow()
+            .stateIn(playerScope, SharingStarted.Eagerly, PlaybackStatus.EMPTY)
+
+        private var _videoFrame = Channel<DecodedFrame.Video?>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+        override val videoFrame: StateFlow<DecodedFrame.Video?> = _videoFrame.consumeAsFlow()
+            .stateIn(playerScope, SharingStarted.Eagerly, null)
 
         private var decoder: Decoder? = null
+
         private var buffer: BufferManager? = null
+
         private var audioSampler: AudioSampler? = null
 
         private val interactionMutex = Mutex()
-        private val synchronizer = TimestampSynchronizer()
+
+        private val synchronizer = TimestampSynchronizer.create()
+
+        private var previewFrame: DecodedFrame.Video? = null
 
         private var isCompleted = false
 
-        private suspend fun startBuffering(previewFrame: suspend (DecodedFrame.Video) -> Unit) {
+        private suspend fun startBuffering() {
+            var previewRendered = false
             buffer?.runCatching {
                 bufferingJob?.cancelAndJoin()
                 bufferingJob = playerScope.launch {
-                    var firstFrameReceived = false
-                    startBuffering().onCompletion { throwable -> isCompleted = throwable == null }
+                    startBuffering()
+                        .onCompletion { throwable ->
+                            isCompleted = throwable == null
+                        }
                         .collect { bufferTimestampNanos ->
-                            if (!firstFrameReceived) {
-                                if (firstVideoFrame() is DecodedFrame.Video) {
-                                    previewFrame(firstVideoFrame() as DecodedFrame.Video)
-                                    firstFrameReceived = true
+                            if (!previewRendered && state.value.media?.videoFrameRate?.compareTo(0.0) == 1) {
+                                (firstVideoFrame() as? DecodedFrame.Video)?.let { frame ->
+                                    previewRendered = _videoFrame.trySend(frame).isSuccess
+                                    previewFrame = frame
                                 }
                             }
                             _state.emit(
@@ -112,7 +189,7 @@ interface PlayerController : AutoCloseable {
 
                                         if (media.audioFrameRate > 0.0) synchronizer.syncWithAudio() else synchronizer.syncWithVideo()
 
-                                        _videoFrame.value = frame
+                                        _videoFrame.trySend(frame)
                                     }
 
                                     is DecodedFrame.End -> return@video
@@ -158,7 +235,7 @@ interface PlayerController : AutoCloseable {
                         )
                     )
 
-                    _status.emit(PlaybackStatus.PAUSED)
+                    _status.send(PlaybackStatus.COMPLETED)
                 }
             }?.onFailure { _error.send(Exception(it)) }
         }
@@ -174,7 +251,7 @@ interface PlayerController : AutoCloseable {
         override suspend fun changeVolume(value: Float) {
             runCatching {
                 audioSampler?.setVolume(value)?.let { volume ->
-                    _state.emit(state.value.copy(volume = volume))
+                    _state.emit(state.value.copy(volume = volume, isMuted = false))
                 }
             }.onFailure { _error.send(Exception(it)) }
         }
@@ -187,17 +264,17 @@ interface PlayerController : AutoCloseable {
                 bufferingJob?.cancelAndJoin()
                 bufferingJob = null
 
-                _videoFrame.value = null
-
                 decoder?.close()
+
+                previewFrame = null
+
+                _status.send(PlaybackStatus.EMPTY)
+
                 decoder = Decoder.create(mediaUrl)
 
                 decoder?.run {
-                    buffer = BufferManager.create(this, bufferDurationMillis ?: DEFAULT_BUFFER_DURATION_MILLIS)
 
-                    media.audioFormat?.let { audioFormat ->
-                        audioSampler = AudioSampler.create(audioFormat)
-                    }
+                    if (media.videoFrameRate <= 0.0) _videoFrame.send(null)
 
                     _state.emit(
                         state.value.copy(
@@ -205,15 +282,21 @@ interface PlayerController : AutoCloseable {
                         )
                     )
 
-                    _status.emit(PlaybackStatus.PAUSED)
+                    buffer = BufferManager.create(this, bufferDurationMillis ?: DEFAULT_BUFFER_DURATION_MILLIS)
 
-                    audioSampler?.start()
+                    media.audioFormat?.let { audioFormat ->
+                        audioSampler = AudioSampler.create(audioFormat)
+                    }
 
                     restart()
 
-                    startBuffering(_videoFrame::emit)
+                    startBuffering()
+
+                    audioSampler?.start()
 
                     startPlayback()
+
+                    _status.send(PlaybackStatus.LOADED)
                 } ?: throw Exception("Unable to load media")
             }
         }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
@@ -221,7 +304,7 @@ interface PlayerController : AutoCloseable {
         override suspend fun seekTo(timestampMillis: Long) = interactionMutex.withLock {
             runCatching {
                 when (status.value) {
-                    PlaybackStatus.PLAYING, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED -> {
+                    PlaybackStatus.LOADED, PlaybackStatus.PLAYING, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> {
                         val initialStatus = status.value
 
                         bufferingJob?.cancelAndJoin()
@@ -230,11 +313,11 @@ interface PlayerController : AutoCloseable {
                         playbackJob?.cancelAndJoin()
                         playbackJob = null
 
-                        _status.emit(PlaybackStatus.SEEKING)
-
                         audioSampler?.stop()
 
                         buffer?.flush()
+
+                        _status.send(PlaybackStatus.SEEKING)
 
                         decoder?.seekTo(timestampMillis.milliseconds.inWholeMicroseconds)?.microseconds?.inWholeMilliseconds?.let { timestamp ->
                             _state.emit(
@@ -244,16 +327,18 @@ interface PlayerController : AutoCloseable {
                             )
                         }
 
-                        startBuffering(_videoFrame::emit)
+                        startBuffering()
 
                         audioSampler?.start()
 
                         startPlayback()
 
                         when (initialStatus) {
-                            PlaybackStatus.PLAYING -> _status.emit(PlaybackStatus.PLAYING)
+                            PlaybackStatus.PLAYING -> _status.send(PlaybackStatus.PLAYING)
 
-                            PlaybackStatus.PAUSED, PlaybackStatus.STOPPED -> _status.emit(PlaybackStatus.PAUSED)
+                            PlaybackStatus.LOADED, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> _status.send(
+                                PlaybackStatus.PAUSED
+                            )
 
                             else -> Unit
                         }
@@ -270,16 +355,18 @@ interface PlayerController : AutoCloseable {
                 if (state.value.playbackTimestampMillis.milliseconds.inWholeNanoseconds == state.value.media?.durationNanos) return@runCatching
 
                 when (status.value) {
-                    PlaybackStatus.PAUSED -> _status.emit(PlaybackStatus.PLAYING)
+                    PlaybackStatus.LOADED, PlaybackStatus.PAUSED -> _status.send(PlaybackStatus.PLAYING)
 
                     PlaybackStatus.STOPPED -> {
-                        startBuffering(_videoFrame::emit)
+                        decoder?.restart()
+
+                        startBuffering()
 
                         audioSampler?.start()
 
                         startPlayback()
 
-                        _status.emit(PlaybackStatus.PLAYING)
+                        _status.send(PlaybackStatus.PLAYING)
                     }
 
                     else -> Unit
@@ -290,7 +377,7 @@ interface PlayerController : AutoCloseable {
         override suspend fun pause() = interactionMutex.withLock {
             runCatching {
                 when (status.value) {
-                    PlaybackStatus.PLAYING -> _status.emit(PlaybackStatus.PAUSED)
+                    PlaybackStatus.PLAYING -> _status.send(PlaybackStatus.PAUSED)
 
                     else -> Unit
                 }
@@ -300,20 +387,22 @@ interface PlayerController : AutoCloseable {
         override suspend fun stop() = interactionMutex.withLock {
             runCatching {
                 when (status.value) {
-                    PlaybackStatus.PLAYING, PlaybackStatus.PAUSED -> {
+                    PlaybackStatus.LOADED, PlaybackStatus.PLAYING, PlaybackStatus.PAUSED, PlaybackStatus.COMPLETED -> {
                         playbackJob?.cancelAndJoin()
                         playbackJob = null
 
                         bufferingJob?.cancelAndJoin()
                         bufferingJob = null
 
-                        _status.emit(PlaybackStatus.STOPPED)
+                        _videoFrame.send(previewFrame)
 
                         audioSampler?.stop()
 
                         buffer?.flush()
 
                         _state.emit(state.value.copy(bufferTimestampMillis = 0L, playbackTimestampMillis = 0L))
+
+                        _status.send(PlaybackStatus.STOPPED)
                     }
 
                     else -> Unit
@@ -327,6 +416,10 @@ interface PlayerController : AutoCloseable {
 
             bufferingJob?.cancel()
             bufferingJob = null
+
+            _error.close()
+            _status.close()
+            _videoFrame.close()
 
             audioSampler?.close()
             decoder?.close()
