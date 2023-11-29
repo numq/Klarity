@@ -23,7 +23,7 @@ interface PlayerController : AutoCloseable {
     /**
      * Flow emitting exceptions that occur during playback.
      */
-    val error: Flow<Exception>
+    val exception: Flow<Exception>
 
     /**
      * StateFlow representing the current state of the player.
@@ -102,9 +102,9 @@ interface PlayerController : AutoCloseable {
 
         private var playbackJob: Job? = null
 
-        private val _error = Channel<Exception>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        private val _exception = Channel<Exception>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-        override val error: Flow<Exception> = _error.consumeAsFlow()
+        override val exception: Flow<Exception> = _exception.consumeAsFlow()
 
         private val _state = MutableStateFlow(PlayerState())
 
@@ -113,11 +113,13 @@ interface PlayerController : AutoCloseable {
         private val _status = Channel<PlaybackStatus>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
         override val status: StateFlow<PlaybackStatus> = _status.consumeAsFlow()
+            .distinctUntilChanged()
             .stateIn(playerScope, SharingStarted.Eagerly, PlaybackStatus.EMPTY)
 
         private var _videoFrame = Channel<DecodedFrame.Video?>(onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
         override val videoFrame: StateFlow<DecodedFrame.Video?> = _videoFrame.consumeAsFlow()
+            .distinctUntilChanged()
             .stateIn(playerScope, SharingStarted.Eagerly, null)
 
         private var decoder: Decoder? = null
@@ -135,7 +137,6 @@ interface PlayerController : AutoCloseable {
         private var isCompleted = false
 
         private suspend fun startBuffering() {
-            var previewRendered = false
             buffer?.runCatching {
                 bufferingJob?.cancelAndJoin()
                 bufferingJob = playerScope.launch {
@@ -144,10 +145,9 @@ interface PlayerController : AutoCloseable {
                             isCompleted = throwable == null
                         }
                         .collect { bufferTimestampNanos ->
-                            if (!previewRendered && state.value.media?.videoFrameRate?.compareTo(0.0) == 1) {
+                            if (previewFrame == null && state.value.media?.videoFrameRate?.compareTo(0.0) == 1) {
                                 (firstVideoFrame() as? DecodedFrame.Video)?.let { frame ->
-                                    previewRendered = _videoFrame.trySend(frame).isSuccess
-                                    previewFrame = frame
+                                    if (_videoFrame.trySend(frame).isSuccess) previewFrame = frame
                                 }
                             }
                             _state.emit(
@@ -157,7 +157,7 @@ interface PlayerController : AutoCloseable {
                             )
                         }
                 }
-            }?.onFailure { _error.send(Exception(it)) }
+            }?.onFailure { _exception.send(Exception(it)) }
         }
 
         private suspend fun startPlayback() {
@@ -168,7 +168,7 @@ interface PlayerController : AutoCloseable {
                 playbackJob?.cancelAndJoin()
                 playbackJob = playerScope.launch playback@{
 
-                    val media = state.value.media ?: return@playback _error.send(Exception("Unable to load media"))
+                    val media = state.value.media ?: return@playback _exception.send(Exception("Unable to load media"))
 
                     val videoJob = if (media.videoFrameRate > 0.0) launch video@{
                         while (isActive) {
@@ -237,7 +237,7 @@ interface PlayerController : AutoCloseable {
 
                     _status.send(PlaybackStatus.COMPLETED)
                 }
-            }?.onFailure { _error.send(Exception(it)) }
+            }?.onFailure { _exception.send(Exception(it)) }
         }
 
         override suspend fun toggleMute() {
@@ -245,7 +245,7 @@ interface PlayerController : AutoCloseable {
                 audioSampler?.setMuted(!state.value.isMuted)?.let { isMuted ->
                     _state.emit(state.value.copy(isMuted = isMuted))
                 }
-            }.onFailure { _error.send(Exception(it)) }
+            }.onFailure { _exception.send(Exception(it)) }
         }
 
         override suspend fun changeVolume(value: Float) {
@@ -253,7 +253,7 @@ interface PlayerController : AutoCloseable {
                 audioSampler?.setVolume(value)?.let { volume ->
                     _state.emit(state.value.copy(volume = volume, isMuted = false))
                 }
-            }.onFailure { _error.send(Exception(it)) }
+            }.onFailure { _exception.send(Exception(it)) }
         }
 
         override suspend fun load(mediaUrl: String, bufferDurationMillis: Long?) = interactionMutex.withLock {
@@ -285,7 +285,10 @@ interface PlayerController : AutoCloseable {
                     buffer = BufferManager.create(this, bufferDurationMillis ?: DEFAULT_BUFFER_DURATION_MILLIS)
 
                     media.audioFormat?.let { audioFormat ->
-                        audioSampler = AudioSampler.create(audioFormat)
+                        audioSampler = AudioSampler.create(audioFormat).apply {
+                            setVolume(state.value.volume)
+                            setMuted(state.value.isMuted)
+                        }
                     }
 
                     restart()
@@ -299,7 +302,7 @@ interface PlayerController : AutoCloseable {
                     _status.send(PlaybackStatus.LOADED)
                 } ?: throw Exception("Unable to load media")
             }
-        }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
         override suspend fun seekTo(timestampMillis: Long) = interactionMutex.withLock {
             runCatching {
@@ -346,8 +349,8 @@ interface PlayerController : AutoCloseable {
 
                     else -> Unit
                 }
-            }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
-        }
+            }
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
         override suspend fun play() = interactionMutex.withLock {
             runCatching {
@@ -372,7 +375,7 @@ interface PlayerController : AutoCloseable {
                     else -> Unit
                 }
             }
-        }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
         override suspend fun pause() = interactionMutex.withLock {
             runCatching {
@@ -381,7 +384,7 @@ interface PlayerController : AutoCloseable {
 
                     else -> Unit
                 }
-            }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
+            }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
         }
 
         override suspend fun stop() = interactionMutex.withLock {
@@ -407,8 +410,8 @@ interface PlayerController : AutoCloseable {
 
                     else -> Unit
                 }
-            }.onFailure { _error.send(Exception(it)) }.getOrDefault(Unit)
-        }
+            }
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
         override fun close() {
             playbackJob?.cancel()
@@ -417,11 +420,14 @@ interface PlayerController : AutoCloseable {
             bufferingJob?.cancel()
             bufferingJob = null
 
-            _error.close()
+            _exception.close()
+
             _status.close()
+
             _videoFrame.close()
 
             audioSampler?.close()
+
             decoder?.close()
         }
     }
