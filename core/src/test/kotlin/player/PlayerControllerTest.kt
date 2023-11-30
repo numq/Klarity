@@ -146,7 +146,10 @@ class PlayerControllerTest {
 
                 pause()
 
+                delay(500L)
+
                 play()
+
             }
         }
 
