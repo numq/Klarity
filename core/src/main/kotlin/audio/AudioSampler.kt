@@ -3,6 +3,8 @@ package audio
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.sound.sampled.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.math.log10
 
 /**
@@ -57,7 +59,10 @@ interface AudioSampler : AutoCloseable {
     }
 
     private class Implementation(private val sourceDataLine: SourceDataLine) : AudioSampler {
-        private val mutex = Mutex()
+
+        private val playbackMutex = Mutex()
+
+        private val controlsMutex = Mutex()
 
         private val muteControl = if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
             sourceDataLine.getControl(BooleanControl.Type.MUTE) as? BooleanControl
@@ -67,14 +72,16 @@ interface AudioSampler : AutoCloseable {
             sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
         } else null
 
-        override suspend fun setMuted(state: Boolean) = mutex.withLock {
-            muteControl?.value = state
-            muteControl?.value
+        override suspend fun setMuted(state: Boolean) = controlsMutex.withLock {
+            muteControl?.run {
+                value = state
+                value
+            }
         }
 
-        override suspend fun setVolume(value: Float) = mutex.withLock {
-            value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
-                gainControl?.run {
+        override suspend fun setVolume(value: Float) = controlsMutex.withLock {
+            gainControl?.run {
+                value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
                     this.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
                     muteControl?.value = false
                     value
@@ -82,22 +89,25 @@ interface AudioSampler : AutoCloseable {
             }
         }
 
-        override suspend fun start() {
-            mutex.withLock {
+        override suspend fun start() = playbackMutex.withLock {
+            suspendCoroutine { continuation ->
                 sourceDataLine.start()
+                continuation.resume(Unit)
             }
         }
 
-        override suspend fun play(bytes: ByteArray) {
-            mutex.withLock {
+        override suspend fun play(bytes: ByteArray) = playbackMutex.withLock {
+            suspendCoroutine { continuation ->
                 sourceDataLine.write(bytes, 0, bytes.size)
+                continuation.resume(Unit)
             }
         }
 
-        override suspend fun stop() {
-            mutex.withLock {
+        override suspend fun stop() = playbackMutex.withLock {
+            suspendCoroutine { continuation ->
                 sourceDataLine.stop()
                 sourceDataLine.flush()
+                continuation.resume(Unit)
             }
         }
 
