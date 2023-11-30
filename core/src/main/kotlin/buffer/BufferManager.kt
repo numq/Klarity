@@ -106,10 +106,8 @@ interface BufferManager {
     ) : BufferManager {
 
         override val audioBufferCapacity = ceil(bufferDurationMillis * decoder.media.audioFrameRate / 1_000L).toInt()
-            .also { println("audio buffer capacity: $it") }
 
         override val videoBufferCapacity = ceil(bufferDurationMillis * decoder.media.videoFrameRate / 1_000L).toInt()
-            .also { println("video buffer capacity: $it") }
 
         private val audioBuffer = LinkedList<DecodedFrame>()
 
@@ -149,7 +147,12 @@ interface BufferManager {
                                 is DecodedFrame.End -> {
                                     audioBuffer.add(frame)
                                     videoBuffer.add(frame)
-                                    return@coroutineScope println("Buffering has been completed")
+
+                                    /**
+                                     * Buffering has been completed
+                                     */
+
+                                    return@coroutineScope
                                 }
                             }
                         }
@@ -162,7 +165,9 @@ interface BufferManager {
             audioBuffer.clear()
             videoBuffer.clear()
 
-            println("Buffer has been flushed")
+            /**
+             * Buffer has been flushed
+             */
         }
     }
 }

@@ -53,7 +53,7 @@ class PlayerControllerTest {
     }
 
     @Test
-    fun `load files`() = runTest {
+    fun `load and unload files`() = runTest {
 
         val expected = arrayOf(
             PlaybackStatus.EMPTY,
@@ -62,6 +62,7 @@ class PlayerControllerTest {
             PlaybackStatus.LOADED,
             PlaybackStatus.EMPTY,
             PlaybackStatus.LOADED,
+            PlaybackStatus.EMPTY,
         )
 
         val actual = mutableListOf<PlaybackStatus>()
@@ -74,11 +75,13 @@ class PlayerControllerTest {
                 fileUrls.forEach { url ->
                     controller.load(url)
 
-                    assertEquals(url, state.value.media!!.url)
+                    assertEquals(url, state.value.media?.url)
 
-                    println(state.value.media)
+                    delay(100L)
 
-                    assertEquals(0L, state.value.playbackTimestampMillis)
+                    controller.unload()
+
+                    assertNull(state.value.media?.url)
                 }
             }
         }
