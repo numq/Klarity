@@ -47,19 +47,35 @@ interface PlayerController : AutoCloseable {
 
     /**
      * Changes the volume of the audio.
+     *
      * @param value The new volume level, ranging from 0.0 to 1.0.
      */
     suspend fun changeVolume(value: Float)
 
     /**
+     * Retrieves a snapshot of the video frame at the specified timestamp in milliseconds.
+     *
+     * @param timestampMillis The timestamp to capture, in milliseconds.
+     * @return The snapshot of the video frame at the specified timestamp, or `null` if not available.
+     */
+    suspend fun snapshot(timestampMillis: Long): DecodedFrame.Video?
+
+    /**
      * Loads and prepares the player for playback of the specified media.
+     *
      * @param mediaUrl The url of the media to load.
      * @param bufferDurationMillis The duration, in milliseconds, for which to buffer frames.
      */
     suspend fun load(mediaUrl: String, bufferDurationMillis: Long? = null)
 
     /**
+     * Unloads the current media, stopping any ongoing playback and releasing resources.
+     */
+    suspend fun unload()
+
+    /**
      * Seeks to the specified timestamp in milliseconds.
+     *
      * @param timestampMillis The timestamp to seek to, in milliseconds.
      */
     suspend fun seekTo(timestampMillis: Long)
@@ -87,6 +103,7 @@ interface PlayerController : AutoCloseable {
 
         /**
          * Creates a [PlayerController] instance.
+         *
          * @return A [PlayerController] instance.
          */
         fun create(): PlayerController = Implementation()
@@ -132,8 +149,6 @@ interface PlayerController : AutoCloseable {
 
         private val synchronizer = TimestampSynchronizer.create()
 
-        private var previewFrame: DecodedFrame.Video? = null
-
         private var isCompleted = false
 
         private suspend fun startBuffering() {
@@ -141,15 +156,8 @@ interface PlayerController : AutoCloseable {
                 bufferingJob?.cancelAndJoin()
                 bufferingJob = playerScope.launch {
                     startBuffering()
-                        .onCompletion { throwable ->
-                            isCompleted = throwable == null
-                        }
+                        .onCompletion { throwable -> isCompleted = throwable == null }
                         .collect { bufferTimestampNanos ->
-                            if (previewFrame == null && state.value.media?.videoFrameRate?.compareTo(0.0) == 1) {
-                                (firstVideoFrame() as? DecodedFrame.Video)?.let { frame ->
-                                    if (_videoFrame.trySend(frame).isSuccess) previewFrame = frame
-                                }
-                            }
                             _state.emit(
                                 state.value.copy(
                                     bufferTimestampMillis = bufferTimestampNanos.nanoseconds.inWholeMilliseconds
@@ -170,34 +178,6 @@ interface PlayerController : AutoCloseable {
 
                     val media = state.value.media ?: return@playback _exception.send(Exception("Unable to load media"))
 
-                    val videoJob = if (media.videoFrameRate > 0.0) launch video@{
-                        while (isActive) {
-                            if (status.value == PlaybackStatus.PLAYING) {
-                                when (val frame = extractVideoFrame()) {
-                                    null -> if (isCompleted) return@video
-                                    is DecodedFrame.Audio -> Unit
-
-                                    is DecodedFrame.Video -> {
-
-                                        _state.emit(
-                                            state.value.copy(
-                                                playbackTimestampMillis = frame.timestampNanos.nanoseconds.inWholeMilliseconds
-                                            )
-                                        )
-
-                                        synchronizer.updateVideoTimestamp(frame.timestampNanos)
-
-                                        if (media.audioFrameRate > 0.0) synchronizer.syncWithAudio() else synchronizer.syncWithVideo()
-
-                                        _videoFrame.trySend(frame)
-                                    }
-
-                                    is DecodedFrame.End -> return@video
-                                }
-                            }
-                        }
-                    } else null
-
                     val audioJob = if (media.audioFrameRate > 0.0) launch audio@{
                         while (isActive) {
                             if (status.value == PlaybackStatus.PLAYING) {
@@ -206,13 +186,13 @@ interface PlayerController : AutoCloseable {
 
                                     is DecodedFrame.Audio -> {
 
+                                        synchronizer.updateAudioTimestamp(frame.timestampNanos)
+
                                         _state.emit(
                                             state.value.copy(
                                                 playbackTimestampMillis = frame.timestampNanos.nanoseconds.inWholeMilliseconds
                                             )
                                         )
-
-                                        synchronizer.updateAudioTimestamp(frame.timestampNanos)
 
                                         audioSampler?.play(frame.bytes)
                                     }
@@ -225,9 +205,40 @@ interface PlayerController : AutoCloseable {
                         }
                     } else null
 
+                    val videoJob = if (media.videoFrameRate > 0.0) launch video@{
+                        while (isActive) {
+                            if (status.value == PlaybackStatus.PLAYING) {
+                                when (val frame = extractVideoFrame()) {
+                                    null -> if (isCompleted) return@video
+                                    is DecodedFrame.Audio -> Unit
+
+                                    is DecodedFrame.Video -> {
+
+                                        synchronizer.updateVideoTimestamp(frame.timestampNanos)
+
+                                        _state.emit(
+                                            state.value.copy(
+                                                playbackTimestampMillis = frame.timestampNanos.nanoseconds.inWholeMilliseconds
+                                            )
+                                        )
+
+                                        if (media.audioFrameRate > 0.0) synchronizer.syncWithAudio(media.videoFrameRate)
+                                        else synchronizer.syncWithVideo(media.videoFrameRate)
+
+                                        _videoFrame.send(frame)
+                                    }
+
+                                    is DecodedFrame.End -> return@video
+                                }
+                            }
+                        }
+                    } else null
+
                     joinAll(*listOfNotNull(audioJob, videoJob).toTypedArray())
 
-                    println("End of media")
+                    /**
+                     * End of media
+                     */
 
                     _state.emit(
                         state.value.copy(
@@ -240,21 +251,21 @@ interface PlayerController : AutoCloseable {
             }?.onFailure { _exception.send(Exception(it)) }
         }
 
-        override suspend fun toggleMute() {
-            runCatching {
-                audioSampler?.setMuted(!state.value.isMuted)?.let { isMuted ->
-                    _state.emit(state.value.copy(isMuted = isMuted))
-                }
-            }.onFailure { _exception.send(Exception(it)) }
-        }
+        override suspend fun toggleMute() = runCatching {
+            audioSampler?.setMuted(!state.value.isMuted)?.let { isMuted ->
+                _state.emit(state.value.copy(isMuted = isMuted))
+            } ?: Unit
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
-        override suspend fun changeVolume(value: Float) {
-            runCatching {
-                audioSampler?.setVolume(value)?.let { volume ->
-                    _state.emit(state.value.copy(volume = volume, isMuted = false))
-                }
-            }.onFailure { _exception.send(Exception(it)) }
-        }
+        override suspend fun changeVolume(value: Float) = runCatching {
+            audioSampler?.setVolume(value)?.let { volume ->
+                _state.emit(state.value.copy(volume = volume, isMuted = false))
+            } ?: Unit
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
+
+        override suspend fun snapshot(timestampMillis: Long) = runCatching {
+            decoder?.snapshot(timestampMillis.milliseconds.inWholeMicroseconds)
+        }.onFailure { _exception.send(Exception(it)) }.getOrNull()
 
         override suspend fun load(mediaUrl: String, bufferDurationMillis: Long?) = interactionMutex.withLock {
             runCatching {
@@ -266,15 +277,11 @@ interface PlayerController : AutoCloseable {
 
                 decoder?.close()
 
-                previewFrame = null
-
-                _status.send(PlaybackStatus.EMPTY)
-
                 decoder = Decoder.create(mediaUrl)
 
                 decoder?.run {
 
-                    if (media.videoFrameRate <= 0.0) _videoFrame.send(null)
+                    _videoFrame.send(media.previewFrame)
 
                     _state.emit(
                         state.value.copy(
@@ -304,6 +311,38 @@ interface PlayerController : AutoCloseable {
             }
         }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
 
+        override suspend fun unload() = interactionMutex.withLock {
+            runCatching {
+                when (status.value) {
+                    PlaybackStatus.EMPTY -> Unit
+
+                    else -> {
+                        playbackJob?.cancelAndJoin()
+                        playbackJob = null
+
+                        bufferingJob?.cancelAndJoin()
+                        bufferingJob = null
+
+                        _videoFrame.send(null)
+
+                        audioSampler?.stop()
+
+                        buffer?.flush()
+
+                        _state.emit(
+                            state.value.copy(
+                                media = null,
+                                bufferTimestampMillis = 0L,
+                                playbackTimestampMillis = 0L
+                            )
+                        )
+
+                        _status.send(PlaybackStatus.EMPTY)
+                    }
+                }
+            }
+        }.onFailure { _exception.send(Exception(it)) }.getOrDefault(Unit)
+
         override suspend fun seekTo(timestampMillis: Long) = interactionMutex.withLock {
             runCatching {
                 when (status.value) {
@@ -322,12 +361,19 @@ interface PlayerController : AutoCloseable {
 
                         _status.send(PlaybackStatus.SEEKING)
 
-                        decoder?.seekTo(timestampMillis.milliseconds.inWholeMicroseconds)?.microseconds?.inWholeMilliseconds?.let { timestamp ->
-                            _state.emit(
-                                state.value.copy(
-                                    bufferTimestampMillis = timestamp, playbackTimestampMillis = timestamp
+                        decoder?.seekTo(timestampMillis.milliseconds.inWholeMicroseconds)?.let { timestampMicros ->
+                            timestampMicros.microseconds.inWholeMilliseconds.run {
+                                _state.emit(
+                                    state.value.copy(
+                                        bufferTimestampMillis = this,
+                                        playbackTimestampMillis = this
+                                    )
                                 )
-                            )
+                            }
+
+                            decoder?.snapshot(timestampMicros)?.let { frame ->
+                                _videoFrame.send(frame)
+                            }
                         }
 
                         startBuffering()
@@ -339,9 +385,11 @@ interface PlayerController : AutoCloseable {
                         when (initialStatus) {
                             PlaybackStatus.PLAYING -> _status.send(PlaybackStatus.PLAYING)
 
-                            PlaybackStatus.LOADED, PlaybackStatus.PAUSED, PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> _status.send(
-                                PlaybackStatus.PAUSED
-                            )
+                            PlaybackStatus.LOADED,
+                            PlaybackStatus.PAUSED,
+                            PlaybackStatus.STOPPED,
+                            PlaybackStatus.COMPLETED,
+                            -> _status.send(PlaybackStatus.PAUSED)
 
                             else -> Unit
                         }
@@ -358,9 +406,13 @@ interface PlayerController : AutoCloseable {
                 if (state.value.playbackTimestampMillis.milliseconds.inWholeNanoseconds == state.value.media?.durationNanos) return@runCatching
 
                 when (status.value) {
-                    PlaybackStatus.LOADED, PlaybackStatus.PAUSED -> _status.send(PlaybackStatus.PLAYING)
+                    PlaybackStatus.PAUSED -> {
+                        audioSampler?.start()
 
-                    PlaybackStatus.STOPPED -> {
+                        _status.send(PlaybackStatus.PLAYING)
+                    }
+
+                    PlaybackStatus.LOADED, PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> {
                         decoder?.restart()
 
                         startBuffering()
@@ -380,7 +432,11 @@ interface PlayerController : AutoCloseable {
         override suspend fun pause() = interactionMutex.withLock {
             runCatching {
                 when (status.value) {
-                    PlaybackStatus.PLAYING -> _status.send(PlaybackStatus.PAUSED)
+                    PlaybackStatus.PLAYING -> {
+                        audioSampler?.stop()
+
+                        _status.send(PlaybackStatus.PAUSED)
+                    }
 
                     else -> Unit
                 }
@@ -397,7 +453,9 @@ interface PlayerController : AutoCloseable {
                         bufferingJob?.cancelAndJoin()
                         bufferingJob = null
 
-                        _videoFrame.send(previewFrame)
+                        state.value.media?.previewFrame?.let { frame ->
+                            _videoFrame.send(frame)
+                        }
 
                         audioSampler?.stop()
 

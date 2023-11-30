@@ -118,7 +118,7 @@ interface Decoder : AutoCloseable {
                     videoCodec = mediaGrabber.videoCodec
                     imageMode = mediaGrabber.imageMode
                     pixelFormat = mediaGrabber.pixelFormat
-                }.use { snapshotGrabber ->
+                }.let { snapshotGrabber ->
                     Implementation(mediaGrabber = mediaGrabber, snapshotGrabber = snapshotGrabber, media)
                 }
             }
@@ -135,6 +135,7 @@ interface Decoder : AutoCloseable {
             Loader.load(org.bytedeco.opencv.opencv_java::class.java)
             avutil.av_log_set_level(avutil.AV_LOG_ERROR)
             FFmpegLogCallback.set()
+            snapshotGrabber.start()
         }
 
         private val grabberMutex = Mutex()
@@ -144,9 +145,8 @@ interface Decoder : AutoCloseable {
         private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
 
         override suspend fun snapshot(timestampMicros: Long) = snapshotGrabber.run {
-            restart()
             setTimestamp(timestampMicros, true)
-            grab()?.let { frame ->
+            grabImage()?.let { frame ->
                 byteArrayFrameConverter.convert(frame)?.let { bytes ->
                     DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
                 }
@@ -189,6 +189,7 @@ interface Decoder : AutoCloseable {
         }
 
         override fun close() {
+            snapshotGrabber.close()
             byteArrayFrameConverter.close()
         }
     }
