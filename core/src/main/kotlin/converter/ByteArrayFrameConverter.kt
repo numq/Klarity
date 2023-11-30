@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
 
-class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
+class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray>() {
 
     /**
      * No need for conversion
@@ -50,8 +50,8 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
      * BGRA image bytes conversion
      */
     private fun getDecodedImage(frame: Frame) = runCatching {
-        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.use {frame ->
-            with(frame){
+        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.use { frame ->
+            with(frame) {
                 (image?.firstOrNull() as? ByteBuffer)?.run {
 
                     if (imageDepth != Frame.DEPTH_UBYTE && imageDepth != Frame.DEPTH_BYTE) return null
@@ -87,4 +87,6 @@ class ByteArrayFrameConverter : FrameConverter<ByteArray>() {
             }
         }
     }.onFailure { println(it.localizedMessage) }.getOrNull()
+
+    override fun close() = super.close()
 }
