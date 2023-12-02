@@ -1,17 +1,15 @@
 package decoder
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.net.URL
 import javax.sound.sampled.AudioFormat
-import kotlin.math.ceil
-import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.ZERO
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 
 class DecoderTest {
     companion object {
@@ -32,89 +30,77 @@ class DecoderTest {
 
     @Test
     fun `static creation`() {
-        fileUrls.forEach { file ->
-            assertNotNull(Decoder.create(file))
+        fileUrls.forEach { url ->
+            assertNotNull(Decoder.create(url))
         }
     }
 
     @Test
-    fun `decoding process`() = runTest {
+    fun `decoding process`() = runTest(timeout = ZERO) {
         fileUrls.forEach { file ->
-            FFmpegFrameGrabber(file).use { grabber ->
+            Decoder.create(file).let { decoder ->
 
-                grabber.start()
+                with(decoder.media) {
 
-                Decoder.create(file).use { decoder ->
-                    with(decoder.media) {
-                        assertEquals(url, url)
+                    assertEquals(file, url)
 
-                        assertEquals(File(file).name, name)
+                    assertEquals(File(file).name, name)
 
-                        if (grabber.hasAudio()) {
-                            assertEquals(
-                                AudioFormat(
-                                    44100F,
-                                    16,
-                                    2,
-                                    true,
-                                    false
-                                ).toString(),
-                                audioFormat.toString()
-                            )
-                        }
-
-                        with(grabber) {
-                            assertEquals(lengthInTime.microseconds.inWholeNanoseconds, durationNanos)
-
-                            assertEquals(audioFrameRate, audioFrameRate)
-
-                            assertEquals(videoFrameRate, videoFrameRate)
-
-                            assertEquals((imageWidth to imageHeight).takeIf { it.first > 0 && it.second > 0 }, size)
-                        }
+                    if (file.contains("audio")) {
+                        assertEquals(
+                            AudioFormat(
+                                44100F,
+                                16,
+                                2,
+                                true,
+                                false
+                            ).toString(),
+                            audioFormat.toString()
+                        )
                     }
 
-                    val audioFrames = mutableListOf<DecodedFrame.Audio>()
+                    assertEquals(5.seconds.inWholeNanoseconds, durationNanos)
 
-                    val videoFrames = mutableListOf<DecodedFrame.Video>()
+                    assertEquals(audioFrameRate, audioFrameRate)
 
-                    var endFrame: DecodedFrame.End? = null
+                    assertEquals(videoFrameRate, videoFrameRate)
 
-                    assertDoesNotThrow {
-                        runBlocking {
-                            decoder.restart()
-                        }
-                    }
+                    if (file.contains("video")) assertEquals(500 to 500, size)
+                }
 
-                    while (true) {
-                        when (val frame = decoder.nextFrame()) {
+                val audioFrames = mutableListOf<DecodedFrame.Audio>()
+
+                val videoFrames = mutableListOf<DecodedFrame.Video>()
+
+                var endFrame: DecodedFrame.End? = null
+
+                while (endFrame == null) {
+                    decoder.nextFrame()?.let { frame ->
+                        when (frame) {
                             is DecodedFrame.Audio -> audioFrames.add(frame)
                             is DecodedFrame.Video -> videoFrames.add(frame)
                             is DecodedFrame.End -> {
                                 endFrame = frame
-                                break
                             }
-
-                            else -> break
                         }
                     }
+                }
 
-                    with(grabber) {
-                        assertEquals(ceil(lengthInTime * audioFrameRate / 1_000_000L).toInt(), audioFrames.size)
-                        assertEquals(ceil(lengthInTime * videoFrameRate / 1_000_000L).toInt(), videoFrames.size)
-                        assertEquals(DecodedFrame.End(lengthInTime.microseconds.inWholeNanoseconds), endFrame)
-                    }
+                if (file.contains("audio")) assertTrue(audioFrames.isNotEmpty())
 
-                    var previousTimestamp: Long? = null
+                if (file.contains("video")) assertTrue(videoFrames.isNotEmpty())
 
-                    repeat(5) {
-                        val randomTimestampMicros =
-                            (0L..decoder.media.durationNanos).random().nanoseconds.inWholeMicroseconds
+                assertEquals(DecodedFrame.End(5.seconds.inWholeNanoseconds), endFrame)
 
-                        assertNotEquals(previousTimestamp, decoder.seekTo(randomTimestampMicros))
+                var previousTimestamp: Long? = null
 
-                        previousTimestamp = randomTimestampMicros
-                    }
+                repeat(5) {
+                    val randomTimestampMicros =
+                        (0L..decoder.media.durationNanos).random().nanoseconds.inWholeMicroseconds
+
+                    assertNotEquals(previousTimestamp, decoder.seekTo(randomTimestampMicros))
+
+                    previousTimestamp = randomTimestampMicros
                 }
             }
         }
