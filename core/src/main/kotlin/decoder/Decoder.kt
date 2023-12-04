@@ -92,13 +92,9 @@ interface Decoder : AutoCloseable {
             FFmpegLogCallback.set()
         }
 
-        private val snapshotGrabberMutex = Mutex()
+        private val snapshotMutex = Mutex()
 
-        private val snapshotFrameMutex = Mutex()
-
-        private val mediaGrabberMutex = Mutex()
-
-        private val mediaFrameMutex = Mutex()
+        private val mediaMutex = Mutex()
 
         private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
 
@@ -117,16 +113,6 @@ interface Decoder : AutoCloseable {
                 0.0, 192.0
             ) to videoFrameRate.coerceIn(0.0, 60.0)
 
-            val previewFrame = restart().let {
-                mediaGrabber.grabImage()?.run {
-                    ByteArrayFrameConverter().use { converter ->
-                        converter.convert(this)?.let { bytes ->
-                            DecodedFrame.Video(timestamp.microseconds.inWholeNanoseconds, bytes)
-                        }
-                    }
-                }
-            }
-
             val media = Media(
                 url = url,
                 name = File(url).takeIf(File::exists)?.name,
@@ -134,22 +120,19 @@ interface Decoder : AutoCloseable {
                 audioFrameRate = audioFrameRate,
                 videoFrameRate = videoFrameRate,
                 audioFormat = audioFormat,
-                size = size,
-                previewFrame = previewFrame
+                size = size
             )
 
             media
         }
 
         override suspend fun snapshot(timestampMicros: Long) = CompletableDeferred<DecodedFrame.Video?>().apply {
-            snapshotGrabberMutex.withLock {
+            snapshotMutex.withLock {
                 with(snapshotGrabber) {
                     setTimestamp(timestampMicros, true)
                     grabImage()?.use { frame ->
-                        snapshotFrameMutex.withLock {
-                            byteArrayFrameConverter.convert(frame)?.let { bytes ->
-                                complete(DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes))
-                            }
+                        byteArrayFrameConverter.convert(frame)?.let { bytes ->
+                            complete(DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes))
                         }
                     }
                 }
@@ -157,26 +140,24 @@ interface Decoder : AutoCloseable {
         }.await()
 
         override suspend fun nextFrame(): DecodedFrame? = CompletableDeferred<DecodedFrame?>().apply {
-            mediaGrabberMutex.withLock {
+            mediaMutex.withLock {
                 with(mediaGrabber) {
                     when (val grabbedFrame = grabFrame(
                         hasAudio(), hasVideo(), true, false, false
                     )) {
                         null -> complete(DecodedFrame.End(media.durationNanos))
-                        else -> mediaFrameMutex.withLock {
-                            grabbedFrame.use { frame ->
-                                val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
-                                val decodedFrame = when (frame.type) {
-                                    Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
-                                        ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
+                        else -> grabbedFrame.use { frame ->
+                            val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
+                            val decodedFrame = when (frame.type) {
+                                Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
+                                    ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
 
-                                    Frame.Type.VIDEO -> byteArrayFrameConverter.convert(frame)
-                                        ?.let { bytes -> DecodedFrame.Video(timestampNanos, bytes) }
+                                Frame.Type.VIDEO -> byteArrayFrameConverter.convert(frame)
+                                    ?.let { bytes -> DecodedFrame.Video(timestampNanos, bytes) }
 
-                                    else -> null
-                                }
-                                complete(decodedFrame)
+                                else -> null
                             }
+                            complete(decodedFrame)
                         }
                     }
                 }
@@ -184,7 +165,7 @@ interface Decoder : AutoCloseable {
         }.await()
 
         override suspend fun seekTo(timestampMicros: Long) = CompletableDeferred<Long>().apply {
-            mediaGrabberMutex.withLock {
+            mediaMutex.withLock {
                 with(mediaGrabber) {
                     setTimestamp(timestampMicros, true)
                     complete(timestamp)
@@ -193,9 +174,9 @@ interface Decoder : AutoCloseable {
         }.await()
 
         override fun close() {
-            byteArrayFrameConverter.close()
             mediaGrabber.close()
             snapshotGrabber.close()
+            byteArrayFrameConverter.close()
         }
     }
 }

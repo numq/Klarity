@@ -1,6 +1,5 @@
 package media
 
-import decoder.DecodedFrame
 import javax.sound.sampled.AudioFormat
 
 data class Media(
@@ -11,5 +10,4 @@ data class Media(
     val videoFrameRate: Double = 0.0,
     val audioFormat: AudioFormat? = null,
     val size: Pair<Int, Int>? = null,
-    val previewFrame: DecodedFrame.Video? = null,
 )
