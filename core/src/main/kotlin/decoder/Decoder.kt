@@ -25,6 +25,8 @@ interface Decoder : AutoCloseable {
      */
     val media: Media
 
+    suspend fun createMedia(url: String): Media?
+
     /**
      * Retrieves a snapshot of the video frame at the specified timestamp in microseconds.
      *
@@ -77,106 +79,152 @@ interface Decoder : AutoCloseable {
             }.let { snapshotGrabber ->
                 snapshotGrabber.start()
 
-                Implementation(mediaGrabber = mediaGrabber, snapshotGrabber = snapshotGrabber)
+                Implementation(
+                    mediaGrabber = mediaGrabber,
+                    snapshotGrabber = snapshotGrabber
+                )
             }
         }
     }
+}
 
-    private class Implementation(
-        private val mediaGrabber: FFmpegFrameGrabber,
-        private val snapshotGrabber: FFmpegFrameGrabber,
-    ) : Decoder {
+private class Implementation(
+    private val mediaGrabber: FFmpegFrameGrabber,
+    private val snapshotGrabber: FFmpegFrameGrabber,
+) : Decoder {
 
-        init {
-            avutil.av_log_set_level(avutil.AV_LOG_ERROR)
-            FFmpegLogCallback.set()
-        }
+    init {
+        avutil.av_log_set_level(avutil.AV_LOG_ERROR)
+        FFmpegLogCallback.set()
+    }
 
-        private val snapshotMutex = Mutex()
+    private val mediaMutex = Mutex()
 
-        private val mediaMutex = Mutex()
+    private val snapshotMutex = Mutex()
 
-        private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
+    private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
 
-        override val media = with(mediaGrabber) {
+    override val media by lazy {
+        with(mediaGrabber) {
             val url = formatContext.url().string
 
             val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
 
             val audioFormat = if (hasAudio()) AudioFormat(
-                sampleRate.toFloat(), avutil.av_get_bytes_per_sample(sampleFormat) * 8, audioChannels, true, false
+                sampleRate.toFloat(),
+                avutil.av_get_bytes_per_sample(sampleFormat) * 8,
+                audioChannels,
+                true,
+                false
             ) else null
 
             val size = if (imageWidth > 0 && imageHeight > 0) imageWidth to imageHeight else null
 
-            val (audioFrameRate, videoFrameRate) = audioFrameRate.coerceIn(
-                0.0, 192.0
-            ) to videoFrameRate.coerceIn(0.0, 60.0)
+            val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
 
-            val media = Media(
+            Media(
                 url = url,
                 name = File(url).takeIf(File::exists)?.name,
                 durationNanos = durationNanos,
-                audioFrameRate = audioFrameRate,
-                videoFrameRate = videoFrameRate,
+                frameRate = frameRate,
                 audioFormat = audioFormat,
                 size = size
             )
-
-            media
         }
+    }
 
-        override suspend fun snapshot(timestampMicros: Long) = CompletableDeferred<DecodedFrame.Video?>().apply {
-            snapshotMutex.withLock {
-                with(snapshotGrabber) {
-                    setTimestamp(timestampMicros, true)
-                    grabImage()?.use { frame ->
-                        byteArrayFrameConverter.convert(frame)?.let { bytes ->
-                            complete(DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes))
-                        }
+    override suspend fun createMedia(url: String) = CompletableDeferred<Media?>().apply {
+        FFmpegFrameGrabber(url).apply {
+            audioCodec = mediaGrabber.audioCodec
+            sampleMode = mediaGrabber.sampleMode
+            sampleFormat = mediaGrabber.sampleFormat
+            sampleRate = mediaGrabber.sampleRate
+
+            videoCodec = mediaGrabber.videoCodec
+            imageMode = mediaGrabber.imageMode
+            pixelFormat = mediaGrabber.pixelFormat
+        }.use { infoGrabber ->
+            infoGrabber.start()
+
+            with(infoGrabber) {
+                runCatching {
+                    val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
+
+                    val audioFormat = if (hasAudio()) AudioFormat(
+                        sampleRate.toFloat(),
+                        avutil.av_get_bytes_per_sample(sampleFormat) * 8,
+                        audioChannels,
+                        true,
+                        false
+                    ) else null
+
+                    val size = if (imageWidth > 0 && imageHeight > 0) imageWidth to imageHeight else null
+
+                    val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
+
+                    Media(
+                        url = url,
+                        name = File(url).takeIf(File::exists)?.name,
+                        durationNanos = durationNanos,
+                        frameRate = frameRate,
+                        audioFormat = audioFormat,
+                        size = size
+                    )
+                }.getOrNull()?.let(::complete)
+            }
+        }
+    }.await()
+
+    override suspend fun snapshot(timestampMicros: Long) = CompletableDeferred<DecodedFrame.Video?>().apply {
+        snapshotMutex.withLock {
+            with(snapshotGrabber) {
+                setTimestamp(timestampMicros, true)
+                grabImage()?.use { frame ->
+                    byteArrayFrameConverter.convert(frame)?.let { bytes ->
+                        complete(DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes))
                     }
                 }
             }
-        }.await()
+        }
+    }.await()
 
-        override suspend fun nextFrame(): DecodedFrame? = CompletableDeferred<DecodedFrame?>().apply {
-            mediaMutex.withLock {
-                with(mediaGrabber) {
-                    when (val grabbedFrame = grabFrame(
-                        hasAudio(), hasVideo(), true, false, false
-                    )) {
-                        null -> complete(DecodedFrame.End(media.durationNanos))
-                        else -> grabbedFrame.use { frame ->
-                            val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
-                            val decodedFrame = when (frame.type) {
-                                Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
-                                    ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
+    override suspend fun nextFrame(): DecodedFrame? = CompletableDeferred<DecodedFrame?>().apply {
+        mediaMutex.withLock {
+            with(mediaGrabber) {
+                when (val grabbedFrame = grabFrame(
+                    hasAudio(), hasVideo(), true, false, false
+                )) {
+                    null -> complete(DecodedFrame.End(media.durationNanos))
+                    else -> grabbedFrame.use { frame ->
+                        val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
+                        val decodedFrame = when (frame.type) {
+                            Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
+                                ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
 
-                                Frame.Type.VIDEO -> byteArrayFrameConverter.convert(frame)
-                                    ?.let { bytes -> DecodedFrame.Video(timestampNanos, bytes) }
+                            Frame.Type.VIDEO -> byteArrayFrameConverter.convert(frame)
+                                ?.let { bytes -> DecodedFrame.Video(timestampNanos, bytes) }
 
-                                else -> null
-                            }
-                            complete(decodedFrame)
+                            else -> null
                         }
+                        complete(decodedFrame)
                     }
                 }
             }
-        }.await()
-
-        override suspend fun seekTo(timestampMicros: Long) = CompletableDeferred<Long>().apply {
-            mediaMutex.withLock {
-                with(mediaGrabber) {
-                    setTimestamp(timestampMicros, true)
-                    complete(timestamp)
-                }
-            }
-        }.await()
-
-        override fun close() {
-            mediaGrabber.close()
-            snapshotGrabber.close()
-            byteArrayFrameConverter.close()
         }
+    }.await()
+
+    override suspend fun seekTo(timestampMicros: Long) = CompletableDeferred<Long>().apply {
+        mediaMutex.withLock {
+            with(mediaGrabber) {
+                setTimestamp(timestampMicros, true)
+                complete(timestamp)
+            }
+        }
+    }.await()
+
+    override fun close() {
+        mediaGrabber.close()
+        snapshotGrabber.close()
+        byteArrayFrameConverter.close()
     }
 }
