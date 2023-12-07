@@ -12,114 +12,119 @@ import java.util.*
 import kotlin.math.ceil
 
 /**
- * Interface representing a buffer manager for handling audio and video frames.
+ * Interface defining the contract for managing audio and video buffers.
  */
 interface BufferManager {
 
     /**
-     * Gets the capacity of the audio buffer.
+     * Retrieves the current capacity (limit) of the audio buffer.
      */
-    val audioBufferCapacity: Int
+    fun audioBufferCapacity(): Int
 
     /**
-     * Gets the capacity of the video buffer.
+     * Retrieves the current capacity (limit) of the video buffer.
      */
-    val videoBufferCapacity: Int
+    fun videoBufferCapacity(): Int
 
     /**
-     * Gets the current size of the audio buffer.
+     * Retrieves the current size of the audio buffer.
      */
     suspend fun audioBufferSize(): Int
 
     /**
-     * Gets the current size of the video buffer.
+     * Retrieves the current size of the video buffer.
      */
     suspend fun videoBufferSize(): Int
 
     /**
-     * Checks if both the audio and video buffers are empty.
-     *
-     * @return `true` if both audio and video buffers are empty, `false` otherwise.
+     * Checks if both audio and video buffers are empty.
      */
     suspend fun bufferIsEmpty(): Boolean
 
     /**
-     * Checks if both the audio and video buffers are full.
-     *
-     * @return `true` if both audio and video buffers are full, `false` otherwise.
+     * Checks whether the audio or video buffer is full.
      */
     suspend fun bufferIsFull(): Boolean
 
     /**
-     * Retrieves the first audio frame in the buffer without removing it.
-     *
-     * @return The first audio frame in the buffer, or `null` if the buffer is empty.
+     * Retrieves the first audio frame from the buffer without removing it.
      */
     suspend fun firstAudioFrame(): DecodedFrame?
 
     /**
-     * Retrieves the first video frame in the buffer without removing it.
-     *
-     * @return The first video frame in the buffer, or `null` if the buffer is empty.
+     * Retrieves the first video frame from the buffer without removing it.
      */
     suspend fun firstVideoFrame(): DecodedFrame?
 
     /**
-     * Extracts and removes the next audio frame from the buffer.
-     *
-     * @return The next audio frame in the buffer, or `null` if the buffer is empty.
+     * Removes and retrieves an audio frame from the buffer.
      */
     suspend fun extractAudioFrame(): DecodedFrame?
 
     /**
-     * Extracts and removes the next video frame from the buffer.
-     *
-     * @return The next video frame in the buffer, or `null` if the buffer is empty.
+     * Removes and retrieves a video frame from the buffer.
      */
     suspend fun extractVideoFrame(): DecodedFrame?
 
     /**
-     * Starts buffering frames from the associated [Decoder].
+     * Starts buffering frames into the audio and video buffers.
      *
-     * @return A [Flow] emitting the timestamps of buffered frames.
+     * @return A flow emitting timestamps of buffered frames.
      */
     suspend fun startBuffering(): Flow<Long>
 
     /**
-     * Flushes the audio and video buffers, discarding all frames.
+     * Clears both audio and video buffers.
      */
     suspend fun flush()
 
     /**
-     * Companion object providing a factory method to create a [BufferManager] instance.
+     * Changes the duration of the buffer.
+     *
+     * @param durationMillis New duration in milliseconds.
+     */
+    fun changeDuration(durationMillis: Long?)
+
+    /**
+     * Retrieves duration of the buffer in milliseconds.
+     */
+    fun bufferDurationMillis(): Long
+
+    /**
+     * Companion object containing default values and a factory method to create a [BufferManager] instance.
      */
     companion object {
+        private const val DEFAULT_AUDIO_FRAME_RATE = 43.0
+        private const val DEFAULT_BUFFER_DURATION_MILLIS = 1_000L
+
         /**
-         * Creates a [BufferManager] instance with the specified [decoder] and buffer duration.
+         * Creates a [BufferManager] instance using the provided [Decoder].
          *
-         * @param decoder The [Decoder] used to decode frames.
-         * @param bufferDurationMillis The duration, in milliseconds, for which the buffer should store frames.
-         * @return A [BufferManager] instance.
+         * @param decoder The [Decoder] providing frames for buffering.
+         * @return A new instance of [BufferManager].
          */
-        fun create(
-            decoder: Decoder,
-            bufferDurationMillis: Long,
-        ): BufferManager = Implementation(
-            decoder = decoder,
-            bufferDurationMillis = bufferDurationMillis
-        )
+        fun create(decoder: Decoder): BufferManager = Implementation(decoder)
     }
 
-    private class Implementation(
-        private val decoder: Decoder,
-        bufferDurationMillis: Long,
-    ) : BufferManager {
+    private class Implementation(private val decoder: Decoder) : BufferManager {
 
         private val bufferMutex = Mutex()
 
-        override val audioBufferCapacity = ceil(bufferDurationMillis * decoder.media.audioFrameRate / 1_000L).toInt()
+        private var bufferDurationMillis = DEFAULT_BUFFER_DURATION_MILLIS
 
-        override val videoBufferCapacity = ceil(bufferDurationMillis * decoder.media.videoFrameRate / 1_000L).toInt()
+        override fun audioBufferCapacity() =
+            (DEFAULT_AUDIO_FRAME_RATE.takeIf { decoder.media?.audioFormat != null } ?: 0.0)
+                .times(bufferDurationMillis)
+                .div(1_000L)
+                .let(::ceil)
+                .toInt()
+
+        override fun videoBufferCapacity() =
+            (decoder.media?.frameRate ?: 0.0)
+                .times(bufferDurationMillis)
+                .div(1_000L)
+                .let(::ceil)
+                .toInt()
 
         private val audioBuffer = LinkedList<DecodedFrame>()
 
@@ -130,11 +135,11 @@ interface BufferManager {
         override suspend fun videoBufferSize() = bufferMutex.withLock { videoBuffer.size }
 
         override suspend fun bufferIsEmpty() = bufferMutex.withLock {
-            (audioBufferCapacity > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity > 0 && videoBuffer.isEmpty())
+            (audioBufferCapacity() > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity() > 0 && videoBuffer.isEmpty())
         }
 
         override suspend fun bufferIsFull() = bufferMutex.withLock {
-            (audioBufferCapacity > 0 && audioBuffer.size >= audioBufferCapacity) && (videoBufferCapacity > 0 && videoBuffer.size >= videoBufferCapacity)
+            (audioBufferCapacity() > 0 && audioBuffer.size >= audioBufferCapacity()) || (videoBufferCapacity() > 0 && videoBuffer.size >= videoBufferCapacity())
         }
 
         override suspend fun firstAudioFrame(): DecodedFrame? = bufferMutex.withLock { audioBuffer.peek() }
@@ -147,7 +152,7 @@ interface BufferManager {
 
         override suspend fun startBuffering() = flow {
             while (currentCoroutineContext().isActive) {
-                if (audioBuffer.size < audioBufferCapacity || videoBuffer.size < videoBufferCapacity) {
+                if (audioBuffer.size < audioBufferCapacity() || videoBuffer.size < videoBufferCapacity()) {
                     decoder.nextFrame()?.let { frame ->
 
                         emit(frame.timestampNanos)
@@ -183,5 +188,11 @@ interface BufferManager {
              * Buffer has been flushed
              */
         }
+
+        override fun changeDuration(durationMillis: Long?) {
+            if (durationMillis != null) bufferDurationMillis = durationMillis
+        }
+
+        override fun bufferDurationMillis() = bufferDurationMillis
     }
 }
