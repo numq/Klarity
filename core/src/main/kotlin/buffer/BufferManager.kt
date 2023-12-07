@@ -17,6 +17,19 @@ import kotlin.math.ceil
 interface BufferManager {
 
     /**
+     * Gets the duration of the buffer in milliseconds.
+     */
+    val bufferDurationMillis: Long
+
+    /**
+     * Changes the duration of the buffer. If [durationMillis] is non-null, the buffer duration is set to
+     * the provided value; otherwise, it is set to the default value [DEFAULT_BUFFER_DURATION_MILLIS].
+     *
+     * @param durationMillis New duration in milliseconds.
+     */
+    fun changeDuration(durationMillis: Long?)
+
+    /**
      * Retrieves the current capacity (limit) of the audio buffer.
      */
     fun audioBufferCapacity(): Int
@@ -42,7 +55,7 @@ interface BufferManager {
     suspend fun bufferIsEmpty(): Boolean
 
     /**
-     * Checks whether the audio or video buffer is full.
+     * Checks whether either the audio or video buffer is full.
      */
     suspend fun bufferIsFull(): Boolean
 
@@ -67,7 +80,7 @@ interface BufferManager {
     suspend fun extractVideoFrame(): DecodedFrame?
 
     /**
-     * Starts buffering frames into the audio and video buffers.
+     * Starts buffering frames into the audio and video buffers and emits timestamps of buffered frames.
      *
      * @return A flow emitting timestamps of buffered frames.
      */
@@ -77,18 +90,6 @@ interface BufferManager {
      * Clears both audio and video buffers.
      */
     suspend fun flush()
-
-    /**
-     * Changes the duration of the buffer.
-     *
-     * @param durationMillis New duration in milliseconds.
-     */
-    fun changeDuration(durationMillis: Long?)
-
-    /**
-     * Retrieves duration of the buffer in milliseconds.
-     */
-    fun bufferDurationMillis(): Long
 
     /**
      * Companion object containing default values and a factory method to create a [BufferManager] instance.
@@ -110,7 +111,12 @@ interface BufferManager {
 
         private val bufferMutex = Mutex()
 
-        private var bufferDurationMillis = DEFAULT_BUFFER_DURATION_MILLIS
+        override var bufferDurationMillis = DEFAULT_BUFFER_DURATION_MILLIS
+            private set
+
+        override fun changeDuration(durationMillis: Long?) {
+            bufferDurationMillis = durationMillis ?: DEFAULT_BUFFER_DURATION_MILLIS
+        }
 
         override fun audioBufferCapacity() =
             (DEFAULT_AUDIO_FRAME_RATE.takeIf { decoder.media?.audioFormat != null } ?: 0.0)
@@ -188,11 +194,5 @@ interface BufferManager {
              * Buffer has been flushed
              */
         }
-
-        override fun changeDuration(durationMillis: Long?) {
-            if (durationMillis != null) bufferDurationMillis = durationMillis
-        }
-
-        override fun bufferDurationMillis() = bufferDurationMillis
     }
 }
