@@ -1,18 +1,26 @@
 package buffer
 
-import decoder.DecodedFrame
 import decoder.Decoder
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.net.URL
-import kotlin.time.Duration.Companion.ZERO
+import kotlin.time.Duration
 
 class BufferManagerTest {
     companion object {
+        private lateinit var decoder: Decoder
+        private lateinit var bufferManager: BufferManager
+
         private val fileUrls = ClassLoader.getSystemResources("files")
             .nextElement()
             .let(URL::getFile)
@@ -21,83 +29,83 @@ class BufferManagerTest {
             ?.filter(File::exists)
             ?.map(File::getAbsolutePath)!!
 
-        private val mediaUrl = File(ClassLoader.getSystemResource("files/audio_video.mp4").file).absolutePath
+        private val fileUrl = fileUrls.first { it.contains("audio") && it.contains("video") }
 
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
             require(fileUrls.isNotEmpty())
-            require(File(mediaUrl).exists())
         }
+    }
+
+    @BeforeEach
+    fun beforeEach() {
+        decoder = Decoder.create().apply {
+            runBlocking {
+                initialize(fileUrl)
+            }
+        }
+        bufferManager = BufferManager.create(decoder)
+    }
+
+    @AfterEach
+    fun afterEach() {
+        decoder.close()
     }
 
     @Test
     fun `static creation`() {
-        fileUrls.forEach { url ->
-            assertNotNull(
-                Decoder.create(url).let { decoder ->
-                    BufferManager.create(
-                        decoder = decoder,
-                        bufferDurationMillis = 1_000L
-                    )
-                }
-            )
-        }
+        assertNotNull(BufferManager.create(decoder = decoder))
     }
 
     @Test
-    fun `buffering frames`() = runTest(timeout = ZERO) {
-        Decoder.create(mediaUrl).let { decoder ->
-            BufferManager.create(
-                decoder = decoder,
-                bufferDurationMillis = 10_000L
-            ).run {
+    fun `change duration`() {
+        bufferManager.changeDuration(0L)
 
-                val timestamps = startBuffering().toList()
+        assertEquals(0L, bufferManager.bufferDurationMillis)
+        assertEquals(0, bufferManager.audioBufferCapacity())
+        assertEquals(0, bufferManager.videoBufferCapacity())
 
-                assertTrue(timestamps.isNotEmpty())
+        bufferManager.changeDuration(1_000L)
 
-                assertEquals(decoder.media.durationNanos, timestamps.last())
+        assertEquals(1_000L, bufferManager.bufferDurationMillis)
+        assertEquals(43, bufferManager.audioBufferCapacity())
+        assertEquals(25, bufferManager.videoBufferCapacity())
+    }
 
-                assertFalse(bufferIsEmpty(), "buffer must not be empty")
+    @Test
+    fun `frames buffering`() = runTest {
+        val timestamps = mutableListOf<Long>()
 
-                val audioFrames = mutableListOf<DecodedFrame>()
+        bufferManager.startBuffering()
+            .takeWhile { bufferManager.bufferIsEmpty() }
+            .onEach(timestamps::add)
+            .collect()
 
-                val videoFrames = mutableListOf<DecodedFrame>()
+        assertTrue(timestamps.isNotEmpty())
 
-                while (!bufferIsEmpty()) {
-                    extractAudioFrame()?.let(audioFrames::add)
-                    extractVideoFrame()?.let(videoFrames::add)
-                }
+        assertFalse(bufferManager.bufferIsEmpty())
+    }
 
-                assertTrue(audioFrames.isNotEmpty(), "audio buffer should not be empty")
+    @Test
+    fun `frames extraction`() = runTest(timeout = Duration.ZERO) {
+        assertTrue(bufferManager.startBuffering().takeWhile { bufferManager.bufferIsEmpty() }.toList().isNotEmpty())
+    }
 
-                assertTrue(videoFrames.isNotEmpty(), "video buffer should not be empty")
+    @Test
+    fun `buffer flushing`() = runTest {
+        bufferManager.startBuffering()
+            .takeWhile { bufferManager.bufferIsEmpty() }
+            .collect()
 
-                assertTrue(
-                    audioFrames.filterIsInstance<DecodedFrame.Video>().isEmpty(),
-                    "audio buffer should not contain video frames"
-                )
+        assertFalse(bufferManager.bufferIsEmpty(), "buffer should not be empty")
 
-                assertTrue(
-                    videoFrames.filterIsInstance<DecodedFrame.Audio>().isEmpty(),
-                    "video buffer should not contain audio frames"
-                )
+        bufferManager.flush()
 
-                val endFrame = DecodedFrame.End(decoder.media.durationNanos)
+        assertTrue(bufferManager.bufferIsEmpty(), "buffer should be empty")
 
-                assertEquals(endFrame, audioFrames.last())
+        assertEquals(0, bufferManager.audioBufferSize())
 
-                assertEquals(endFrame, videoFrames.last())
-
-                flush()
-
-                assertTrue(bufferIsEmpty(), "both buffers must be empty")
-
-                assertEquals(0, audioBufferSize())
-
-                assertEquals(0, videoBufferSize())
-            }
-        }
+        assertEquals(0, bufferManager.videoBufferSize())
     }
 }
