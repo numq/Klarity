@@ -1,7 +1,7 @@
 package decoder
 
 import converter.ByteArrayFrameConverter
-import kotlinx.coroutines.CompletableDeferred
+import extension.suspend
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import media.Media
@@ -15,139 +15,50 @@ import java.io.File
 import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.microseconds
 
-/**
- * Interface representing a decoder for handling media frames.
- */
 interface Decoder : AutoCloseable {
 
-    /**
-     * Gets the associated [Media] information for the decoder.
-     */
-    val media: Media
+    object Configuration {
+        val sampleMode = FrameGrabber.SampleMode.SHORT
+        const val audioCodec = avcodec.AV_CODEC_ID_AAC
+        const val sampleFormat = avutil.AV_SAMPLE_FMT_S16
+        const val sampleRate = 44100
 
-    suspend fun createMedia(url: String): Media?
+        val imageMode = FrameGrabber.ImageMode.COLOR
+        const val videoCodec = avcodec.AV_CODEC_ID_H264
+        const val pixelFormat = avutil.AV_PIX_FMT_BGRA
+    }
 
-    /**
-     * Retrieves a snapshot of the video frame at the specified timestamp in microseconds.
-     *
-     * @param timestampMicros The timestamp to capture, in microseconds.
-     * @return The snapshot of the video frame at the specified timestamp, or `null` if not available.
-     */
+    val isInitialized: Boolean
+
+    val media: Media?
+
+    suspend fun initialize(url: String)
+
+    suspend fun dispose()
+
     suspend fun snapshot(timestampMicros: Long): DecodedFrame.Video?
 
-    /**
-     * Retrieves the next decoded frame from the media.
-     *
-     * @return The next decoded frame, or `null` if the frame cannot be grabbed for any reason.
-     */
     suspend fun nextFrame(): DecodedFrame?
 
-    /**
-     * Seeks to the specified timestamp in microseconds.
-     *
-     * @param timestampMicros The timestamp to seek to, in microseconds.
-     * @return The actual timestamp after seeking.
-     */
-    suspend fun seekTo(timestampMicros: Long): Long
+    suspend fun seekTo(timestampMicros: Long): Long?
 
-    /**
-     * Companion object providing a factory method to create a [Decoder] instance.
-     */
     companion object {
-        /**
-         * Creates a [Decoder] instance for the specified media url.
-         *
-         * @param mediaUrl The url of the media to decode.
-         * @return A [Decoder] instance.
-         */
-        fun create(mediaUrl: String): Decoder = FFmpegFrameGrabber(mediaUrl).apply {
-            audioCodec = avcodec.AV_CODEC_ID_AAC
-            sampleMode = FrameGrabber.SampleMode.SHORT
-            sampleFormat = avutil.AV_SAMPLE_FMT_S16
-            sampleRate = 44100
+        fun create(): Decoder = Implementation()
 
-            videoCodec = avcodec.AV_CODEC_ID_H264
-            imageMode = FrameGrabber.ImageMode.COLOR
-            pixelFormat = avutil.AV_PIX_FMT_BGRA
-        }.let { mediaGrabber ->
-            mediaGrabber.start()
+        fun createMedia(url: String) = runCatching {
+            FFmpegFrameGrabber(url).apply {
+                audioCodec = Configuration.audioCodec
+                sampleMode = Configuration.sampleMode
+                sampleFormat = Configuration.sampleFormat
+                sampleRate = Configuration.sampleRate
 
-            FFmpegFrameGrabber(mediaUrl).apply {
-                videoCodec = mediaGrabber.videoCodec
-                imageMode = mediaGrabber.imageMode
-                pixelFormat = mediaGrabber.pixelFormat
-            }.let { snapshotGrabber ->
-                snapshotGrabber.start()
+                videoCodec = Configuration.videoCodec
+                imageMode = Configuration.imageMode
+                pixelFormat = Configuration.pixelFormat
 
-                Implementation(
-                    mediaGrabber = mediaGrabber,
-                    snapshotGrabber = snapshotGrabber
-                )
-            }
-        }
-    }
-}
-
-private class Implementation(
-    private val mediaGrabber: FFmpegFrameGrabber,
-    private val snapshotGrabber: FFmpegFrameGrabber,
-) : Decoder {
-
-    init {
-        avutil.av_log_set_level(avutil.AV_LOG_ERROR)
-        FFmpegLogCallback.set()
-    }
-
-    private val mediaMutex = Mutex()
-
-    private val snapshotMutex = Mutex()
-
-    private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
-
-    override val media by lazy {
-        with(mediaGrabber) {
-            val url = formatContext.url().string
-
-            val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
-
-            val audioFormat = if (hasAudio()) AudioFormat(
-                sampleRate.toFloat(),
-                avutil.av_get_bytes_per_sample(sampleFormat) * 8,
-                audioChannels,
-                true,
-                false
-            ) else null
-
-            val size = if (imageWidth > 0 && imageHeight > 0) imageWidth to imageHeight else null
-
-            val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
-
-            Media(
-                url = url,
-                name = File(url).takeIf(File::exists)?.name,
-                durationNanos = durationNanos,
-                frameRate = frameRate,
-                audioFormat = audioFormat,
-                size = size
-            )
-        }
-    }
-
-    override suspend fun createMedia(url: String) = CompletableDeferred<Media?>().apply {
-        FFmpegFrameGrabber(url).apply {
-            audioCodec = mediaGrabber.audioCodec
-            sampleMode = mediaGrabber.sampleMode
-            sampleFormat = mediaGrabber.sampleFormat
-            sampleRate = mediaGrabber.sampleRate
-
-            videoCodec = mediaGrabber.videoCodec
-            imageMode = mediaGrabber.imageMode
-            pixelFormat = mediaGrabber.pixelFormat
-        }.use { infoGrabber ->
-            infoGrabber.start()
-
-            with(infoGrabber) {
-                runCatching {
+                startUnsafe()
+            }.use { infoGrabber ->
+                with(infoGrabber) {
                     val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
 
                     val audioFormat = if (hasAudio()) AudioFormat(
@@ -162,42 +73,160 @@ private class Implementation(
 
                     val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
 
+                    val previewFrame = runCatching {
+                        grabImage()?.use { frame ->
+                            ByteArrayFrameConverter().use { converter ->
+                                converter.convert(frame)?.let { bytes ->
+                                    DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
+                                }
+                            }
+                        }
+                    }.getOrNull()
+
                     Media(
                         url = url,
                         name = File(url).takeIf(File::exists)?.name,
                         durationNanos = durationNanos,
                         frameRate = frameRate,
                         audioFormat = audioFormat,
-                        size = size
+                        size = size,
+                        previewFrame = previewFrame
                     )
-                }.getOrNull()?.let(::complete)
+                }
             }
-        }
-    }.await()
+        }.onFailure(Throwable::printStackTrace).getOrNull()
+    }
+}
 
-    override suspend fun snapshot(timestampMicros: Long) = CompletableDeferred<DecodedFrame.Video?>().apply {
-        snapshotMutex.withLock {
-            with(snapshotGrabber) {
-                setTimestamp(timestampMicros, true)
-                grabImage()?.use { frame ->
-                    byteArrayFrameConverter.convert(frame)?.let { bytes ->
-                        complete(DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes))
+private class Implementation : Decoder {
+
+    init {
+        avutil.av_log_set_level(avutil.AV_LOG_ERROR)
+        FFmpegLogCallback.set()
+    }
+
+    private val byteArrayFrameConverter by lazy { ByteArrayFrameConverter() }
+
+    private val mediaMutex = Mutex()
+
+    private val snapshotMutex = Mutex()
+
+    private val initializationMutex = Mutex()
+
+    private var mediaGrabber: FFmpegFrameGrabber? = null
+
+    private var snapshotGrabber: FFmpegFrameGrabber? = null
+
+    override var isInitialized = false
+        private set
+
+    override var media: Media? = null
+        private set
+
+    override suspend fun initialize(url: String) = initializationMutex.withLock {
+
+        if (isInitialized) throw Exception("Decoder is already initialized")
+
+        runCatching {
+            mediaMutex.withLock {
+                mediaGrabber = FFmpegFrameGrabber(url).apply {
+                    audioCodec = Decoder.Configuration.audioCodec
+                    sampleMode = Decoder.Configuration.sampleMode
+                    sampleFormat = Decoder.Configuration.sampleFormat
+                    sampleRate = Decoder.Configuration.sampleRate
+
+                    videoCodec = Decoder.Configuration.videoCodec
+                    imageMode = Decoder.Configuration.imageMode
+                    pixelFormat = Decoder.Configuration.pixelFormat
+
+                    startUnsafe()
+                }.also { mediaGrabber ->
+
+                    media = with(mediaGrabber) {
+                        val mediaUrl = formatContext.url().string
+
+                        val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
+
+                        val audioFormat = if (hasAudio()) AudioFormat(
+                            sampleRate.toFloat(),
+                            avutil.av_get_bytes_per_sample(sampleFormat) * 8,
+                            audioChannels,
+                            true,
+                            false
+                        ) else null
+
+                        val size = if (imageWidth > 0 && imageHeight > 0) imageWidth to imageHeight else null
+
+                        val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
+
+                        Media(
+                            url = mediaUrl,
+                            name = File(mediaUrl).takeIf(java.io.File::exists)?.name,
+                            durationNanos = durationNanos,
+                            frameRate = frameRate,
+                            audioFormat = audioFormat,
+                            size = size
+                        )
                     }
                 }
             }
-        }
-    }.await()
 
-    override suspend fun nextFrame(): DecodedFrame? = CompletableDeferred<DecodedFrame?>().apply {
-        mediaMutex.withLock {
-            with(mediaGrabber) {
+            snapshotGrabber = snapshotMutex.withLock {
+                FFmpegFrameGrabber(url).apply {
+                    videoCodec = Decoder.Configuration.videoCodec
+                    imageMode = Decoder.Configuration.imageMode
+                    pixelFormat = Decoder.Configuration.pixelFormat
+
+                    startUnsafe()
+                }
+            }
+
+            isInitialized = true
+        }
+    }.onFailure(Throwable::printStackTrace).suspend()
+
+    override suspend fun dispose() = initializationMutex.withLock {
+
+        if (!isInitialized) throw Exception("Unable to dispose uninitialized decoder")
+
+        runCatching {
+            mediaMutex.withLock {
+                mediaGrabber?.close()
+                mediaGrabber = null
+            }
+
+            snapshotMutex.withLock {
+                snapshotGrabber?.close()
+                snapshotGrabber = null
+            }
+
+            media = null
+
+            isInitialized = false
+        }
+    }.onFailure(Throwable::printStackTrace).suspend()
+
+    override suspend fun snapshot(timestampMicros: Long) = snapshotMutex.withLock {
+        snapshotGrabber?.runCatching {
+            setTimestamp(timestampMicros, true)
+            grabImage()?.use { frame ->
+                byteArrayFrameConverter.convert(frame)?.let { bytes ->
+                    DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
+                }
+            }
+        }
+    }?.onFailure(Throwable::printStackTrace)?.suspend()
+
+    override suspend fun nextFrame(): DecodedFrame? = mediaMutex.withLock {
+        mediaGrabber?.runCatching {
+            media?.run {
                 when (val grabbedFrame = grabFrame(
                     hasAudio(), hasVideo(), true, false, false
                 )) {
-                    null -> complete(DecodedFrame.End(media.durationNanos))
+                    null -> DecodedFrame.End(durationNanos)
                     else -> grabbedFrame.use { frame ->
                         val timestampNanos = frame.timestamp.microseconds.inWholeNanoseconds
-                        val decodedFrame = when (frame.type) {
+                        when (frame.type) {
                             Frame.Type.AUDIO -> byteArrayFrameConverter.convert(frame)
                                 ?.let { bytes -> DecodedFrame.Audio(timestampNanos, bytes) }
 
@@ -206,25 +235,26 @@ private class Implementation(
 
                             else -> null
                         }
-                        complete(decodedFrame)
                     }
                 }
             }
         }
-    }.await()
+    }?.onFailure(Throwable::printStackTrace)?.suspend()
 
-    override suspend fun seekTo(timestampMicros: Long) = CompletableDeferred<Long>().apply {
-        mediaMutex.withLock {
-            with(mediaGrabber) {
-                setTimestamp(timestampMicros, true)
-                complete(timestamp)
-            }
+    override suspend fun seekTo(timestampMicros: Long) = mediaMutex.withLock {
+        mediaGrabber?.runCatching {
+            setTimestamp(timestampMicros, true)
+            timestamp
         }
-    }.await()
+    }?.onFailure(Throwable::printStackTrace)?.suspend()
 
     override fun close() {
-        mediaGrabber.close()
-        snapshotGrabber.close()
+        mediaGrabber?.close()
+        mediaGrabber = null
+
+        snapshotGrabber?.close()
+        snapshotGrabber = null
+
         byteArrayFrameConverter.close()
     }
 }
