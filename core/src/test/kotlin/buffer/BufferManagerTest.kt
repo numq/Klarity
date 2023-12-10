@@ -27,7 +27,7 @@ class BufferManagerTest {
             .let(::File)
             .listFiles()
             ?.filter(File::exists)
-            ?.map(File::getAbsolutePath)!!
+            ?.mapNotNull(File::getAbsolutePath)!!
 
         private val fileUrl = fileUrls.first { it.contains("audio") && it.contains("video") }
 
