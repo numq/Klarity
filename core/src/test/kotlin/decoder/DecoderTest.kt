@@ -22,7 +22,7 @@ class DecoderTest {
             .let(::File)
             .listFiles()
             ?.filter(File::exists)
-            ?.map(File::getAbsolutePath)!!
+            ?.mapNotNull(File::getAbsolutePath)!!
 
         @JvmStatic
         @BeforeAll
@@ -48,26 +48,12 @@ class DecoderTest {
 
     @Test
     fun `create a media`() {
-        assertNotNull(Decoder.createMedia(fileUrls.random()))
-    }
-
-    @Test
-    fun `take a snapshot`() = runTest {
-        decoder.initialize(fileUrls.first { it.contains("video") })
-
-        assertTrue(decoder.snapshot(0L)?.bytes?.isNotEmpty()!!)
-    }
-
-    @Test
-    fun `initialize and dispose`() = runTest {
         fileUrls.forEach { fileUrl ->
-            decoder.initialize(fileUrl)
+            val media = Decoder.createMedia(fileUrl)
 
-            assertTrue(decoder.isInitialized)
+            assertNotNull(media)
 
-            assertNotNull(decoder.media)
-
-            with(decoder.media!!) {
+            with(media!!) {
 
                 assertEquals(fileUrl, url)
 
@@ -92,6 +78,24 @@ class DecoderTest {
 
                 if (fileUrl.contains("video")) assertEquals(500 to 500, size)
             }
+        }
+    }
+
+    @Test
+    fun `take a snapshot`() = runTest {
+        decoder.initialize(fileUrls.first { it.contains("video") })
+
+        assertTrue(decoder.snapshot(0L)?.bytes?.isNotEmpty()!!)
+    }
+
+    @Test
+    fun `initialize and dispose`() = runTest {
+        fileUrls.forEach { fileUrl ->
+            decoder.initialize(fileUrl)
+
+            assertTrue(decoder.isInitialized)
+
+            assertEquals(fileUrl, decoder.media!!.url)
 
             decoder.dispose()
 
