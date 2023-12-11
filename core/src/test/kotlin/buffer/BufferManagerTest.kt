@@ -55,7 +55,7 @@ class BufferManagerTest {
 
     @Test
     fun `static creation`() {
-        assertNotNull(BufferManager.create(decoder = decoder))
+        assertInstanceOf(BufferManager::class.java, BufferManager.create(decoder = decoder))
     }
 
     @Test

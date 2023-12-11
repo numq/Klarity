@@ -51,7 +51,7 @@ interface TimestampSynchronizer {
         fun create(): TimestampSynchronizer = Implementation()
     }
 
-    class Implementation : TimestampSynchronizer {
+    private class Implementation : TimestampSynchronizer {
 
         private var audioTimestampNanos: Long? = null
 

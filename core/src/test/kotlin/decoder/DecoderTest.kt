@@ -43,7 +43,7 @@ class DecoderTest {
 
     @Test
     fun `static creation`() {
-        assertNotNull(Decoder.create())
+        assertInstanceOf(Decoder::class.java, Decoder.create())
     }
 
     @Test
