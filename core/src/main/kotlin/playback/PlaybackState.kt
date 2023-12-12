@@ -1,8 +1,8 @@
-package player
+package playback
 
 import media.Media
 
-data class PlayerState(
+data class PlaybackState(
     val media: Media? = null,
     val bufferTimestampMillis: Long = 0L,
     val playbackTimestampMillis: Long = 0L,

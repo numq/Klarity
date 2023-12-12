@@ -21,7 +21,7 @@ interface Decoder : AutoCloseable {
         val sampleMode = FrameGrabber.SampleMode.SHORT
         const val audioCodec = avcodec.AV_CODEC_ID_AAC
         const val sampleFormat = avutil.AV_SAMPLE_FMT_S16
-        const val sampleRate = 44100
+        const val sampleRate = 44_100
 
         val imageMode = FrameGrabber.ImageMode.COLOR
         const val videoCodec = avcodec.AV_CODEC_ID_H264
