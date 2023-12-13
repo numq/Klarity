@@ -19,6 +19,7 @@ interface Decoder : AutoCloseable {
 
     object Configuration {
         val sampleMode = FrameGrabber.SampleMode.SHORT
+        const val audioChannels = 2
         const val audioCodec = avcodec.AV_CODEC_ID_AAC
         const val sampleFormat = avutil.AV_SAMPLE_FMT_S16
         const val sampleRate = 44_100
@@ -26,6 +27,8 @@ interface Decoder : AutoCloseable {
         val imageMode = FrameGrabber.ImageMode.COLOR
         const val videoCodec = avcodec.AV_CODEC_ID_H264
         const val pixelFormat = avutil.AV_PIX_FMT_BGRA
+
+        const val numBuffers = 0
     }
 
     val isInitialized: Boolean
@@ -49,6 +52,7 @@ interface Decoder : AutoCloseable {
 
         fun createMedia(url: String) = runCatching {
             FFmpegFrameGrabber(url).apply {
+                audioChannels = Configuration.audioChannels
                 audioCodec = Configuration.audioCodec
                 sampleMode = Configuration.sampleMode
                 sampleFormat = Configuration.sampleFormat
@@ -58,7 +62,7 @@ interface Decoder : AutoCloseable {
                 imageMode = Configuration.imageMode
                 pixelFormat = Configuration.pixelFormat
 
-                numBuffers = 0
+                numBuffers = Configuration.numBuffers
 
                 startUnsafe()
             }.use { infoGrabber ->
@@ -134,6 +138,7 @@ interface Decoder : AutoCloseable {
                 media = Media.create(url)?.apply {
                     mediaMutex.withLock {
                         mediaGrabber = FFmpegFrameGrabber(url).apply {
+                            audioChannels = Configuration.audioChannels
                             audioCodec = Configuration.audioCodec
                             sampleMode = Configuration.sampleMode
                             sampleFormat = Configuration.sampleFormat
@@ -143,7 +148,7 @@ interface Decoder : AutoCloseable {
                             imageMode = Configuration.imageMode
                             pixelFormat = Configuration.pixelFormat
 
-                            numBuffers = 0
+                            numBuffers = Configuration.numBuffers
 
                             startUnsafe()
                         }
@@ -155,7 +160,7 @@ interface Decoder : AutoCloseable {
                             imageMode = Configuration.imageMode
                             pixelFormat = Configuration.pixelFormat
 
-                            numBuffers = 0
+                            numBuffers = Configuration.numBuffers
 
                             startUnsafe()
                         }

@@ -1,11 +1,11 @@
 package audio
 
+import extension.suspend
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.sound.sampled.*
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlin.math.log10
+
 
 /**
  * Interface representing an audio sampler that allows controlling various audio features.
@@ -39,6 +39,11 @@ interface AudioSampler : AutoCloseable {
     suspend fun play(bytes: ByteArray)
 
     /**
+     * Pauses the audio sampler.
+     */
+    suspend fun pause()
+
+    /**
      * Stops the audio sampler, halting audio playback.
      */
     suspend fun stop()
@@ -47,14 +52,21 @@ interface AudioSampler : AutoCloseable {
      * Companion object providing a factory method to create an [AudioSampler] instance.
      */
     companion object {
+        private val S16LE = AudioFormat(
+            44_100F,
+            16,
+            2,
+            true,
+            false
+        )
+
         /**
-         * Creates an [AudioSampler] instance with the specified [audioFormat].
-         * @param audioFormat The audio format for the sampler.
+         * Creates an [AudioSampler] instance.
          * @return An [AudioSampler] instance.
          */
-        fun create(audioFormat: AudioFormat): AudioSampler =
-            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, audioFormat)) as SourceDataLine)
-                .apply { open(audioFormat, 8192) }
+        fun create(bufferSize: Int?): AudioSampler =
+            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, S16LE)) as SourceDataLine)
+                .apply { open(S16LE, bufferSize ?: 4096) }
                 .let(AudioSampler::Implementation)
     }
 
@@ -90,26 +102,30 @@ interface AudioSampler : AutoCloseable {
         }
 
         override suspend fun start() = playbackMutex.withLock {
-            suspendCoroutine { continuation ->
+            runCatching {
                 sourceDataLine.start()
-                continuation.resume(Unit)
             }
-        }
+        }.onFailure(Throwable::printStackTrace).suspend()
 
         override suspend fun play(bytes: ByteArray) = playbackMutex.withLock {
-            suspendCoroutine { continuation ->
+            runCatching {
                 sourceDataLine.write(bytes, 0, bytes.size)
-                continuation.resume(Unit)
+                Unit
             }
-        }
+        }.onFailure(Throwable::printStackTrace).suspend()
+
+        override suspend fun pause() = playbackMutex.withLock {
+            runCatching {
+                sourceDataLine.stop()
+            }
+        }.onFailure(Throwable::printStackTrace).suspend()
 
         override suspend fun stop() = playbackMutex.withLock {
-            suspendCoroutine { continuation ->
-                sourceDataLine.stop()
+            runCatching {
                 sourceDataLine.flush()
-                continuation.resume(Unit)
+                sourceDataLine.stop()
             }
-        }
+        }.onFailure(Throwable::printStackTrace).suspend()
 
         override fun close() = sourceDataLine.close()
     }
