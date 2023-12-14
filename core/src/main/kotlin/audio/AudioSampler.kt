@@ -52,7 +52,10 @@ interface AudioSampler : AutoCloseable {
      * Companion object providing a factory method to create an [AudioSampler] instance.
      */
     companion object {
-        private val S16LE = AudioFormat(
+        /**
+         * S16LE
+         */
+        val format = AudioFormat(
             44_100F,
             16,
             2,
@@ -64,9 +67,9 @@ interface AudioSampler : AutoCloseable {
          * Creates an [AudioSampler] instance.
          * @return An [AudioSampler] instance.
          */
-        fun create(bufferSize: Int?): AudioSampler =
-            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, S16LE)) as SourceDataLine)
-                .apply { open(S16LE, bufferSize ?: 4096) }
+        fun create(bufferSize: Int? = null): AudioSampler =
+            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, format)) as SourceDataLine)
+                .apply { open(format, bufferSize ?: 8192) }
                 .let(AudioSampler::Implementation)
     }
 

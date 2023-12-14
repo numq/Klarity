@@ -1,7 +1,7 @@
 package synchronizer
 
 import kotlinx.coroutines.delay
-import kotlin.math.ceil
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 
 /**
@@ -40,6 +40,11 @@ interface TimestampSynchronizer {
     suspend fun syncWithVideo(videoFrameRate: Double)
 
     /**
+     * Resets synchronization timestamps.
+     */
+    fun reset()
+
+    /**
      * Companion object providing a factory method to create a [TimestampSynchronizer] instance.
      */
     companion object {
@@ -59,6 +64,16 @@ interface TimestampSynchronizer {
 
         private var videoTimestampNanos: Long? = null
 
+        private suspend fun syncWithTimestamp(currentNanos: Long?, previousNanos: Long?, videoFrameRate: Double) {
+            currentNanos?.let { current ->
+                previousNanos?.let { previous ->
+                    current - previous
+                }?.nanoseconds?.let { duration ->
+                    delay(duration.coerceIn(Duration.ZERO, (1_000_000_000 / videoFrameRate).nanoseconds))
+                }
+            }
+        }
+
         override suspend fun updateAudioTimestamp(nanos: Long) {
             audioTimestampNanos = nanos
         }
@@ -68,24 +83,16 @@ interface TimestampSynchronizer {
             videoTimestampNanos = nanos
         }
 
-        override suspend fun syncWithAudio(videoFrameRate: Double) {
-            videoTimestampNanos?.let { currentTimestampNanos ->
-                audioTimestampNanos?.let { previousTimestampNanos ->
-                    currentTimestampNanos - previousTimestampNanos
-                }?.nanoseconds
-                    ?.takeIf { it.isPositive() }
-                    ?.let { delay(it.inWholeMilliseconds.coerceAtMost(ceil(1_000 / videoFrameRate).toLong())) }
-            }
-        }
+        override suspend fun syncWithAudio(videoFrameRate: Double) =
+            syncWithTimestamp(videoTimestampNanos, audioTimestampNanos, videoFrameRate)
 
-        override suspend fun syncWithVideo(videoFrameRate: Double) {
-            videoTimestampNanos?.let { currentTimestampNanos ->
-                previousVideoTimestampNanos?.let { previousTimestampNanos ->
-                    currentTimestampNanos - previousTimestampNanos
-                }?.nanoseconds
-                    ?.takeIf { it.isPositive() }
-                    ?.let { delay(it.inWholeMilliseconds.coerceAtMost(ceil(1_000 / videoFrameRate).toLong())) }
-            }
+        override suspend fun syncWithVideo(videoFrameRate: Double) =
+            syncWithTimestamp(videoTimestampNanos, previousVideoTimestampNanos, videoFrameRate)
+
+        override fun reset() {
+            audioTimestampNanos = null
+            previousVideoTimestampNanos = null
+            videoTimestampNanos = null
         }
     }
 }
