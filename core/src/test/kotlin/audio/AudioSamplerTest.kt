@@ -1,38 +1,35 @@
 package audio
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.*
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import javax.sound.sampled.AudioFormat
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.random.Random
 
 class AudioSamplerTest {
 
     @Test
-    fun `valid format instance creation`() {
-        val audioFormat = AudioFormat(44100F, 8, 2, true, false)
-
-        AudioSampler.create(audioFormat).use { audioSampler ->
+    fun `valid buffer size instance creation`() {
+        AudioSampler.create().use { audioSampler ->
             assertNotNull(audioSampler)
         }
     }
 
     @Test
-    fun `invalid format null creation`() {
-        val audioFormat = AudioFormat(0F, 0, 0, true, false)
-
-        assertThrows<Exception> {
-            AudioSampler.create(audioFormat).close()
+    fun `invalid buffer size instance creation`() {
+        assertThrows<IllegalArgumentException> {
+            AudioSampler.create(0).close()
         }
     }
 
-    private val audioFormat = AudioFormat(44100F, 8, 2, true, false)
     private var audioSampler: AudioSampler? = null
 
     @BeforeEach
     fun beforeEach() {
-        audioSampler = AudioSampler.create(audioFormat)
+        audioSampler = AudioSampler.create()
     }
 
     @AfterEach
@@ -58,7 +55,10 @@ class AudioSamplerTest {
             assertDoesNotThrow {
                 repeat(5) {
                     val newState = arrayOf(true, false).random()
-                    assertEquals(newState, setMuted(newState))
+                    assertEquals(
+                        newState,
+                        runBlocking { setMuted(newState) }
+                    )
                 }
             }
         }

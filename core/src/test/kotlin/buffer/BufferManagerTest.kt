@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import media.Media
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
@@ -42,7 +43,7 @@ class BufferManagerTest {
     fun beforeEach() {
         decoder = Decoder.create().apply {
             runBlocking {
-                initialize(fileUrl)
+                initialize(Media.create(fileUrl)!!)
             }
         }
         bufferManager = BufferManager.create(decoder)

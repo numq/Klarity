@@ -1,6 +1,7 @@
 package decoder
 
 import kotlinx.coroutines.test.runTest
+import media.Media
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
@@ -47,7 +48,7 @@ class DecoderTest {
     }
 
     @Test
-    fun `create a media`() {
+    fun `create a media`() = runTest {
         fileUrls.forEach { fileUrl ->
             val media = Decoder.createMedia(fileUrl)
 
@@ -83,7 +84,7 @@ class DecoderTest {
 
     @Test
     fun `take a snapshot`() = runTest {
-        decoder.initialize(fileUrls.first { it.contains("video") })
+        decoder.initialize(Media.create(fileUrls.first { it.contains("video") })!!)
 
         assertTrue(decoder.snapshot(0L)?.bytes?.isNotEmpty()!!)
     }
@@ -91,7 +92,7 @@ class DecoderTest {
     @Test
     fun `initialize and dispose`() = runTest {
         fileUrls.forEach { fileUrl ->
-            decoder.initialize(fileUrl)
+            decoder.initialize(Media.create(fileUrl)!!)
 
             assertTrue(decoder.isInitialized)
 
@@ -110,7 +111,7 @@ class DecoderTest {
 
         val fileUrl = fileUrls.random()
 
-        decoder.initialize(fileUrl)
+        decoder.initialize(Media.create(fileUrl)!!)
 
         val audioFrames = mutableListOf<DecodedFrame.Audio>()
 
@@ -141,7 +142,7 @@ class DecoderTest {
 
     @Test
     fun `seek to desired timestamp and return actual position`() = runTest {
-        decoder.initialize(fileUrls.random())
+        decoder.initialize(Media.create(fileUrls.random())!!)
 
         var previousTimestamp: Long? = null
 
