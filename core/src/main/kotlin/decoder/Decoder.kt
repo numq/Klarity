@@ -25,7 +25,7 @@ interface Decoder : AutoCloseable {
         const val sampleRate = 44_100
 
         val imageMode = FrameGrabber.ImageMode.COLOR
-        const val videoCodec = avcodec.AV_CODEC_ID_H264
+        const val videoCodec = avcodec.AV_CODEC_ID_HEVC
         const val pixelFormat = avutil.AV_PIX_FMT_BGRA
 
         const val numBuffers = 0
@@ -35,7 +35,7 @@ interface Decoder : AutoCloseable {
 
     val media: Media?
 
-    suspend fun initialize(url: String)
+    suspend fun initialize(media: Media)
 
     suspend fun dispose()
 
@@ -46,10 +46,6 @@ interface Decoder : AutoCloseable {
     suspend fun seekTo(timestampMicros: Long): Long?
 
     companion object {
-        private val previewFrameConverter by lazy { ByteArrayFrameConverter() }
-
-        fun create(): Decoder = Implementation()
-
         fun createMedia(url: String) = runCatching {
             FFmpegFrameGrabber(url).apply {
                 audioChannels = Configuration.audioChannels
@@ -83,8 +79,10 @@ interface Decoder : AutoCloseable {
 
                     val previewFrame = runCatching {
                         grabImage()?.use { frame ->
-                            previewFrameConverter.convert(frame)?.let { bytes ->
-                                DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
+                            ByteArrayFrameConverter().use { converter ->
+                                converter.convert(frame)?.let { bytes ->
+                                    DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
+                                }
                             }
                         }
                     }.getOrNull()
@@ -101,6 +99,8 @@ interface Decoder : AutoCloseable {
                 }
             }
         }.onFailure(Throwable::printStackTrace).getOrNull()
+
+        fun create(): Decoder = Implementation()
     }
 
     private class Implementation : Decoder {
@@ -130,12 +130,12 @@ interface Decoder : AutoCloseable {
         override var media: Media? = null
             private set
 
-        override suspend fun initialize(url: String) = initializationMutex.withLock {
+        override suspend fun initialize(media: Media) = initializationMutex.withLock {
 
             if (isInitialized) throw Exception("Decoder is already initialized")
 
             runCatching {
-                media = Media.create(url)?.apply {
+                this.media = media.apply {
                     mediaMutex.withLock {
                         mediaGrabber = FFmpegFrameGrabber(url).apply {
                             audioChannels = Configuration.audioChannels
@@ -165,9 +165,9 @@ interface Decoder : AutoCloseable {
                             startUnsafe()
                         }
                     }
+                }
 
-                    isInitialized = true
-                } ?: throw Exception("Unable to initialize decoder")
+                isInitialized = true
             }
         }.onFailure(Throwable::printStackTrace).suspend()
 
@@ -243,7 +243,6 @@ interface Decoder : AutoCloseable {
             snapshotGrabber?.close()
             snapshotGrabber = null
 
-            previewFrameConverter.close()
             mediaFrameConverter.close()
             snapshotFrameConverter.close()
         }
