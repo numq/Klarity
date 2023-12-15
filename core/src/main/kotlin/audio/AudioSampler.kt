@@ -52,6 +52,8 @@ interface AudioSampler : AutoCloseable {
      * Companion object providing a factory method to create an [AudioSampler] instance.
      */
     companion object {
+        private val MIN_BUFFER_SIZE = 2048
+
         /**
          * S16LE
          */
@@ -69,7 +71,11 @@ interface AudioSampler : AutoCloseable {
          */
         fun create(bufferSize: Int? = null): AudioSampler =
             (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, format)) as SourceDataLine)
-                .apply { open(format, bufferSize ?: 8192) }
+                .apply {
+                    if (bufferSize != null) require(bufferSize >= MIN_BUFFER_SIZE)
+
+                    open(format, bufferSize ?: 8192)
+                }
                 .let(AudioSampler::Implementation)
     }
 
