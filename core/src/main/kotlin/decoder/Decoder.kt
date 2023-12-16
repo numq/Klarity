@@ -106,8 +106,8 @@ interface Decoder : AutoCloseable {
     private class Implementation : Decoder {
 
         init {
-            avutil.av_log_set_level(avutil.AV_LOG_ERROR)
             FFmpegLogCallback.set()
+            avutil.av_log_set_level(avutil.AV_LOG_ERROR)
         }
 
         private val mediaFrameConverter by lazy { ByteArrayFrameConverter() }
@@ -132,7 +132,7 @@ interface Decoder : AutoCloseable {
 
         override suspend fun initialize(media: Media) = initializationMutex.withLock {
 
-            if (isInitialized) throw Exception("Decoder is already initialized")
+            if (isInitialized) throw DecoderException.AlreadyInitialized
 
             runCatching {
                 this.media = media.apply {
@@ -169,11 +169,11 @@ interface Decoder : AutoCloseable {
 
                 isInitialized = true
             }
-        }.onFailure(Throwable::printStackTrace).suspend()
+        }.suspend()
 
         override suspend fun dispose() = initializationMutex.withLock {
 
-            if (!isInitialized) throw Exception("Unable to dispose uninitialized decoder")
+            if (!isInitialized) throw DecoderException.UnableToInitialize
 
             runCatching {
                 mediaMutex.withLock {
@@ -190,7 +190,7 @@ interface Decoder : AutoCloseable {
 
                 isInitialized = false
             }
-        }.onFailure(Throwable::printStackTrace).suspend()
+        }.suspend()
 
         override suspend fun snapshot(timestampMicros: Long) = snapshotMutex.withLock {
             snapshotGrabber?.runCatching {
@@ -202,7 +202,7 @@ interface Decoder : AutoCloseable {
                     }
                 }
             }
-        }?.onFailure(Throwable::printStackTrace)?.onSuccess { println(it?.timestampNanos) }?.suspend()
+        }?.suspend()
 
         override suspend fun nextFrame(): DecodedFrame? = mediaMutex.withLock {
             mediaGrabber?.runCatching {
@@ -226,7 +226,7 @@ interface Decoder : AutoCloseable {
                     }
                 }
             }
-        }?.onFailure(Throwable::printStackTrace)?.suspend()
+        }?.suspend()
 
         override suspend fun seekTo(timestampMicros: Long) = mediaMutex.withLock {
             mediaGrabber?.runCatching {
@@ -234,7 +234,7 @@ interface Decoder : AutoCloseable {
                 setTimestamp(timestampMicros, true)
                 timestamp
             }
-        }?.onFailure(Throwable::printStackTrace)?.suspend()
+        }?.suspend()
 
         override fun close() {
             mediaGrabber?.close()

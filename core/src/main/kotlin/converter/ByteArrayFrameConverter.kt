@@ -15,7 +15,7 @@ internal class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray
     /**
      * No need for conversion
      */
-    override fun convert(bytes: ByteArray?) = throw Exception("Not supported")
+    override fun convert(bytes: ByteArray?) = null
 
     /**
      * Convert AUDIO or VIDEO based on frame type
@@ -48,7 +48,7 @@ internal class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray
                 }
             }
         }
-    }.onFailure { t -> println(if (t is Exception) t.localizedMessage else t) }.getOrNull()
+    }.getOrNull()
 
     /**
      * BGRA image bytes conversion
@@ -76,7 +76,7 @@ internal class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray
                 }
             }
         }
-    }.onFailure { t -> println(if (t is Exception) t.localizedMessage else t) }.getOrNull()
+    }.getOrNull()
 
     override fun close() = super.close()
 }

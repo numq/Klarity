@@ -7,10 +7,14 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 suspend inline fun <reified T> Result<T>.suspend(
+    noinline onFailure: ((Throwable) -> Unit)? = null,
     noinline cancellationBlock: suspend () -> Unit = {},
 ) = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation {
         CoroutineScope(continuation.context).launch { cancellationBlock() }
     }
-    onFailure(continuation::resumeWithException).onSuccess(continuation::resume)
+    fold(
+        onSuccess = continuation::resume,
+        onFailure = onFailure ?: continuation::resumeWithException
+    )
 }

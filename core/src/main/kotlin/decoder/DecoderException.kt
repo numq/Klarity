@@ -1,5 +1,6 @@
 package decoder
 
-sealed class DecoderException private constructor(override val message: String) : Exception(message) {
-    object UnableToCreate : DecoderException("Unable to create decoder")
+sealed class DecoderException private constructor(message: String) : Exception(message) {
+    object AlreadyInitialized : DecoderException("Decoder is already initialized")
+    object UnableToInitialize : DecoderException("Unable to initialize decoder")
 }
