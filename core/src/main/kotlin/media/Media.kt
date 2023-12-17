@@ -1,6 +1,6 @@
 package media
 
-import decoder.DecodedFrame
+import frame.DecodedFrame
 import decoder.Decoder
 import javax.sound.sampled.AudioFormat
 

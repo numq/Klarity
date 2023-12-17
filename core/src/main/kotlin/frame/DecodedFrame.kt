@@ -1,4 +1,4 @@
-package decoder
+package frame
 
 sealed class DecodedFrame private constructor(
     open val timestampNanos: Long,

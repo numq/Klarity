@@ -1,6 +1,6 @@
 package buffer
 
-import decoder.DecodedFrame
+import frame.DecodedFrame
 import decoder.Decoder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
