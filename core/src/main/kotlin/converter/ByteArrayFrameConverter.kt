@@ -29,54 +29,48 @@ internal class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray
     /**
      * S16LE audio bytes conversion
      */
-    private fun getDecodedSamples(frame: Frame) = runCatching {
-        frame.takeIf { it.type == Frame.Type.AUDIO && it.samples != null }?.use { frame ->
-            with(frame) {
-                (samples?.firstOrNull() as? ShortBuffer)?.run {
+    private fun getDecodedSamples(frame: Frame) =
+        frame.takeIf { it.type == Frame.Type.AUDIO && it.samples != null }?.runCatching {
+            (samples?.firstOrNull() as? ShortBuffer)?.run {
 
-                    if (audioChannels <= 0 || sampleRate <= 0) return null
+                if (audioChannels <= 0 || sampleRate <= 0) return null
 
-                    val dataSize = remaining() * audioChannels
+                val dataSize = remaining() * audioChannels
 
-                    val bytes = ByteArray(dataSize)
+                val bytes = ByteArray(dataSize)
 
-                    rewind()
+                rewind()
 
-                    ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(this).clear()
+                ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(this).clear()
 
-                    bytes
-                }
+                bytes
             }
-        }
-    }.getOrNull()
+        }?.getOrNull()
 
     /**
      * BGRA image bytes conversion
      */
-    private fun getDecodedImage(frame: Frame): ByteArray? = runCatching {
-        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.use { frame ->
-            with(frame) {
-                (image?.firstOrNull() as? ByteBuffer)?.run {
-                    val dataSize = imageWidth * imageHeight * imageChannels
-                    val bytes = ByteArray(dataSize)
+    private fun getDecodedImage(frame: Frame): ByteArray? =
+        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.runCatching {
+            (image?.firstOrNull() as? ByteBuffer)?.run {
+                val dataSize = imageWidth * imageHeight * imageChannels
+                val bytes = ByteArray(dataSize)
 
-                    rewind()
+                rewind()
 
-                    for (dstIndex in 0 until dataSize step imageChannels) {
-                        val y = dstIndex / (imageWidth * imageChannels)
-                        val x = (dstIndex / imageChannels) % imageWidth
-                        val srcIndex = y * imageStride + x * imageChannels
+                for (dstIndex in 0 until dataSize step imageChannels) {
+                    val y = dstIndex / (imageWidth * imageChannels)
+                    val x = (dstIndex / imageChannels) % imageWidth
+                    val srcIndex = y * imageStride + x * imageChannels
 
-                        repeat(imageChannels) { c ->
-                            bytes[dstIndex + c] = get(srcIndex + c) and 0xFF.toByte()
-                        }
+                    repeat(imageChannels) { c ->
+                        bytes[dstIndex + c] = get(srcIndex + c) and 0xFF.toByte()
                     }
-
-                    bytes
                 }
+
+                bytes
             }
-        }
-    }.getOrNull()
+        }?.getOrNull()
 
     override fun close() = super.close()
 }

@@ -10,7 +10,6 @@ import org.junit.jupiter.api.assertThrows
 import kotlin.random.Random
 
 class AudioSamplerTest {
-
     @Test
     fun `valid buffer size instance creation`() {
         AudioSampler.create().use { audioSampler ->
@@ -36,6 +35,11 @@ class AudioSamplerTest {
     fun afterEach() {
         audioSampler?.close()
         audioSampler = null
+    }
+
+    @Test
+    fun `static creation`() {
+        assertInstanceOf(AudioSampler::class.java, AudioSampler.create())
     }
 
     @Test
