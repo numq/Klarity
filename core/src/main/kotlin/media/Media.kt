@@ -1,19 +1,26 @@
 package media
 
-import frame.DecodedFrame
 import decoder.Decoder
-import javax.sound.sampled.AudioFormat
 
-data class Media internal constructor(
-    val url: String,
-    val name: String?,
-    val durationNanos: Long,
-    val frameRate: Double = 0.0,
-    val audioFormat: AudioFormat? = null,
-    val size: Pair<Int, Int>? = null,
-    val previewFrame: DecodedFrame.Video? = null,
-) {
+sealed class Media private constructor(open val info: MediaInfo) {
+    data class Local(
+        val path: String,
+        val name: String,
+        override val info: MediaInfo,
+    ) : Media(info)
+
+    data class Remote(
+        val url: String,
+        override val info: MediaInfo,
+    ) : Media(info)
+
     companion object {
-        fun create(url: String) = Decoder.createMedia(url)
+        suspend fun create(location: String): Media? = Decoder.createMedia(location)?.takeIf { it.hasAudio() || it.hasVideo() }
+    }
+
+    fun hasAudio() = info.audioFormat != null
+
+    fun hasVideo() = with(info) {
+        frameRate != null && size != null
     }
 }
