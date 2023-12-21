@@ -1,15 +1,8 @@
 package buffer
 
-import frame.DecodedFrame
 import decoder.Decoder
-import kotlinx.coroutines.currentCoroutineContext
+import frame.DecodedFrame
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import java.util.*
-import kotlin.math.ceil
 
 /**
  * Interface defining the contract for managing audio and video buffers.
@@ -24,6 +17,8 @@ interface BufferManager {
     /**
      * Changes the duration of the buffer. If [durationMillis] is non-null, the buffer duration is set to
      * the provided value; otherwise, it is set to the default value [DEFAULT_BUFFER_DURATION_MILLIS].
+     * If the specified duration is equal to or less than zero, the size of each buffer will be one frame,
+     * since playback is not possible with an empty buffer.
      *
      * @param durationMillis New duration in milliseconds.
      */
@@ -95,8 +90,8 @@ interface BufferManager {
      * Companion object containing default values and a factory method to create a [BufferManager] instance.
      */
     companion object {
-        private const val DEFAULT_AUDIO_FRAME_RATE = 43.0
-        private const val DEFAULT_BUFFER_DURATION_MILLIS = 1_000L
+        const val DEFAULT_AUDIO_FRAME_RATE = 43.0
+        const val DEFAULT_BUFFER_DURATION_MILLIS = 1_000L
 
         /**
          * Creates a [BufferManager] instance using the provided [Decoder].
@@ -104,95 +99,6 @@ interface BufferManager {
          * @param decoder The [Decoder] providing frames for buffering.
          * @return A new instance of [BufferManager].
          */
-        fun create(decoder: Decoder): BufferManager = Implementation(decoder)
-    }
-
-    private class Implementation(private val decoder: Decoder) : BufferManager {
-
-        private val bufferMutex = Mutex()
-
-        override var bufferDurationMillis = DEFAULT_BUFFER_DURATION_MILLIS
-            private set
-
-        override fun changeDuration(durationMillis: Long?) {
-            bufferDurationMillis = durationMillis ?: DEFAULT_BUFFER_DURATION_MILLIS
-        }
-
-        override fun audioBufferCapacity() =
-            (DEFAULT_AUDIO_FRAME_RATE.takeIf { decoder.media?.audioFormat != null } ?: 0.0)
-                .times(bufferDurationMillis)
-                .div(1_000L)
-                .let(::ceil)
-                .toInt()
-
-        override fun videoBufferCapacity() =
-            (decoder.media?.frameRate ?: 0.0)
-                .times(bufferDurationMillis)
-                .div(1_000L)
-                .let(::ceil)
-                .toInt()
-
-        private val audioBuffer = LinkedList<DecodedFrame>()
-
-        private val videoBuffer = LinkedList<DecodedFrame>()
-
-        override suspend fun audioBufferSize() = bufferMutex.withLock { audioBuffer.size }
-
-        override suspend fun videoBufferSize() = bufferMutex.withLock { videoBuffer.size }
-
-        override suspend fun bufferIsEmpty() = bufferMutex.withLock {
-            (audioBufferCapacity() > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity() > 0 && videoBuffer.isEmpty())
-        }
-
-        override suspend fun bufferIsFull() = bufferMutex.withLock {
-            (audioBufferCapacity() > 0 && audioBuffer.size >= audioBufferCapacity()) || (videoBufferCapacity() > 0 && videoBuffer.size >= videoBufferCapacity())
-        }
-
-        override suspend fun firstAudioFrame(): DecodedFrame? = bufferMutex.withLock { audioBuffer.peek() }
-
-        override suspend fun firstVideoFrame(): DecodedFrame? = bufferMutex.withLock { videoBuffer.peek() }
-
-        override suspend fun extractAudioFrame(): DecodedFrame? = bufferMutex.withLock { audioBuffer.poll() }
-
-        override suspend fun extractVideoFrame(): DecodedFrame? = bufferMutex.withLock { videoBuffer.poll() }
-
-        override suspend fun startBuffering() = flow {
-            while (currentCoroutineContext().isActive) {
-                if (audioBuffer.size < audioBufferCapacity() || videoBuffer.size < videoBufferCapacity()) {
-                    decoder.nextFrame()?.let { frame ->
-
-                        emit(frame.timestampNanos)
-
-                        bufferMutex.withLock {
-                            when (frame) {
-                                is DecodedFrame.Audio -> audioBuffer.add(frame)
-
-                                is DecodedFrame.Video -> videoBuffer.add(frame)
-
-                                is DecodedFrame.End -> {
-                                    audioBuffer.add(frame)
-                                    videoBuffer.add(frame)
-
-                                    /**
-                                     * Buffering has been completed
-                                     */
-
-                                    return@flow
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        override suspend fun flush() = bufferMutex.withLock {
-            audioBuffer.clear()
-            videoBuffer.clear()
-
-            /**
-             * Buffer has been flushed
-             */
-        }
+        fun create(decoder: Decoder): BufferManager = DefaultBufferManager(decoder)
     }
 }
