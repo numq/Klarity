@@ -5,14 +5,14 @@ import frame.DecodedFrame
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.util.*
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.math.ceil
 
 internal class DefaultBufferManager(private val decoder: Decoder) : BufferManager {
 
-    private val bufferMutex = Mutex()
+    private val lock = ReentrantLock()
 
     override var bufferDurationMillis = BufferManager.DEFAULT_BUFFER_DURATION_MILLIS
         private set
@@ -42,38 +42,34 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
 
     private val videoBuffer = LinkedList<DecodedFrame>()
 
-    override suspend fun audioBufferSize() = bufferMutex.withLock { audioBuffer.size }
+    override fun audioBufferSize() = lock.withLock { audioBuffer.size }
 
-    override suspend fun videoBufferSize() = bufferMutex.withLock { videoBuffer.size }
+    override fun videoBufferSize() = lock.withLock { videoBuffer.size }
 
-    override suspend fun bufferIsEmpty() = bufferMutex.withLock {
+    override fun bufferIsEmpty() = lock.withLock {
         (audioBufferCapacity() > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity() > 0 && videoBuffer.isEmpty())
     }
 
-    override suspend fun bufferIsFull() = bufferMutex.withLock {
+    override fun bufferIsFull() = lock.withLock {
         (audioBufferCapacity() > 0 && audioBuffer.size >= audioBufferCapacity()) || (videoBufferCapacity() > 0 && videoBuffer.size >= videoBufferCapacity())
     }
 
-    override suspend fun firstAudioFrame(): DecodedFrame? = bufferMutex.withLock { audioBuffer.peek() }
+    override fun firstAudioFrame(): DecodedFrame? = lock.withLock { audioBuffer.peek() }
 
-    override suspend fun firstVideoFrame(): DecodedFrame? = bufferMutex.withLock { videoBuffer.peek() }
+    override fun firstVideoFrame(): DecodedFrame? = lock.withLock { videoBuffer.peek() }
 
-    override suspend fun extractAudioFrame(): DecodedFrame? = bufferMutex.withLock { audioBuffer.poll() }
+    override fun extractAudioFrame(): DecodedFrame? = lock.withLock { audioBuffer.poll() }
 
-    override suspend fun extractVideoFrame(): DecodedFrame? = bufferMutex.withLock { videoBuffer.poll() }
+    override fun extractVideoFrame(): DecodedFrame? = lock.withLock { videoBuffer.poll() }
 
-    override suspend fun startBuffering() = flow {
-
-        println(audioBufferCapacity())
-        println(videoBufferCapacity())
-
+    override fun startBuffering() = flow {
         while (currentCoroutineContext().isActive) {
             if (audioBuffer.size < audioBufferCapacity() || videoBuffer.size < videoBufferCapacity()) {
                 decoder.nextFrame()?.let { frame ->
 
                     emit(frame.timestampNanos)
 
-                    bufferMutex.withLock {
+                    lock.withLock {
                         when (frame) {
                             is DecodedFrame.Audio -> audioBuffer.add(frame)
 
@@ -82,10 +78,6 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
                             is DecodedFrame.End -> {
                                 audioBuffer.add(frame)
                                 videoBuffer.add(frame)
-
-                                /**
-                                 * Buffering has been completed
-                                 */
 
                                 /**
                                  * Buffering has been completed
@@ -102,7 +94,7 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
         }
     }
 
-    override suspend fun flush() = bufferMutex.withLock {
+    override fun flush() = lock.withLock {
         audioBuffer.clear()
         videoBuffer.clear()
 
