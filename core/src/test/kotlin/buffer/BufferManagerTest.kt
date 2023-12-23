@@ -1,6 +1,9 @@
 package buffer
 
+import audio.AudioSampler
 import decoder.Decoder
+import fake.FakeDecoder
+import frame.DecodedFrame
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.takeWhile
@@ -8,42 +11,34 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import media.Media
+import media.MediaInfo
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.File
-import java.net.URL
 import kotlin.time.Duration
 
 class BufferManagerTest {
-    companion object {
-        private lateinit var decoder: Decoder
-        private lateinit var bufferManager: BufferManager
-
-        private val fileUrls = ClassLoader.getSystemResources("files")
-            .nextElement()
-            .let(URL::getFile)
-            .let(::File)
-            .listFiles()
-            ?.filter(File::exists)
-            ?.mapNotNull(File::getAbsolutePath)!!
-
-        private val fileUrl = fileUrls.first { it.contains("audio") && it.contains("video") }
-
-        @JvmStatic
-        @BeforeAll
-        fun beforeAll() {
-            require(fileUrls.isNotEmpty())
-        }
-    }
+    private lateinit var decoder: Decoder
+    private lateinit var bufferManager: BufferManager
 
     @BeforeEach
     fun beforeEach() {
-        decoder = Decoder.create().apply {
+        decoder = FakeDecoder().apply {
             runBlocking {
-                initialize(Media.create(fileUrl)!!)
+                initialize(
+                    Media.Local(
+                        path = "url",
+                        name = "name",
+                        info = MediaInfo(
+                            durationNanos = 10_000L,
+                            audioFormat = AudioSampler.AUDIO_FORMAT,
+                            frameRate = 30.0,
+                            size = 500 to 500,
+                            previewFrame = DecodedFrame.Video(0L, false, byteArrayOf())
+                        )
+                    )
+                )
             }
         }
         bufferManager = BufferManager.create(decoder)
@@ -64,14 +59,14 @@ class BufferManagerTest {
         bufferManager.changeDuration(0L)
 
         assertEquals(0L, bufferManager.bufferDurationMillis)
-        assertEquals(0, bufferManager.audioBufferCapacity())
-        assertEquals(0, bufferManager.videoBufferCapacity())
+        assertEquals(1, bufferManager.audioBufferCapacity())
+        assertEquals(1, bufferManager.videoBufferCapacity())
 
         bufferManager.changeDuration(1_000L)
 
         assertEquals(1_000L, bufferManager.bufferDurationMillis)
         assertEquals(43, bufferManager.audioBufferCapacity())
-        assertEquals(25, bufferManager.videoBufferCapacity())
+        assertEquals(30, bufferManager.videoBufferCapacity())
     }
 
     @Test
