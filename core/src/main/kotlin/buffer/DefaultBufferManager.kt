@@ -17,7 +17,7 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
     override var bufferDurationMillis = BufferManager.DEFAULT_BUFFER_DURATION_MILLIS
         private set
 
-    override fun changeDuration(durationMillis: Long?) {
+    override fun changeDuration(durationMillis: Long?) = lock.withLock {
         bufferDurationMillis = durationMillis ?: BufferManager.DEFAULT_BUFFER_DURATION_MILLIS
     }
 
@@ -78,12 +78,6 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
                             is DecodedFrame.End -> {
                                 audioBuffer.add(frame)
                                 videoBuffer.add(frame)
-
-                                /**
-                                 * Buffering has been completed
-                                 */
-
-                                return@flow
                             }
 
                             else -> Unit
@@ -97,9 +91,5 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
     override fun flush() = lock.withLock {
         audioBuffer.clear()
         videoBuffer.clear()
-
-        /**
-         * Buffer has been flushed
-         */
     }
 }

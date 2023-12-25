@@ -15,7 +15,7 @@ interface BufferManager {
     val bufferDurationMillis: Long
 
     /**
-     * Changes the duration of the buffer. If [durationMillis] is non-null, the buffer duration is set to
+     * Changes the capacity of the buffer, represented as a duration. If [durationMillis] is non-null, the buffer duration is set to
      * the provided value; otherwise, it is set to the default value [DEFAULT_BUFFER_DURATION_MILLIS].
      * If the specified duration is equal to or less than zero, the size of each buffer will be one frame,
      * since playback is not possible with an empty buffer.
@@ -37,54 +37,54 @@ interface BufferManager {
     /**
      * Retrieves the current size of the audio buffer.
      */
-    suspend fun audioBufferSize(): Int
+    fun audioBufferSize(): Int
 
     /**
      * Retrieves the current size of the video buffer.
      */
-    suspend fun videoBufferSize(): Int
+    fun videoBufferSize(): Int
 
     /**
      * Checks if both audio and video buffers are empty.
      */
-    suspend fun bufferIsEmpty(): Boolean
+    fun bufferIsEmpty(): Boolean
 
     /**
      * Checks whether either the audio or video buffer is full.
      */
-    suspend fun bufferIsFull(): Boolean
+    fun bufferIsFull(): Boolean
 
     /**
      * Retrieves the first audio frame from the buffer without removing it.
      */
-    suspend fun firstAudioFrame(): DecodedFrame?
+    fun firstAudioFrame(): DecodedFrame?
 
     /**
      * Retrieves the first video frame from the buffer without removing it.
      */
-    suspend fun firstVideoFrame(): DecodedFrame?
+    fun firstVideoFrame(): DecodedFrame?
 
     /**
      * Removes and retrieves an audio frame from the buffer.
      */
-    suspend fun extractAudioFrame(): DecodedFrame?
+    fun extractAudioFrame(): DecodedFrame?
 
     /**
      * Removes and retrieves a video frame from the buffer.
      */
-    suspend fun extractVideoFrame(): DecodedFrame?
+    fun extractVideoFrame(): DecodedFrame?
 
     /**
      * Starts buffering frames into the audio and video buffers and emits timestamps of buffered frames.
      *
      * @return A flow emitting timestamps of buffered frames.
      */
-    suspend fun startBuffering(): Flow<Long>
+    fun startBuffering(): Flow<Long>
 
     /**
      * Clears both audio and video buffers.
      */
-    suspend fun flush()
+    fun flush()
 
     /**
      * Companion object containing default values and a factory method to create a [BufferManager] instance.
