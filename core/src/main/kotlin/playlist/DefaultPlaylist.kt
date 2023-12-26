@@ -73,11 +73,11 @@ internal class DefaultPlaylist(
 
         _queue.emit(queue.value.filterNot { it == playlistMedia })
 
-        if (playlistMedia == playingMedia.value) {
-            queue.value.getOrNull(index.coerceAtMost(queue.value.lastIndex))?.run {
-                _playingMedia.emit(this)
-            }
-        }
+        if (playlistMedia == playingMedia.value) _playingMedia.emit(
+            queue.value.getOrNull(
+                index.coerceAtMost(queue.value.lastIndex)
+            )
+        )
     }
 
     override suspend fun select(playlistMedia: PlaylistMedia) {

@@ -24,16 +24,18 @@ interface TimestampSynchronizer {
      * introducing a delay if necessary for synchronization.
      *
      * @param videoFrameRate Frame rate of the video.
+     * @return Delay nanos.
      */
-    suspend fun syncWithAudio(videoFrameRate: Double)
+    suspend fun syncWithAudio(videoFrameRate: Double): Long
 
     /**
      * Synchronizes the current video timestamp with the last processed video timestamp,
      * introducing a delay if necessary for synchronization.
      *
      * @param videoFrameRate Frame rate of the video.
+     * @return Delay nanos.
      */
-    suspend fun syncWithVideo(videoFrameRate: Double)
+    suspend fun syncWithVideo(videoFrameRate: Double): Long
 
     /**
      * Resets synchronization timestamps.

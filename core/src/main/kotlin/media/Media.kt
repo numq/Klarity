@@ -15,7 +15,8 @@ sealed class Media private constructor(open val info: MediaInfo) {
     ) : Media(info)
 
     companion object {
-        suspend fun create(location: String): Media? = Decoder.createMedia(location)?.takeIf { it.hasAudio() || it.hasVideo() }
+        suspend fun create(location: String): Media? =
+            Decoder.createMedia(location)?.takeIf { it.hasAudio() || it.hasVideo() }
     }
 
     fun hasAudio() = info.audioFormat != null

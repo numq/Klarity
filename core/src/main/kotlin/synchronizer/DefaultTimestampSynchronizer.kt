@@ -3,6 +3,7 @@ package synchronizer
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 
 internal class DefaultTimestampSynchronizer : TimestampSynchronizer {
 
@@ -12,15 +13,19 @@ internal class DefaultTimestampSynchronizer : TimestampSynchronizer {
 
     private var videoTimestampNanos: Long? = null
 
-    private suspend fun syncWithTimestamp(currentNanos: Long?, previousNanos: Long?, videoFrameRate: Double) {
-        currentNanos?.let { current ->
-            previousNanos?.let { previous ->
-                current - previous
-            }?.nanoseconds?.let { duration ->
-                delay(duration.coerceIn(Duration.ZERO, (1_000_000_000 / videoFrameRate).nanoseconds))
-            }
+    private suspend fun syncWithTimestamp(
+        currentNanos: Long?,
+        previousNanos: Long?,
+        videoFrameRate: Double,
+    ) = currentNanos?.let { current ->
+        previousNanos?.let { previous ->
+            current - previous
+        }?.nanoseconds?.let { duration ->
+            val delayDuration = duration.coerceIn(Duration.ZERO, (1.seconds.inWholeNanoseconds / videoFrameRate).nanoseconds)
+            delay(delayDuration)
+            delayDuration.inWholeNanoseconds
         }
-    }
+    } ?: 0L
 
     override suspend fun updateAudioTimestamp(nanos: Long) {
         audioTimestampNanos = nanos
