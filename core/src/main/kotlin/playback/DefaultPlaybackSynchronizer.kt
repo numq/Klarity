@@ -1,11 +1,11 @@
-package synchronizer
+package playback
 
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
-internal class DefaultTimestampSynchronizer : TimestampSynchronizer {
+internal class DefaultPlaybackSynchronizer : PlaybackSynchronizer {
 
     private var audioTimestampNanos: Long? = null
 
