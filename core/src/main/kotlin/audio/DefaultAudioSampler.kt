@@ -61,8 +61,8 @@ internal class DefaultAudioSampler(
 
     override suspend fun stop() = lock.withLock {
         runCatching {
-            sourceDataLine.flush()
             sourceDataLine.stop()
+            sourceDataLine.flush()
         }
     }.suspend()
 
