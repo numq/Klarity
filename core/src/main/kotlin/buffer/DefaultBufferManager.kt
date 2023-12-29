@@ -5,53 +5,47 @@ import frame.DecodedFrame
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
+import media.Media
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.math.ceil
 
 internal class DefaultBufferManager(private val decoder: Decoder) : BufferManager {
 
     private val lock = ReentrantLock()
 
-    override var bufferDurationMillis = BufferManager.DEFAULT_BUFFER_DURATION_MILLIS
-        private set
+    private val audioBuffer = LinkedList<DecodedFrame?>()
 
-    override fun changeDuration(durationMillis: Long?) = lock.withLock {
-        bufferDurationMillis = durationMillis ?: BufferManager.DEFAULT_BUFFER_DURATION_MILLIS
+    private val videoBuffer = LinkedList<DecodedFrame?>()
+
+    private var audioBufferCapacity = 0
+
+    private var videoBufferCapacity = 0
+
+    override fun changeAudioBufferCapacity(value: Int) {
+        audioBufferCapacity = value.coerceAtLeast(1)
     }
 
-    override fun audioBufferCapacity() =
-        BufferManager.DEFAULT_AUDIO_FRAME_RATE
-            .takeIf { decoder.media?.hasAudio() == true }
-            ?.times(bufferDurationMillis)
-            ?.div(1_000L)
-            ?.let(::ceil)
-            ?.toInt()
-            ?.coerceAtLeast(1) ?: 0
+    override fun changeVideoBufferCapacity(value: Int) {
+        videoBufferCapacity = value.coerceAtLeast(1)
+    }
 
-    override fun videoBufferCapacity() =
-        decoder.media?.info?.frameRate
-            ?.times(bufferDurationMillis)
-            ?.div(1_000L)
-            ?.let(::ceil)
-            ?.toInt()
-            ?.coerceAtLeast(1) ?: 0
+    override fun audioBufferCapacity() = decoder.media?.takeIf(Media::hasAudio)?.run { audioBufferCapacity } ?: 0
 
-    private val audioBuffer = LinkedList<DecodedFrame>()
-
-    private val videoBuffer = LinkedList<DecodedFrame>()
+    override fun videoBufferCapacity() = decoder.media?.takeIf(Media::hasVideo)?.run { videoBufferCapacity } ?: 0
 
     override fun audioBufferSize() = lock.withLock { audioBuffer.size }
 
     override fun videoBufferSize() = lock.withLock { videoBuffer.size }
 
     override fun bufferIsEmpty() = lock.withLock {
-        (audioBufferCapacity() > 0 && audioBuffer.isEmpty()) && (videoBufferCapacity() > 0 && videoBuffer.isEmpty())
+        (decoder.media?.takeIf(Media::hasAudio)?.run { audioBuffer.isEmpty() } == true)
+                && (decoder.media?.takeIf(Media::hasVideo)?.run { videoBuffer.isEmpty() } == true)
     }
 
     override fun bufferIsFull() = lock.withLock {
-        (audioBufferCapacity() > 0 && audioBuffer.size >= audioBufferCapacity()) || (videoBufferCapacity() > 0 && videoBuffer.size >= videoBufferCapacity())
+        (decoder.media?.takeIf(Media::hasAudio)?.run { audioBuffer.size == audioBufferCapacity } == true)
+                && (decoder.media?.takeIf(Media::hasVideo)?.run { videoBuffer.size == videoBufferCapacity } == true)
     }
 
     override fun firstAudioFrame(): DecodedFrame? = lock.withLock { audioBuffer.peek() }
@@ -63,24 +57,35 @@ internal class DefaultBufferManager(private val decoder: Decoder) : BufferManage
     override fun extractVideoFrame(): DecodedFrame? = lock.withLock { videoBuffer.poll() }
 
     override fun startBuffering() = flow {
-        while (currentCoroutineContext().isActive) {
-            if (audioBuffer.size < audioBufferCapacity() || videoBuffer.size < videoBufferCapacity()) {
-                decoder.nextFrame()?.let { frame ->
+        decoder.media?.run {
 
-                    emit(frame.timestampNanos)
+            if (hasAudio()) require(audioBufferCapacity > 0)
 
-                    lock.withLock {
-                        when (frame) {
-                            is DecodedFrame.Audio -> audioBuffer.add(frame)
+            if (hasVideo()) require(videoBufferCapacity > 0)
 
-                            is DecodedFrame.Video -> videoBuffer.add(frame)
+            while (currentCoroutineContext().isActive) {
+                if (
+                    (hasAudio() && audioBuffer.size < audioBufferCapacity)
+                    && (hasVideo() && videoBuffer.size < videoBufferCapacity)
+                ) {
+                    decoder.nextFrame()?.let { frame ->
 
-                            is DecodedFrame.End -> {
-                                audioBuffer.add(frame)
-                                videoBuffer.add(frame)
+                        emit(frame.timestampNanos)
+
+                        lock.withLock {
+                            when (frame) {
+                                is DecodedFrame.Audio -> if (hasAudio()) audioBuffer.add(frame)
+
+                                is DecodedFrame.Video -> if (hasVideo()) videoBuffer.add(frame)
+
+                                is DecodedFrame.End -> {
+                                    if (audioBufferCapacity() > 0) audioBuffer.add(frame)
+                                    if (videoBufferCapacity() > 0) videoBuffer.add(frame)
+                                    return@flow
+                                }
+
+                                else -> Unit
                             }
-
-                            else -> Unit
                         }
                     }
                 }

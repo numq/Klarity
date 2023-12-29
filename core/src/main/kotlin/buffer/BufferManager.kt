@@ -8,21 +8,19 @@ import kotlinx.coroutines.flow.Flow
  * Interface defining the contract for managing audio and video buffers.
  */
 interface BufferManager {
-
     /**
-     * Gets the duration of the buffer in milliseconds.
-     */
-    val bufferDurationMillis: Long
-
-    /**
-     * Changes the capacity of the buffer, represented as a duration. If [durationMillis] is non-null, the buffer duration is set to
-     * the provided value; otherwise, it is set to the default value [DEFAULT_BUFFER_DURATION_MILLIS].
-     * If the specified duration is equal to or less than zero, the size of each buffer will be one frame,
-     * since playback is not possible with an empty buffer.
+     * Changes the capacity of the audio buffer.
      *
-     * @param durationMillis New duration in milliseconds.
+     * @param value New capacity.
      */
-    fun changeDuration(durationMillis: Long?)
+    fun changeAudioBufferCapacity(value: Int)
+
+    /**
+     * Changes the capacity of the video buffer.
+     *
+     * @param value New capacity.
+     */
+    fun changeVideoBufferCapacity(value: Int)
 
     /**
      * Retrieves the current capacity (limit) of the audio buffer.
@@ -90,9 +88,6 @@ interface BufferManager {
      * Companion object containing default values and a factory method to create a [BufferManager] instance.
      */
     companion object {
-        const val DEFAULT_AUDIO_FRAME_RATE = 43.0
-        const val DEFAULT_BUFFER_DURATION_MILLIS = 1_000L
-
         /**
          * Creates a [BufferManager] instance using the provided [Decoder].
          *
