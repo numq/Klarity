@@ -1,4 +1,4 @@
-package playback
+package playback.synchronizer
 
 /**
  * Interface representing a synchronizer for managing the synchronization of video frame timestamps.

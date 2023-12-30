@@ -1,4 +1,4 @@
-package playback
+package playback.synchronizer
 
 import kotlinx.coroutines.delay
 import kotlin.time.Duration
