@@ -11,7 +11,13 @@ suspend inline fun <reified T> Result<T>.suspend(
     noinline cancellationBlock: suspend () -> Unit = {},
 ) = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation {
-        CoroutineScope(continuation.context).launch { cancellationBlock() }
+        CoroutineScope(continuation.context).launch {
+            try {
+                cancellationBlock()
+            } catch (e: Exception) {
+                continuation.resumeWithException(e)
+            }
+        }
     }
     fold(
         onSuccess = continuation::resume,
