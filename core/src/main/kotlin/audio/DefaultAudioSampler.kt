@@ -1,6 +1,5 @@
 package audio
 
-import extension.suspend
 import java.util.concurrent.locks.ReentrantLock
 import javax.sound.sampled.BooleanControl
 import javax.sound.sampled.FloatControl
@@ -22,49 +21,39 @@ internal class DefaultAudioSampler(
         sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
     } else null
 
-    override suspend fun setMuted(state: Boolean) = lock.withLock {
-        muteControl?.run {
-            value = state
+    override suspend fun setMuted(state: Boolean) = muteControl?.run {
+        value = state
+        value
+    }
+
+    override suspend fun setVolume(value: Float) = gainControl?.run {
+        value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
+            this.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
+            muteControl?.value = false
             value
         }
     }
 
-    override suspend fun setVolume(value: Float) = lock.withLock {
-        gainControl?.run {
-            value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
-                this.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
-                muteControl?.value = false
-                value
-            }
-        }
+    override suspend fun start() = lock.withLock {
+        sourceDataLine.flush()
+        sourceDataLine.drain()
+        sourceDataLine.start()
     }
 
-    override suspend fun start() = lock.withLock {
-        runCatching {
-            sourceDataLine.flush()
-            sourceDataLine.start()
-        }
-    }.suspend()
-
     override suspend fun play(bytes: ByteArray) = lock.withLock {
-        runCatching {
-            sourceDataLine.write(bytes, 0, bytes.size)
-            Unit
-        }
-    }.suspend()
+        sourceDataLine.write(bytes, 0, bytes.size)
+        Unit
+    }
 
     override suspend fun pause() = lock.withLock {
-        runCatching {
-            sourceDataLine.stop()
-        }
-    }.suspend()
+        sourceDataLine.stop()
+    }
 
     override suspend fun stop() = lock.withLock {
-        runCatching {
-            sourceDataLine.stop()
-            sourceDataLine.flush()
-        }
-    }.suspend()
+        sourceDataLine.flush()
+        sourceDataLine.drain()
+        sourceDataLine.stop()
+    }
 
     override fun close() = lock.withLock {
         sourceDataLine.close()
