@@ -5,7 +5,6 @@ import org.bytedeco.javacv.FrameConverter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
-import kotlin.experimental.and
 
 /**
  * An instance of [FrameConverter] that provides conversion of [Frame] to [ByteArray].
@@ -50,27 +49,44 @@ internal class ByteArrayFrameConverter : AutoCloseable, FrameConverter<ByteArray
     /**
      * BGRA image bytes conversion
      */
-    private fun getDecodedImage(frame: Frame): ByteArray? =
-        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.runCatching {
-            (image?.firstOrNull() as? ByteBuffer)?.run {
-                val dataSize = imageWidth * imageHeight * imageChannels
-                val bytes = ByteArray(dataSize)
+    private fun getDecodedImage(frame: Frame) = runCatching {
+        frame.takeIf { it.type == Frame.Type.VIDEO && it.image != null }?.use { frame ->
+            with(frame) {
+                (image?.firstOrNull() as? ByteBuffer)?.run {
 
-                rewind()
+                    if (imageDepth != Frame.DEPTH_UBYTE && imageDepth != Frame.DEPTH_BYTE) return null
 
-                for (dstIndex in 0 until dataSize step imageChannels) {
-                    val y = dstIndex / (imageWidth * imageChannels)
-                    val x = (dstIndex / imageChannels) % imageWidth
-                    val srcIndex = y * imageStride + x * imageChannels
+                    if (imageHeight <= 0 || imageWidth <= 0) return null
 
-                    repeat(imageChannels) { c ->
-                        bytes[dstIndex + c] = get(srcIndex + c) and 0xFF.toByte()
+                    val dataSize = imageWidth * imageHeight * imageChannels
+
+                    val bytes = ByteArray(dataSize)
+
+                    rewind()
+
+                    for (y in 0 until imageHeight) {
+                        for (x in 0 until imageWidth) {
+
+                            val srcIndex = y * imageStride + x * 4
+
+                            val blue = get(srcIndex).toInt() and 0xFF
+                            val green = get(srcIndex + 1).toInt() and 0xFF
+                            val red = get(srcIndex + 2).toInt() and 0xFF
+                            val alpha = get(srcIndex + 3).toInt() and 0xFF
+
+                            val dstIndex = (y * imageWidth + x) * 4
+
+                            bytes[dstIndex] = blue.toByte()
+                            bytes[dstIndex + 1] = green.toByte()
+                            bytes[dstIndex + 2] = red.toByte()
+                            bytes[dstIndex + 3] = alpha.toByte()
+                        }
                     }
+                    bytes
                 }
-
-                bytes
             }
-        }?.getOrNull()
+        }
+    }.onFailure { println(it.localizedMessage) }.getOrNull()
 
     override fun close() = super.close()
 }
