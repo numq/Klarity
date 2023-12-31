@@ -1,8 +1,7 @@
 package buffer
 
-import decoder.Decoder
 import frame.DecodedFrame
-import kotlinx.coroutines.flow.Flow
+import media.Media
 
 /**
  * Interface defining the contract for managing audio and video buffers.
@@ -53,31 +52,34 @@ interface BufferManager {
     fun bufferIsFull(): Boolean
 
     /**
-     * Retrieves the first audio frame from the buffer without removing it.
+     * Retrieves the first audio frame from the audio buffer without removing it.
      */
-    fun firstAudioFrame(): DecodedFrame?
+    fun firstAudioFrame(): DecodedFrame.Audio?
 
     /**
-     * Retrieves the first video frame from the buffer without removing it.
+     * Retrieves the first video frame from the video buffer without removing it.
      */
-    fun firstVideoFrame(): DecodedFrame?
+    fun firstVideoFrame(): DecodedFrame.Video?
 
     /**
-     * Removes and retrieves an audio frame from the buffer.
+     * Removes and retrieves an audio frame from the audio buffer.
      */
-    fun extractAudioFrame(): DecodedFrame?
+    fun extractAudioFrame(): DecodedFrame.Audio?
 
     /**
-     * Removes and retrieves a video frame from the buffer.
+     * Removes and retrieves a video frame from the video buffer.
      */
-    fun extractVideoFrame(): DecodedFrame?
+    fun extractVideoFrame(): DecodedFrame.Video?
 
     /**
-     * Starts buffering frames into the audio and video buffers and emits timestamps of buffered frames.
-     *
-     * @return A flow emitting timestamps of buffered frames.
+     * Adds an audio frame to the end of audio buffer.
      */
-    fun startBuffering(): Flow<Long>
+    fun insertAudioFrame(frame: DecodedFrame.Audio)
+
+    /**
+     * Adds a video frame to the end of video buffer.
+     */
+    fun insertVideoFrame(frame: DecodedFrame.Video)
 
     /**
      * Clears both audio and video buffers.
@@ -89,11 +91,10 @@ interface BufferManager {
      */
     companion object {
         /**
-         * Creates a [BufferManager] instance using the provided [Decoder].
+         * Creates a [BufferManager] instance.
          *
-         * @param decoder The [Decoder] providing frames for buffering.
-         * @return A new instance of [BufferManager].
+         * @return A [BufferManager] instance for [media].
          */
-        fun create(decoder: Decoder): BufferManager = DefaultBufferManager(decoder)
+        fun create(media: Media): BufferManager = DefaultBufferManager(media)
     }
 }
