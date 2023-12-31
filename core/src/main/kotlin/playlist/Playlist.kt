@@ -1,18 +1,16 @@
 package playlist
 
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import media.Media
 
-interface Playlist {
+interface Playlist : AutoCloseable {
 
-    val events: Flow<PlaylistEvent>
     val playingMedia: StateFlow<PlaylistMedia?>
     val queue: StateFlow<List<PlaylistMedia>>
     val shuffled: StateFlow<Boolean>
     val repeatMode: StateFlow<RepeatMode>
-    fun hasPrevious(): Boolean
-    fun hasNext(): Boolean
+    val hasPrevious: StateFlow<Boolean>
+    val hasNext: StateFlow<Boolean>
     suspend fun toggleShuffle()
     suspend fun changeRepeatMode(repeatMode: RepeatMode)
     suspend fun add(media: Media)

@@ -1,9 +1,10 @@
 package playlist
 
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.*
 import media.Media
 
 internal class DefaultPlaylist(
@@ -11,9 +12,9 @@ internal class DefaultPlaylist(
     initialRepeatMode: Playlist.RepeatMode,
 ) : Playlist {
 
-    private val _events = Channel<PlaylistEvent>(Channel.BUFFERED)
+    private val coroutineContext = Dispatchers.Default + SupervisorJob()
 
-    override val events = _events.consumeAsFlow()
+    private val coroutineScope = CoroutineScope(coroutineContext)
 
     private val _playingMedia = MutableStateFlow<PlaylistMedia?>(null)
 
@@ -31,11 +32,19 @@ internal class DefaultPlaylist(
 
     override val repeatMode = _repeatMode.asStateFlow()
 
-    override fun hasPrevious() = shuffled.value
+    private val _hasPrevious = MutableStateFlow(false)
+
+    override val hasPrevious = _hasPrevious.asStateFlow()
+
+    private val _hasNext = MutableStateFlow(false)
+
+    override val hasNext = _hasNext.asStateFlow()
+
+    private fun hasPrevious() = shuffled.value
             || repeatMode.value in arrayOf(Playlist.RepeatMode.SINGLE, Playlist.RepeatMode.PLAYLIST)
             || queue.value.indexOf(playingMedia.value).let { index -> index != -1 && index > 0 }
 
-    override fun hasNext() = shuffled.value
+    private fun hasNext() = shuffled.value
             || repeatMode.value in arrayOf(Playlist.RepeatMode.SINGLE, Playlist.RepeatMode.PLAYLIST)
             || queue.value.indexOf(playingMedia.value).let { index -> index != -1 && index < queue.value.lastIndex }
 
@@ -46,14 +55,10 @@ internal class DefaultPlaylist(
             if (shuffled.value) queue.value.shuffled()
             else queue.value.sortedBy(PlaylistMedia::addedAtMillis)
         )
-
-        _events.send(PlaylistEvent.Shuffle)
     }
 
     override suspend fun changeRepeatMode(repeatMode: Playlist.RepeatMode) {
         _repeatMode.emit(repeatMode)
-
-        _events.send(PlaylistEvent.ChangeRepeatMode(repeatMode))
     }
 
     override suspend fun add(media: Media) {
@@ -63,8 +68,6 @@ internal class DefaultPlaylist(
             _queue.emit(
                 queue.value.plus(playlistMedia).sortedBy(PlaylistMedia::addedAtMillis)
             )
-
-            _events.send(PlaylistEvent.Add(playlistMedia))
         }
     }
 
@@ -82,8 +85,6 @@ internal class DefaultPlaylist(
 
     override suspend fun select(playlistMedia: PlaylistMedia) {
         _playingMedia.emit(playlistMedia)
-
-        _events.send(PlaylistEvent.Select(playlistMedia))
     }
 
     override suspend fun previous() {
@@ -95,9 +96,7 @@ internal class DefaultPlaylist(
             shuffled.value -> queue.value.filterNot { media -> media == playingMedia.value }.randomOrNull()
 
             repeatMode.value == Playlist.RepeatMode.NONE -> queue.value.getOrNull(
-                (queue.value.indexOf(playingMedia.value) - 1).coerceAtLeast(
-                    0
-                )
+                (queue.value.indexOf(playingMedia.value) - 1).coerceAtLeast(0)
             )
 
             else -> {
@@ -106,9 +105,7 @@ internal class DefaultPlaylist(
             }
         }
 
-        _playingMedia.emit(playlistMedia?.apply {
-            _events.send(PlaylistEvent.Previous(playlistMedia))
-        })
+        _playingMedia.emit(playlistMedia)
     }
 
     override suspend fun next() {
@@ -131,8 +128,15 @@ internal class DefaultPlaylist(
             }
         }
 
-        _playingMedia.emit(playlistMedia?.apply {
-            _events.send(PlaylistEvent.Next(playlistMedia))
-        })
+        _playingMedia.emit(playlistMedia)
+    }
+
+    override fun close() = coroutineScope.cancel()
+
+    init {
+        merge(playingMedia, queue, shuffled, repeatMode).onEach {
+            _hasPrevious.emit(hasPrevious())
+            _hasNext.emit(hasNext())
+        }.launchIn(coroutineScope)
     }
 }
