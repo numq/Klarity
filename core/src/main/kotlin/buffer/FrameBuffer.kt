@@ -6,7 +6,7 @@ import media.Media
 /**
  * Interface defining the contract for managing audio and video buffers.
  */
-interface BufferManager {
+interface FrameBuffer {
     /**
      * Changes the capacity of the audio buffer.
      *
@@ -87,14 +87,14 @@ interface BufferManager {
     fun flush()
 
     /**
-     * Companion object containing default values and a factory method to create a [BufferManager] instance.
+     * Companion object containing default values and a factory method to create a [FrameBuffer] instance.
      */
     companion object {
         /**
-         * Creates a [BufferManager] instance.
+         * Creates a [FrameBuffer] instance.
          *
-         * @return A [BufferManager] instance for [media].
+         * @return A [FrameBuffer] instance for [media].
          */
-        fun create(media: Media): BufferManager = DefaultBufferManager(media)
+        fun create(media: Media): FrameBuffer = DefaultFrameBuffer(media)
     }
 }

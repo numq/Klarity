@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-internal class DefaultBufferManager(private val media: Media) : BufferManager {
+internal class DefaultFrameBuffer(private val media: Media) : FrameBuffer {
 
     private val lock = ReentrantLock()
 
@@ -36,13 +36,15 @@ internal class DefaultBufferManager(private val media: Media) : BufferManager {
 
     override fun bufferIsEmpty() = lock.withLock {
         with(media) {
-            (hasAudio() && audioBuffer?.isEmpty() == true) && (hasVideo() && videoBuffer?.isEmpty() == true)
+            (hasAudio() && audioBuffer?.isEmpty() == true)
+                    && (hasVideo() && videoBuffer?.isEmpty() == true)
         }
     }
 
     override fun bufferIsFull() = lock.withLock {
         with(media) {
-            (hasAudio() && audioBuffer?.remainingCapacity() == 0) && (hasVideo() && videoBuffer?.remainingCapacity() == 0)
+            (hasAudio() && audioBuffer?.remainingCapacity() == 0)
+                    || (hasVideo() && videoBuffer?.remainingCapacity() == 0)
         }
     }
 
