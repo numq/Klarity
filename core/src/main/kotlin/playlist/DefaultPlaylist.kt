@@ -16,6 +16,10 @@ internal class DefaultPlaylist(
 
     private val coroutineScope = CoroutineScope(coroutineContext)
 
+    private val _event = MutableSharedFlow<PlaylistEvent>()
+
+    override val event = _event.asSharedFlow()
+
     private val _playingMedia = MutableStateFlow<PlaylistMedia?>(null)
 
     override val playingMedia = _playingMedia.asStateFlow()
@@ -68,32 +72,41 @@ internal class DefaultPlaylist(
             _queue.emit(
                 queue.value.plus(playlistMedia).sortedBy(PlaylistMedia::addedAtMillis)
             )
+
+            _event.emit(PlaylistEvent.Add(playlistMedia))
         }
     }
 
     override suspend fun remove(playlistMedia: PlaylistMedia) {
-        val index = queue.value.indexOf(playlistMedia)
+        if (queue.value.contains(playlistMedia)) {
+            val index = queue.value.indexOf(playlistMedia)
 
-        _queue.emit(queue.value.filterNot { it == playlistMedia })
+            _queue.emit(queue.value.filterNot { it == playlistMedia })
 
-        if (playlistMedia == playingMedia.value) _playingMedia.emit(
-            queue.value.getOrNull(
-                index.coerceAtMost(queue.value.lastIndex)
-            )
-        )
+            val nextMedia =
+                if (playingMedia.value == playlistMedia) queue.value.getOrNull(index.coerceAtMost(queue.value.lastIndex)) else null
+
+            _playingMedia.emit(nextMedia)
+
+            _event.emit(PlaylistEvent.Remove(playlistMedia, nextMedia))
+        }
     }
 
     override suspend fun select(playlistMedia: PlaylistMedia) {
-        _playingMedia.emit(playlistMedia)
+        if (queue.value.contains(playlistMedia)) {
+            _playingMedia.emit(playlistMedia)
+
+            _event.emit(PlaylistEvent.Select(playlistMedia))
+        }
     }
 
     override suspend fun previous() {
-        if (repeatMode.value == Playlist.RepeatMode.SINGLE) _repeatMode.emit(Playlist.RepeatMode.PLAYLIST)
-
-        val playlistMedia = when {
+        when {
             queue.value.isEmpty() -> null
 
             shuffled.value -> queue.value.filterNot { media -> media == playingMedia.value }.randomOrNull()
+
+            repeatMode.value == Playlist.RepeatMode.SINGLE -> playingMedia.value
 
             repeatMode.value == Playlist.RepeatMode.NONE -> queue.value.getOrNull(
                 (queue.value.indexOf(playingMedia.value) - 1).coerceAtLeast(0)
@@ -103,18 +116,20 @@ internal class DefaultPlaylist(
                 val index = queue.value.indexOf(playingMedia.value)
                 queue.value.getOrNull((index - 1 + queue.value.size) % queue.value.size)
             }
-        }
+        }.let { playlistMedia ->
+            _playingMedia.emit(playlistMedia)
 
-        _playingMedia.emit(playlistMedia)
+            _event.emit(PlaylistEvent.Previous(playlistMedia))
+        }
     }
 
     override suspend fun next() {
-        if (repeatMode.value == Playlist.RepeatMode.SINGLE) _repeatMode.emit(Playlist.RepeatMode.PLAYLIST)
-
-        val playlistMedia = when {
+        when {
             queue.value.isEmpty() -> null
 
             shuffled.value -> queue.value.filterNot { media -> media == playingMedia.value }.randomOrNull()
+
+            repeatMode.value == Playlist.RepeatMode.SINGLE -> playingMedia.value
 
             repeatMode.value == Playlist.RepeatMode.NONE -> queue.value.getOrNull(
                 (queue.value.indexOf(playingMedia.value) + 1).coerceAtMost(
@@ -126,15 +141,17 @@ internal class DefaultPlaylist(
                 val index = queue.value.indexOf(playingMedia.value)
                 queue.value.getOrNull((index + 1) % queue.value.size)
             }
-        }
+        }.let { playlistMedia ->
+            _playingMedia.emit(playlistMedia)
 
-        _playingMedia.emit(playlistMedia)
+            _event.emit(PlaylistEvent.Next(playlistMedia))
+        }
     }
 
     override fun close() = coroutineScope.cancel()
 
     init {
-        merge(playingMedia, queue, shuffled, repeatMode).onEach {
+        merge(event, playingMedia, queue, shuffled, repeatMode).onEach {
             _hasPrevious.emit(hasPrevious())
             _hasNext.emit(hasNext())
         }.launchIn(coroutineScope)
