@@ -21,12 +21,12 @@ internal class DefaultAudioSampler(
         sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
     } else null
 
-    override suspend fun setMuted(state: Boolean) = muteControl?.run {
+    override fun setMuted(state: Boolean) = muteControl?.run {
         value = state
         value
     }
 
-    override suspend fun setVolume(value: Float) = gainControl?.run {
+    override fun setVolume(value: Float) = gainControl?.run {
         value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
             this.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
             muteControl?.value = false
@@ -34,25 +34,23 @@ internal class DefaultAudioSampler(
         }
     }
 
-    override suspend fun start() = lock.withLock {
-        sourceDataLine.flush()
-        sourceDataLine.drain()
+    override fun start() = lock.withLock {
         sourceDataLine.start()
     }
 
-    override suspend fun play(bytes: ByteArray) = lock.withLock {
+    override fun play(bytes: ByteArray) = lock.withLock {
         sourceDataLine.write(bytes, 0, bytes.size)
+
         Unit
     }
 
-    override suspend fun pause() = lock.withLock {
+    override fun pause() = lock.withLock {
         sourceDataLine.stop()
     }
 
-    override suspend fun stop() = lock.withLock {
-        sourceDataLine.flush()
-        sourceDataLine.drain()
+    override fun stop() = lock.withLock {
         sourceDataLine.stop()
+        sourceDataLine.flush()
     }
 
     override fun close() = lock.withLock {
