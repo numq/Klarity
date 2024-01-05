@@ -44,10 +44,6 @@ internal class DefaultAudioSampler(
         Unit
     }
 
-    override fun pause() = lock.withLock {
-        sourceDataLine.stop()
-    }
-
     override fun stop() = lock.withLock {
         sourceDataLine.stop()
         sourceDataLine.flush()

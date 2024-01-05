@@ -37,12 +37,7 @@ interface AudioSampler : AutoCloseable {
     fun play(bytes: ByteArray)
 
     /**
-     * Pauses the audio sampler.
-     */
-    fun pause()
-
-    /**
-     * Stops the audio sampler, halting audio playback.
+     * Stops the audio sampler, halting audio playback. Clears the buffer.
      */
     fun stop()
 
