@@ -19,7 +19,7 @@ interface AudioSampler : AutoCloseable {
     fun setMuted(state: Boolean): Boolean?
 
     /**
-     * Unmutes and sets the volume of the audio sampler.
+     * Sets the volume of the audio sampler, unmutes if muted.
      * @param value The desired volume level, in the range [0.0, 1.0].
      * @return The actual volume level after the operation, or `null` if the action was not completed successfully.
      */
@@ -56,10 +56,9 @@ interface AudioSampler : AutoCloseable {
          * Creates an [AudioSampler] instance.
          * @return An [AudioSampler] instance.
          */
-        fun create(): AudioSampler = (AudioSystem.getLine(
-            DataLine.Info(
-                SourceDataLine::class.java, AUDIO_FORMAT
-            )
-        ) as SourceDataLine).apply { open(format, 4096) }.let(::DefaultAudioSampler)
+        fun create(): AudioSampler =
+            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, AUDIO_FORMAT)) as SourceDataLine)
+                .apply { open(format, 8192) }
+                .let(::DefaultAudioSampler)
     }
 }

@@ -13,24 +13,30 @@ internal class DefaultAudioSampler(
 
     private val lock = ReentrantLock()
 
-    private val muteControl = if (sourceDataLine.isControlSupported(BooleanControl.Type.MUTE)) {
-        sourceDataLine.getControl(BooleanControl.Type.MUTE) as? BooleanControl
-    } else null
-
-    private val gainControl = if (sourceDataLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-        sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
-    } else null
-
-    override fun setMuted(state: Boolean) = muteControl?.run {
-        value = state
-        value
+    private val muteControl = with(sourceDataLine) {
+        takeIf { isControlSupported(BooleanControl.Type.MUTE) }
+            ?.getControl(BooleanControl.Type.MUTE) as? BooleanControl
     }
 
-    override fun setVolume(value: Float) = gainControl?.run {
-        value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
-            this.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
-            muteControl?.value = false
+    private val gainControl = with(sourceDataLine) {
+        takeIf { isControlSupported(FloatControl.Type.MASTER_GAIN) }
+            ?.getControl(FloatControl.Type.MASTER_GAIN) as? FloatControl
+    }
+
+    override fun setMuted(state: Boolean) = lock.withLock {
+        muteControl?.run {
+            value = state
             value
+        }
+    }
+
+    override fun setVolume(value: Float) = lock.withLock {
+        gainControl?.run control@{
+            value.takeIf { it in 0.0..1.0 }?.let { volumeValue ->
+                this@control.value = (20.0f * log10(volumeValue)).coerceIn(minimum, maximum)
+                muteControl?.value = false
+                value
+            }
         }
     }
 
@@ -45,8 +51,10 @@ internal class DefaultAudioSampler(
     }
 
     override fun stop() = lock.withLock {
-        sourceDataLine.stop()
-        sourceDataLine.flush()
+        with(sourceDataLine) {
+            stop()
+            flush()
+        }
     }
 
     override fun close() = lock.withLock {
