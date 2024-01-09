@@ -1,6 +1,6 @@
 package media
 
-import decoder.Decoder
+import decoder.FrameDecoder
 
 sealed class Media private constructor(open val info: MediaInfo) {
     data class Local(
@@ -16,7 +16,7 @@ sealed class Media private constructor(open val info: MediaInfo) {
 
     companion object {
         suspend fun create(location: String): Media? =
-            Decoder.createMedia(location)?.takeIf { it.hasAudio() || it.hasVideo() }
+            FrameDecoder.createMedia(location)?.takeIf { it.hasAudio() || it.hasVideo() }
     }
 
     fun hasAudio() = info.audioFormat != null
