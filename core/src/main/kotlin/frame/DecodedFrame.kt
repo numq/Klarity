@@ -1,8 +1,6 @@
 package frame
 
-sealed class DecodedFrame private constructor(
-    open val timestampNanos: Long,
-) {
+sealed class DecodedFrame private constructor(open val timestampNanos: Long) {
     data class End(override val timestampNanos: Long) : DecodedFrame(timestampNanos)
 
     data class Video(
