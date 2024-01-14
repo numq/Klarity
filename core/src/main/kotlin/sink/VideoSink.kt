@@ -1,4 +1,4 @@
-package video
+package sink
 
 import frame.DecodedFrame
 import kotlinx.coroutines.flow.StateFlow
