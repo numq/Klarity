@@ -1,5 +1,6 @@
 package decoder
 
+import frame.DecodedFrame
 import kotlinx.coroutines.test.runTest
 import media.Media
 import org.junit.jupiter.api.AfterEach
@@ -13,11 +14,11 @@ import javax.sound.sampled.AudioFormat
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 
-class DecoderTest {
+class FrameDecoderTest {
     companion object {
         private lateinit var decoder: Decoder
 
-        private val fileUrls = ClassLoader.getSystemResources("files")
+        private val filePaths = ClassLoader.getSystemResources("files")
             .nextElement()
             .let(URL::getFile)
             .let(::File)
@@ -28,7 +29,7 @@ class DecoderTest {
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
-            require(fileUrls.isNotEmpty())
+            require(filePaths.isNotEmpty())
         }
     }
 
@@ -49,18 +50,20 @@ class DecoderTest {
 
     @Test
     fun `create a media`() = runTest {
-        fileUrls.forEach { fileUrl ->
-            val media = Decoder.createMedia(fileUrl)
+        filePaths.forEach { filePath ->
+            val media = Decoder.createMedia(filePath)
+
+            println(media)
 
             assertNotNull(media)
 
-            with(media!!) {
+            with(media as Media.Local) {
 
-                assertEquals(fileUrl, url)
+                assertEquals(filePath, path)
 
-                assertEquals(File(fileUrl).name, name)
+                assertEquals(File(filePath).name, name)
 
-                if (fileUrl.contains("audio")) {
+                if (filePath.contains("audio")) {
                     assertEquals(
                         AudioFormat(
                             44100F,
@@ -69,38 +72,34 @@ class DecoderTest {
                             true,
                             false
                         ).toString(),
-                        audioFormat!!.toString()
+                        info.audioFormat!!.toString()
                     )
                 }
 
-                assertEquals(5.seconds.inWholeNanoseconds, durationNanos)
+                assertEquals(5.seconds.inWholeNanoseconds, info.durationNanos)
 
-                assertEquals(frameRate, frameRate)
+                assertEquals(media.info.frameRate, info.frameRate)
 
-                if (fileUrl.contains("video")) assertEquals(500 to 500, size)
+                if (filePath.contains("sink")) assertEquals(500 to 500, info.size)
             }
         }
     }
 
     @Test
     fun `take a snapshot`() = runTest {
-        decoder.initialize(Media.create(fileUrls.first { it.contains("video") })!!)
+        decoder.initialize(Media.create(filePaths.first { it.contains("sink") })!!)
 
-        assertTrue(decoder.snapshot(0L)?.bytes?.isNotEmpty()!!)
+        assertTrue(decoder.snapshot(0L, null)?.bytes?.isNotEmpty()!!)
     }
 
     @Test
     fun `initialize and dispose`() = runTest {
-        fileUrls.forEach { fileUrl ->
-            decoder.initialize(Media.create(fileUrl)!!)
+        filePaths.forEach { filePath ->
+            decoder.initialize(Media.create(filePath)!!)
 
-            assertTrue(decoder.isInitialized)
-
-            assertEquals(fileUrl, decoder.media!!.url)
+            assertEquals(filePath, (decoder.media as Media.Local).path)
 
             decoder.dispose()
-
-            assertFalse(decoder.isInitialized)
 
             assertNull(decoder.media)
         }
@@ -109,9 +108,9 @@ class DecoderTest {
     @Test
     fun `decode media`() = runTest {
 
-        val fileUrl = fileUrls.random()
+        val filePath = filePaths.random()
 
-        decoder.initialize(Media.create(fileUrl)!!)
+        decoder.initialize(Media.create(filePath)!!)
 
         val audioFrames = mutableListOf<DecodedFrame.Audio>()
 
@@ -120,20 +119,22 @@ class DecoderTest {
         var endFrame: DecodedFrame.End? = null
 
         while (endFrame == null) {
-            decoder.nextFrame()?.let { frame ->
+            decoder.readFrame()?.let { frame ->
                 when (frame) {
                     is DecodedFrame.Audio -> audioFrames.add(frame)
                     is DecodedFrame.Video -> videoFrames.add(frame)
                     is DecodedFrame.End -> {
                         endFrame = frame
                     }
+
+                    else -> Unit
                 }
             }
         }
 
-        if (fileUrl.contains("audio")) assertTrue(audioFrames.isNotEmpty())
+        if (filePath.contains("audio")) assertTrue(audioFrames.isNotEmpty())
 
-        if (fileUrl.contains("video")) assertTrue(videoFrames.isNotEmpty())
+        if (filePath.contains("sink")) assertTrue(videoFrames.isNotEmpty())
 
         assertEquals(DecodedFrame.End(5.seconds.inWholeNanoseconds), endFrame)
 
@@ -142,13 +143,13 @@ class DecoderTest {
 
     @Test
     fun `seek to desired timestamp and return actual position`() = runTest {
-        decoder.initialize(Media.create(fileUrls.random())!!)
+        decoder.initialize(Media.create(filePaths.random())!!)
 
         var previousTimestamp: Long? = null
 
         repeat(5) {
             val randomTimestampMicros =
-                (0L..decoder.media!!.durationNanos).random().nanoseconds.inWholeMicroseconds
+                (0L..decoder.media!!.info.durationNanos).random().nanoseconds.inWholeMicroseconds
 
             assertNotEquals(previousTimestamp, decoder.seekTo(randomTimestampMicros))
 
