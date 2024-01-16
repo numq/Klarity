@@ -47,7 +47,7 @@ class FrameBufferTest {
 
         buffer.changeVideoBufferCapacity(1)
 
-        val audioFrame = DecodedFrame.Audio(0L, false, byteArrayOf())
+        val audioFrame = DecodedFrame.Audio(0L, byteArrayOf())
 
         buffer.insertAudioFrame(audioFrame)
 
@@ -55,7 +55,7 @@ class FrameBufferTest {
 
         assertTrue(buffer.bufferIsFull())
 
-        val videoFrame = DecodedFrame.Video(0L, false, byteArrayOf())
+        val videoFrame = DecodedFrame.Video(0L, byteArrayOf())
 
         buffer.insertVideoFrame(videoFrame)
 
