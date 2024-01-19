@@ -46,19 +46,23 @@ interface AudioSampler : AutoCloseable {
      */
     companion object {
         /**
-         * S16LE
+         * Creates an [AudioFormat] with S16LE encoding, 2 channels, and the specified sample rate.
+         * @param sampleRate The sample rate as a float number.
          */
-        val AUDIO_FORMAT = AudioFormat(
-            44_100F, 16, 2, true, false
-        )
+        private fun createAudioFormat(sampleRate: Float): AudioFormat =
+            AudioFormat(sampleRate, 16, 2, true, false)
 
         /**
          * Creates an [AudioSampler] instance.
+         * @param sampleRate The sample rate as a float number.
+         * @param bufferSize The size of the audio buffer or null.
          * @return An [AudioSampler] instance.
          */
-        fun create(): AudioSampler =
-            (AudioSystem.getLine(DataLine.Info(SourceDataLine::class.java, AUDIO_FORMAT)) as SourceDataLine)
-                .apply { open(format, 8192) }
+        fun create(sampleRate: Float, bufferSize: Int? = null): AudioSampler =
+            createAudioFormat(sampleRate)
+                .run { DataLine.Info(SourceDataLine::class.java, this) }
+                .run { AudioSystem.getLine(this) as SourceDataLine }
+                .apply { bufferSize?.run { open(format, this) } ?: open(format) }
                 .let(::DefaultAudioSampler)
     }
 }
