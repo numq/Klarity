@@ -14,7 +14,7 @@ class AudioSamplerTest {
 
     @BeforeEach
     fun beforeEach() {
-        audioSampler = AudioSampler.create()
+        audioSampler = AudioSampler.create(44100F)
     }
 
     @AfterEach
@@ -25,7 +25,7 @@ class AudioSamplerTest {
 
     @Test
     fun `static creation`() {
-        assertInstanceOf(AudioSampler::class.java, AudioSampler.create())
+        assertInstanceOf(AudioSampler::class.java, AudioSampler.create(44100F))
     }
 
     @Test
