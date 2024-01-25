@@ -13,6 +13,25 @@ import media.Media
  * @see PlaylistEvent for events emitted by the playlist.
  */
 interface Playlist : AutoCloseable {
+    /**
+     * Factory companion object to create instances of the Playlist interface.
+     */
+    companion object {
+        /**
+         * Creates a new playlist with the specified initial settings.
+         *
+         * @param initialShuffled Initial shuffle mode.
+         * @param initialRepeatMode Initial repeat mode.
+         * @return A new instance of the Playlist interface.
+         */
+        fun create(
+            initialShuffled: Boolean = false,
+            initialRepeatMode: RepeatMode = RepeatMode.NONE,
+        ): Playlist = DefaultPlaylist(
+            initialShuffled = initialShuffled,
+            initialRepeatMode = initialRepeatMode
+        )
+    }
 
     /**
      * Flow representing events in the playlist, such as media additions, removals, etc.
@@ -110,25 +129,5 @@ interface Playlist : AutoCloseable {
          * Repeat the entire playlist.
          */
         PLAYLIST
-    }
-
-    /**
-     * Factory companion object to create instances of the Playlist interface.
-     */
-    companion object {
-        /**
-         * Creates a new playlist with the specified initial settings.
-         *
-         * @param initialShuffled Initial shuffle mode.
-         * @param initialRepeatMode Initial repeat mode.
-         * @return A new instance of the Playlist interface.
-         */
-        fun create(
-            initialShuffled: Boolean = false,
-            initialRepeatMode: RepeatMode = RepeatMode.NONE,
-        ): Playlist = DefaultPlaylist(
-            initialShuffled = initialShuffled,
-            initialRepeatMode = initialRepeatMode
-        )
     }
 }

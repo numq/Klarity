@@ -6,6 +6,17 @@ import kotlinx.coroutines.flow.StateFlow
  * Interface representing a rendering sink that can receive pixel data and perform drawing operations.
  */
 interface RenderSink {
+    /**
+     * Companion object providing a factory method to create instances of RenderSink.
+     */
+    companion object {
+        /**
+         * Creates a new instance of RenderSink using the default implementation.
+         *
+         * @return A new RenderSink instance.
+         */
+        fun create(): RenderSink = DefaultRenderSink()
+    }
 
     /**
      * A StateFlow representing the pixel data to be rendered.
@@ -27,16 +38,4 @@ interface RenderSink {
      * @return `true` if the erase operation was successful, `false` otherwise.
      */
     fun erase(): Boolean
-
-    /**
-     * Companion object providing a factory method to create instances of RenderSink.
-     */
-    companion object {
-        /**
-         * Creates a new instance of RenderSink using the default implementation.
-         *
-         * @return A new RenderSink instance.
-         */
-        fun create(): RenderSink = DefaultRenderSink()
-    }
 }

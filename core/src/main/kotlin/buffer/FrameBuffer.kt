@@ -8,6 +8,18 @@ import media.Media
  */
 interface FrameBuffer {
     /**
+     * Companion object containing default values and a factory method to create a [FrameBuffer] instance.
+     */
+    companion object {
+        /**
+         * Creates a [FrameBuffer] instance.
+         *
+         * @return A [FrameBuffer] instance for [media].
+         */
+        fun create(media: Media): FrameBuffer = DefaultFrameBuffer(media)
+    }
+
+    /**
      * Changes the capacity of the audio buffer.
      *
      * @param value New capacity.
@@ -85,16 +97,4 @@ interface FrameBuffer {
      * Clears both audio and video buffers.
      */
     fun flush()
-
-    /**
-     * Companion object containing default values and a factory method to create a [FrameBuffer] instance.
-     */
-    companion object {
-        /**
-         * Creates a [FrameBuffer] instance.
-         *
-         * @return A [FrameBuffer] instance for [media].
-         */
-        fun create(media: Media): FrameBuffer = DefaultFrameBuffer(media)
-    }
 }
