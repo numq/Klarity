@@ -26,8 +26,8 @@ class FrameBufferTest {
 
     @Test
     fun `static creation`() {
-        assertInstanceOf(FrameBuffer::class.java, FrameBuffer.create(Media.Local("", "", MediaInfo(0L))))
-        assertInstanceOf(FrameBuffer::class.java, FrameBuffer.create(Media.Remote("", MediaInfo(0L))))
+        assertInstanceOf(FrameBuffer::class.java, FrameBuffer.create(Media.Local(0L, "", "", MediaInfo(0L))))
+        assertInstanceOf(FrameBuffer::class.java, FrameBuffer.create(Media.Remote(0L, "", MediaInfo(0L))))
     }
 
     @Test
