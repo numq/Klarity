@@ -2,10 +2,10 @@ package interaction
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
-import androidx.compose.material.SliderColors
-import androidx.compose.material.SliderDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.VolumeDown
 import androidx.compose.material.icons.rounded.VolumeMute
@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import component.VolumeBar
 
 @Composable
@@ -27,14 +28,8 @@ fun VolumeControls(
     changeVolume: (Float) -> Unit,
     modifier: Modifier = Modifier,
     iconTint: Color = Color.White,
-    volumeBarColors: SliderColors = SliderDefaults.colors(
-        thumbColor = Color.White,
-        disabledThumbColor = Color.LightGray,
-        activeTickColor = Color.White,
-        activeTrackColor = Color.White,
-        inactiveTickColor = Color.LightGray,
-        inactiveTrackColor = Color.LightGray
-    ),
+    backgroundColor: Color = Color.DarkGray,
+    foregroundColor: Color = Color.LightGray,
 ) {
     Row(
         modifier = modifier,
@@ -58,8 +53,9 @@ fun VolumeControls(
         VolumeBar(
             volume = volume,
             changeVolume = { value -> if (enabled) changeVolume(value) },
-            modifier = Modifier.weight(1f).alpha(if (enabled) 1f else .25f),
-            volumeBarColors = volumeBarColors,
+            modifier = Modifier.fillMaxWidth().height(8.dp).alpha(if (enabled) 1f else .25f),
+            backgroundColor = backgroundColor,
+            foregroundColor = foregroundColor
         )
     }
 }
