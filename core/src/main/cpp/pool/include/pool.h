@@ -12,26 +12,26 @@ private:
 
 public:
     ~Pool() {
-        std::lock_guard <std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         for (auto &pair: instances) {
             delete pair.second;
         }
         instances.clear();
     }
 
-    bool create(uint64_t id, const std::string &location) {
-        std::lock_guard <std::mutex> lock(mutex);
-        return instances.emplace(id, new Instance(location)).second;
+    bool create(uint64_t id, Instance *instance) {
+        std::lock_guard<std::mutex> lock(mutex);
+        return instances.emplace(id, instance).second;
     }
 
     Instance *acquire(uint64_t id) {
-        std::lock_guard <std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         auto it = instances.find(id);
         return (it != instances.end()) ? it->second : nullptr;
     }
 
     bool release(uint64_t id) {
-        std::lock_guard <std::mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
         auto it = instances.find(id);
         if (it != instances.end()) {
             delete it->second;
