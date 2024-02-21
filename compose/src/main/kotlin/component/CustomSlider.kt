@@ -1,22 +1,19 @@
 package component
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 private fun transform(value: Float, source: ClosedRange<Float>, target: ClosedRange<Float>): Float {
     if (source.endInclusive - source.start == 0f) return target.start
@@ -30,17 +27,24 @@ fun CustomSlider(
     valueRange: ClosedRange<Float> = (0f..1f),
     modifier: Modifier = Modifier,
     backgroundColor: Color = Color.DarkGray,
-    foregroundColor: Color = Color.LightGray,
+    foregroundColor: Color = Color.Gray,
+    thumbColor: Color = Color.White,
+    interactionThumbColor: Color? = null,
 ) {
-    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterStart) {
+
+    val coroutineScope = rememberCoroutineScope()
+
+    BoxWithConstraints(modifier = modifier) {
 
         /**
          * Track
          */
 
-        val trackSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight / 4f)
+        val trackSize = remember(constraints.maxWidth, constraints.maxHeight) {
+            Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+        }
 
-        val trackRange = remember(trackSize) { (0f..trackSize.width) }
+        val trackRange = remember(trackSize.width) { (0f..trackSize.width) }
 
         val animatedOffsetX = remember { Animatable(transform(value, valueRange, trackRange)) }
 
@@ -48,72 +52,77 @@ fun CustomSlider(
          * Thumb
          */
 
-        val scaledThumbSize = constraints.maxHeight.toFloat()
-
-        val thumbSize by remember(scaledThumbSize) {
-            derivedStateOf {
-                scaledThumbSize / 1.5f
-            }
-        }
-
-        var draggingOffsetX by remember { mutableStateOf(0f) }
+        val thumbRadius = remember(trackSize.height) { trackSize.height / 2 }
 
         var isThumbPressed by remember { mutableStateOf(false) }
 
         var isThumbDragging by remember { mutableStateOf(false) }
 
-        val isThumbScaled by remember(isThumbPressed, isThumbDragging) {
-            derivedStateOf {
-                isThumbPressed || isThumbDragging
+        LaunchedEffect(value) {
+            if (!(isThumbPressed || isThumbDragging)) animatedOffsetX.animateTo(
+                transform(
+                    value, valueRange, trackRange
+                )
+            )
+        }
+
+        Canvas(modifier = Modifier.fillMaxSize().pointerInput(trackRange) {
+            detectTapGestures(onTap = { (x, _) ->
+                isThumbPressed = true
+                onValueChange(transform(x, trackRange, valueRange))
+            }, onPress = {
+                isThumbPressed = false
+            })
+        }.pointerInput(trackRange) {
+            detectDragGestures(onDragStart = { (x, _) ->
+                isThumbDragging = true
+                coroutineScope.launch {
+                    animatedOffsetX.snapTo(x)
+                }
+            }, onDragCancel = {
+                isThumbDragging = false
+            }, onDragEnd = {
+                onValueChange(transform(animatedOffsetX.value, trackRange, valueRange))
+                isThumbDragging = false
+            }) { change, (x, _) ->
+                if (change.position.x in (0f..size.width.toFloat())) {
+                    coroutineScope.launch {
+                        animatedOffsetX.snapTo((animatedOffsetX.value + x).coerceIn(0f..size.width.toFloat()))
+                    }
+                }
             }
-        }
-
-        val animatedThumbSize by animateFloatAsState(if (isThumbScaled) scaledThumbSize else thumbSize)
-
-        LaunchedEffect(value, draggingOffsetX) {
-            if (isThumbDragging) animatedOffsetX.snapTo(draggingOffsetX)
-            else animatedOffsetX.animateTo(transform(value, valueRange, trackRange))
-        }
-
-        Canvas(modifier = Modifier.size(trackSize.width.dp, trackSize.height.dp)
-            .padding(horizontal = scaledThumbSize.dp / 2).pointerInput(Unit) {
-                detectTapGestures(onTap = { (x, _) ->
-                    onValueChange(transform(x, trackRange, valueRange))
-                })
-            }) {
+        }) {
             drawLine(
                 color = backgroundColor,
-                start = Offset(trackRange.start, trackSize.height / 2),
-                end = Offset(trackRange.endInclusive, trackSize.height / 2),
-                strokeWidth = trackSize.height
+                start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
+                end = Offset(trackRange.endInclusive - thumbRadius, trackSize.height / 2),
+                strokeWidth = trackSize.height,
+                cap = StrokeCap.Round
             )
             drawLine(
                 color = foregroundColor,
-                start = Offset(trackRange.start, trackSize.height / 2),
-                end = Offset(animatedOffsetX.value, trackSize.height / 2),
-                strokeWidth = trackSize.height
+                start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
+                end = Offset(
+                    transform(
+                        animatedOffsetX.value,
+                        trackRange,
+                        (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
+                    ), trackSize.height / 2
+                ),
+                strokeWidth = trackSize.height,
+                cap = StrokeCap.Round
+            )
+            drawCircle(
+                color = interactionThumbColor.takeIf { isThumbPressed || isThumbDragging } ?: thumbColor,
+                radius = thumbRadius,
+                center = Offset(
+                    transform(
+                        animatedOffsetX.value,
+                        trackRange,
+                        (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
+                    ), trackSize.height / 2
+                )
             )
         }
-        Spacer(modifier = Modifier.size(animatedThumbSize.dp)
-            .offset(x = animatedOffsetX.value.dp - animatedThumbSize.dp / 2 + scaledThumbSize.dp / 2).alpha(.25f)
-            .background(color = foregroundColor, shape = CircleShape).pointerInput(Unit) {
-                detectTapGestures(onPress = {
-                    isThumbPressed = true
-                    tryAwaitRelease()
-                    isThumbPressed = false
-                })
-            }.pointerInput(Unit) {
-                detectDragGestures(onDragStart = {
-                    draggingOffsetX = animatedOffsetX.value
-                    isThumbDragging = true
-                }, onDragCancel = {
-                    isThumbDragging = false
-                }, onDragEnd = {
-                    onValueChange(transform(animatedOffsetX.value, trackRange, valueRange))
-                    isThumbDragging = false
-                }) { _, (x, _) ->
-                    draggingOffsetX = (draggingOffsetX + x).coerceIn(trackRange)
-                }
-            })
     }
 }
