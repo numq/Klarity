@@ -14,11 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
-import kotlin.math.ceil
 
 private fun transform(value: Float, source: ClosedRange<Float>, target: ClosedRange<Float>): Float {
     if (source.endInclusive - source.start == 0f) return target.start
-    return ceil(((value - source.start) / (source.endInclusive - source.start)) * (target.endInclusive - target.start) + target.start)
+    return ((value - source.start) / (source.endInclusive - source.start)) * (target.endInclusive - target.start) + target.start
 }
 
 @Composable
