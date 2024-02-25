@@ -68,14 +68,14 @@ fun CustomSlider(
             )
         }
 
-        Canvas(modifier = Modifier.fillMaxSize().pointerInput(trackRange) {
+        Canvas(modifier = Modifier.fillMaxSize().pointerInput(trackRange, valueRange) {
             detectTapGestures(onTap = { (x, _) ->
                 onValueChange(transform(x, trackRange, valueRange))
                 isThumbPressed = false
             }, onPress = {
                 isThumbPressed = true
             })
-        }.pointerInput(trackRange) {
+        }.pointerInput(trackRange, valueRange) {
             detectDragGestures(onDragStart = { (x, _) ->
                 coroutineScope.launch {
                     animatedOffsetX.snapTo(x)
