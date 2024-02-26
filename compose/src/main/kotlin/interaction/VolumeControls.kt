@@ -53,7 +53,7 @@ fun VolumeControls(
         VolumeBar(
             volume = volume,
             changeVolume = { value -> if (enabled) changeVolume(value) },
-            modifier = Modifier.fillMaxWidth().height(8.dp).alpha(if (enabled) 1f else .25f),
+            modifier = Modifier.fillMaxWidth().height(16.dp).alpha(if (enabled) 1f else .25f),
             backgroundColor = backgroundColor,
             foregroundColor = foregroundColor
         )
