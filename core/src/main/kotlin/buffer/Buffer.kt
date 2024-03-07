@@ -5,6 +5,8 @@ interface Buffer<T> {
         fun <T> create(): Buffer<T> = DefaultBuffer()
     }
 
+    val list: List<T>
+
     val capacity: Int
 
     suspend fun resize(capacity: Int)
