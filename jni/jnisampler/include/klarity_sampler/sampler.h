@@ -34,11 +34,12 @@ private:
     uint32_t source;
     uint32_t sampleRate;
     uint32_t numBuffers = MIN_NUM_BUFFERS;
+    std::vector<ALuint> buffers;
     ALCdevice *device;
     ALCcontext *context;
     Stretch<float> *stretch;
 
-    static std::vector<uint8_t> _convertSamples(float *samples, uint64_t size);
+    static std::vector<uint8_t> _convertSamples(const std::vector<float> &samples);
 
     static void _checkALError(const char *file, int line);
 
