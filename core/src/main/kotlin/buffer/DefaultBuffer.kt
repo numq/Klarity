@@ -10,7 +10,7 @@ internal class DefaultBuffer<T>(override var capacity: Int = 1) : Buffer<T> {
     override val list: MutableList<T> = mutableListOf()
 
     override suspend fun resize(capacity: Int) = mutex.withLock {
-        check(capacity > 0) { "Invalid buffer size" }
+        check(capacity > 0) { "Invalid buffer capacity" }
 
         this.capacity = capacity
 
@@ -32,7 +32,7 @@ internal class DefaultBuffer<T>(override var capacity: Int = 1) : Buffer<T> {
     }
 
     override suspend fun push(item: T) = mutex.withLock {
-        check(capacity > 0) { "Invalid buffer size" }
+        check(capacity > 0) { "Invalid buffer capacity" }
 
         list.add(item)
 
