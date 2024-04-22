@@ -1,47 +1,29 @@
 package frame
 
-sealed class DecodedFrame private constructor(open val timestampNanos: Long) {
-    data class End(override val timestampNanos: Long) : DecodedFrame(timestampNanos)
-
-    data class Video(
-        override val timestampNanos: Long,
-        val bytes: ByteArray,
-    ) : DecodedFrame(timestampNanos) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as Video
-
-            if (timestampNanos != other.timestampNanos) return false
-            return bytes.contentEquals(other.bytes)
-        }
-
-        override fun hashCode(): Int {
-            var result = timestampNanos.hashCode()
-            result = 31 * result + bytes.contentHashCode()
-            return result
-        }
+data class DecodedFrame(
+    val type: Type,
+    val timestampMicros: Long,
+    val bytes: ByteArray,
+) {
+    enum class Type {
+        AUDIO, VIDEO
     }
 
-    data class Audio(
-        override val timestampNanos: Long,
-        val bytes: ByteArray,
-    ) : DecodedFrame(timestampNanos) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-            other as Audio
+        other as DecodedFrame
 
-            if (timestampNanos != other.timestampNanos) return false
-            return bytes.contentEquals(other.bytes)
-        }
+        if (type != other.type) return false
+        if (timestampMicros != other.timestampMicros) return false
+        return bytes.contentEquals(other.bytes)
+    }
 
-        override fun hashCode(): Int {
-            var result = timestampNanos.hashCode()
-            result = 31 * result + bytes.contentHashCode()
-            return result
-        }
+    override fun hashCode(): Int {
+        var result = type.hashCode()
+        result = 31 * result + timestampMicros.hashCode()
+        result = 31 * result + bytes.contentHashCode()
+        return result
     }
 }
