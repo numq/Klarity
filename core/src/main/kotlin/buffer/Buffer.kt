@@ -2,7 +2,7 @@ package buffer
 
 interface Buffer<T> {
     companion object {
-        fun <T> create(): Buffer<T> = DefaultBuffer()
+        fun <T> create(capacity: Int): Buffer<T> = DefaultBuffer(capacity = capacity)
     }
 
     val list: List<T>
