@@ -3,7 +3,7 @@ package buffer
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class DefaultBuffer<T>(override var capacity: Int = 1) : Buffer<T> {
+internal class DefaultBuffer<T>(override var capacity: Int) : Buffer<T> {
 
     private val mutex = Mutex()
 

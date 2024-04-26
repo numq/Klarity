@@ -2,7 +2,11 @@ package buffer
 
 interface Buffer<T> {
     companion object {
-        fun <T> create(capacity: Int): Buffer<T> = DefaultBuffer(capacity = capacity)
+        fun <T> create(capacity: Int): Result<Buffer<T>> = when {
+            capacity > 0 -> Result.success(DefaultBuffer(capacity = capacity))
+
+            else -> Result.failure(Exception("Unable to create buffer with $capacity capacity"))
+        }
     }
 
     val list: List<T>
