@@ -34,8 +34,6 @@ private:
     std::mutex mutex;
 
 protected:
-    std::vector<uint8_t> pixels = std::vector<uint8_t>();
-    std::vector<uint8_t> samples = std::vector<uint8_t>();
     AVFormatContext *formatContext = nullptr;
     AVCodecContext *videoCodecContext = nullptr;
     AVCodecContext *audioCodecContext = nullptr;
@@ -46,9 +44,9 @@ protected:
 
     Frame *_readFrame(bool doVideo, bool doAudio);
 
-    void _processVideoFrame(const AVFrame &src);
+    std::vector<uint8_t> _processVideoFrame(const AVFrame &src);
 
-    void _processAudioFrame(const AVFrame &src);
+    std::vector<uint8_t> _processAudioFrame(const AVFrame &src);
 
     void _seekTo(long timestampMicros);
 
@@ -57,7 +55,7 @@ protected:
     void _cleanUp();
 
 public:
-    Decoder(const std::string &location, const bool findAudioStream, const bool findVideoStream);
+    Decoder(const std::string &location, bool findAudioStream, bool findVideoStream);
 
     ~Decoder() override;
 

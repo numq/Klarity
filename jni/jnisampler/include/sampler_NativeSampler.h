@@ -10,18 +10,18 @@ extern "C" {
 /*
  * Class:     sampler_NativeSampler
  * Method:    initNative
- * Signature: (JIII)Z
+ * Signature: (JII)Z
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII
-  (JNIEnv *, jobject, jlong, jint, jint, jint);
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JII
+  (JNIEnv *, jobject, jlong, jint, jint);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    initNative
- * Signature: (JIIII)Z
+ * Signature: (JIII)Z
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIIII
-  (JNIEnv *, jobject, jlong, jint, jint, jint, jint);
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII
+  (JNIEnv *, jobject, jlong, jint, jint, jint);
 
 /*
  * Class:     sampler_NativeSampler

@@ -55,48 +55,31 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     delete pool;
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII(
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JII(
         JNIEnv *env,
         jobject thisObject,
         jlong id,
-        jint bitsPerSample,
         jint sampleRate,
         jint channels
 ) {
     try {
-        return pool->create(
-                id,
-                new Sampler(
-                        (uint32_t) bitsPerSample,
-                        (uint32_t) sampleRate,
-                        (uint32_t) channels
-                )
-        );
+        return pool->create(id, new Sampler((uint32_t) sampleRate, (uint32_t) channels));
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
         return false;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIIII(
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII(
         JNIEnv *env,
         jobject thisObject,
         jlong id,
-        jint bitsPerSample,
         jint sampleRate,
         jint channels,
         jint numBuffers
 ) {
     try {
-        return pool->create(
-                id,
-                new Sampler(
-                        (uint32_t) bitsPerSample,
-                        (uint32_t) sampleRate,
-                        (uint32_t) channels,
-                        (uint32_t) numBuffers
-                )
-        );
+        return pool->create(id, new Sampler((uint32_t) sampleRate, (uint32_t) channels, (uint32_t) numBuffers));
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
         return false;
