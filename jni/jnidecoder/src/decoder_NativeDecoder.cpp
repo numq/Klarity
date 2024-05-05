@@ -117,7 +117,7 @@ Java_decoder_NativeDecoder_initNative(
 }
 
 JNIEXPORT jobject JNICALL
-Java_decoder_NativeDecoder_readFrameNative(JNIEnv *env, jobject obj, jlong id, jboolean doVideo, jboolean doAudio) {
+Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong id) {
     jobject javaObject = nullptr;
 
     IDecoder *decoder;
@@ -127,7 +127,7 @@ Java_decoder_NativeDecoder_readFrameNative(JNIEnv *env, jobject obj, jlong id, j
 
             Frame *frame;
 
-            if (!(frame = decoder->readFrame((bool) doVideo, (bool) doAudio))) return nullptr;
+            if (!(frame = decoder->nextFrame())) return nullptr;
 
             jbyteArray byteArray = nullptr;
 

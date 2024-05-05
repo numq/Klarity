@@ -17,11 +17,11 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_initNative
 
 /*
  * Class:     decoder_NativeDecoder
- * Method:    readFrameNative
- * Signature: (JZZ)Ldecoder/NativeFrame;
+ * Method:    nextFrameNative
+ * Signature: (J)Ldecoder/NativeFrame;
  */
-JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_readFrameNative
-  (JNIEnv *, jobject, jlong, jboolean, jboolean);
+JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     decoder_NativeDecoder

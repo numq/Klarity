@@ -22,7 +22,7 @@ public:
 
     virtual ~IDecoder() = default;
 
-    virtual Frame *readFrame(bool doVideo, bool doAudio) = 0;
+    virtual Frame *nextFrame() = 0;
 
     virtual void seekTo(long timestampMicros) = 0;
 
@@ -35,14 +35,14 @@ private:
 
 protected:
     AVFormatContext *formatContext = nullptr;
-    AVCodecContext *videoCodecContext = nullptr;
     AVCodecContext *audioCodecContext = nullptr;
-    AVStream *videoStream = nullptr;
+    AVCodecContext *videoCodecContext = nullptr;
     AVStream *audioStream = nullptr;
+    AVStream *videoStream = nullptr;
     SwsContext *swsContext = nullptr;
     SwrContext *swrContext = nullptr;
 
-    Frame *_readFrame(bool doVideo, bool doAudio);
+    Frame *_nextFrame();
 
     std::vector<uint8_t> _processVideoFrame(const AVFrame &src);
 
@@ -59,7 +59,7 @@ public:
 
     ~Decoder() override;
 
-    Frame *readFrame(bool doVideo, bool doAudio) override;
+    Frame *nextFrame() override;
 
     void seekTo(long timestampMicros) override;
 
