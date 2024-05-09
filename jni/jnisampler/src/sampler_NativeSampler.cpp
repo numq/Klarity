@@ -95,7 +95,7 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             sampler->setPlaybackSpeed((float) factor);
 
             return true;
@@ -117,7 +117,7 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setVolumeNative(
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             return sampler->setVolume((float) value);
         }
     } catch (const std::exception &e) {
@@ -138,7 +138,7 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative(
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
             if (!byteArray) {
                 std::cerr << "Failed to get byte array elements." << std::endl;
@@ -166,7 +166,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative(JNIEnv *env, jobje
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             sampler->pause();
         }
     } catch (const std::exception &e) {
@@ -178,7 +178,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative(JNIEnv *env, jobj
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             sampler->resume();
         }
     } catch (const std::exception &e) {
@@ -190,7 +190,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobjec
     ISampler *sampler;
 
     try {
-        if ((sampler = pool->acquire(id))) {
+        if ((sampler = pool->acquire((uint64_t) id))) {
             sampler->stop();
         }
     } catch (const std::exception &e) {
@@ -200,7 +200,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobjec
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_closeNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        pool->release(id);
+        pool->release((uint64_t) id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in closeNative method: ") + e.what());
     }

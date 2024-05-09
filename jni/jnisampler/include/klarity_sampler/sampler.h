@@ -37,10 +37,9 @@ private:
     uint32_t sampleRate;
     uint32_t channels;
     uint32_t numBuffers = MIN_NUM_BUFFERS;
-    std::vector<ALuint> buffers;
     ALCdevice *device;
     ALCcontext *context;
-    signalsmith::stretch::SignalsmithStretch<float> *stretch;
+    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
 
     static void _checkALError(const char *file, int line);
 
