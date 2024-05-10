@@ -8,9 +8,9 @@ public class NativeSampler {
         this.id = System.identityHashCode(this);
     }
 
-    private native boolean initNative(long id, int bitsPerSample, int sampleRate, int channels);
+    private native boolean initNative(long id, int sampleRate, int channels);
 
-    private native boolean initNative(long id, int bitsPerSample, int sampleRate, int channels, int numBuffers);
+    private native boolean initNative(long id, int sampleRate, int channels, int numBuffers);
 
     private native boolean setPlaybackSpeedNative(long id, float factor);
 
@@ -26,12 +26,12 @@ public class NativeSampler {
 
     private native void closeNative(long id);
 
-    public boolean init(int bitsPerSample, int sampleRate, int channels) {
-        return initNative(id, bitsPerSample, sampleRate, channels);
+    public boolean init(int sampleRate, int channels) {
+        return initNative(id, sampleRate, channels);
     }
 
-    public boolean init(int bitsPerSample, int sampleRate, int channels, int numBuffers) {
-        return initNative(id, bitsPerSample, sampleRate, channels, numBuffers);
+    public boolean init(int sampleRate, int channels, int numBuffers) {
+        return initNative(id, sampleRate, channels, numBuffers);
     }
 
     public boolean setPlaybackSpeed(float factor) {

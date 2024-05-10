@@ -20,7 +20,7 @@ public class NativeDecoder {
 
     private native NativeFormat initNative(long id, String location, boolean findAudioStream, boolean findVideoStream);
 
-    private native NativeFrame readFrameNative(long id, boolean doVideo, boolean doAudio);
+    private native NativeFrame nextFrameNative(long id);
 
     private native void seekToNative(long id, long timestampMicros);
 
@@ -33,8 +33,8 @@ public class NativeDecoder {
         return this.format != null;
     }
 
-    public NativeFrame readFrame(boolean doVideo, boolean doAudio) {
-        return readFrameNative(id, doVideo, doAudio);
+    public NativeFrame nextFrame() {
+        return nextFrameNative(id);
     }
 
     public void seekTo(long timestampMicros) {
