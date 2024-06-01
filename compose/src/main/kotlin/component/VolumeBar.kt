@@ -13,10 +13,10 @@ fun VolumeBar(
     foregroundColor: Color = Color.LightGray,
 ) {
     CustomSlider(
-        value = volume,
-        onValueChange = changeVolume,
+        primaryValue = volume,
+        onPrimaryValueChange = changeVolume,
         modifier = modifier,
         backgroundColor = backgroundColor,
-        foregroundColor = foregroundColor
+        foregroundPrimaryColor = foregroundColor
     )
 }

@@ -22,12 +22,14 @@ private fun transform(value: Float, source: ClosedRange<Float>, target: ClosedRa
 
 @Composable
 fun CustomSlider(
-    value: Float,
-    onValueChange: (Float) -> Unit,
+    primaryValue: Float,
+    secondaryValue: Float? = null,
+    onPrimaryValueChange: (Float) -> Unit,
     valueRange: ClosedRange<Float> = (0f..1f),
     modifier: Modifier = Modifier,
     backgroundColor: Color = Color.DarkGray,
-    foregroundColor: Color = Color.Gray,
+    foregroundPrimaryColor: Color = Color.LightGray,
+    foregroundSecondaryColor: Color = Color.Gray,
     thumbColor: Color = Color.White,
     interactionThumbColor: Color? = null,
 ) {
@@ -46,7 +48,9 @@ fun CustomSlider(
 
         val trackRange = remember(trackSize.width) { (0f..trackSize.width) }
 
-        val animatedOffsetX = remember { Animatable(transform(value, valueRange, trackRange)) }
+        val animatedPrimaryOffsetX = remember { Animatable(transform(primaryValue, valueRange, trackRange)) }
+
+        val animatedSecondaryOffsetX = remember { Animatable(transform(primaryValue, valueRange, trackRange)) }
 
         /**
          * Thumb
@@ -58,10 +62,26 @@ fun CustomSlider(
 
         var isThumbDragging by remember { mutableStateOf(false) }
 
-        LaunchedEffect(value) {
-            if (!(isThumbPressed || isThumbDragging)) animatedOffsetX.animateTo(
+        LaunchedEffect(primaryValue) {
+            if (!(isThumbPressed || isThumbDragging)) animatedPrimaryOffsetX.animateTo(
                 transform(
-                    value,
+                    primaryValue,
+                    valueRange,
+                    trackRange
+                )
+            )
+        }
+
+        DisposableEffect(primaryValue) {
+            onDispose {
+                isThumbPressed = false
+            }
+        }
+
+        if (secondaryValue != null) LaunchedEffect(secondaryValue) {
+            animatedSecondaryOffsetX.animateTo(
+                transform(
+                    secondaryValue,
                     valueRange,
                     trackRange
                 )
@@ -70,27 +90,28 @@ fun CustomSlider(
 
         Canvas(modifier = Modifier.fillMaxSize().pointerInput(trackRange, valueRange) {
             detectTapGestures(onTap = { (x, _) ->
-                onValueChange(transform(x, trackRange, valueRange))
-                isThumbPressed = false
+                onPrimaryValueChange(transform(x, trackRange, valueRange))
             }, onPress = {
                 isThumbPressed = true
+                awaitRelease()
+                isThumbPressed = false
             })
         }.pointerInput(trackRange, valueRange) {
             detectDragGestures(onDragStart = { (x, _) ->
                 coroutineScope.launch {
-                    animatedOffsetX.snapTo(x)
+                    animatedPrimaryOffsetX.snapTo(x)
                 }
                 isThumbDragging = true
             }, onDragCancel = {
                 isThumbDragging = false
             }, onDragEnd = {
-                onValueChange(transform(animatedOffsetX.value, trackRange, valueRange))
+                onPrimaryValueChange(transform(animatedPrimaryOffsetX.value, trackRange, valueRange))
 
                 isThumbDragging = false
             }) { change, (x, _) ->
                 if (change.position.x in trackRange) {
                     coroutineScope.launch {
-                        animatedOffsetX.snapTo((animatedOffsetX.value + x).coerceIn(trackRange))
+                        animatedPrimaryOffsetX.snapTo((animatedPrimaryOffsetX.value + x).coerceIn(trackRange))
                     }
                 }
             }
@@ -103,11 +124,24 @@ fun CustomSlider(
                 cap = StrokeCap.Round
             )
             drawLine(
-                color = foregroundColor,
+                color = foregroundSecondaryColor,
                 start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
                 end = Offset(
                     transform(
-                        animatedOffsetX.value,
+                        animatedSecondaryOffsetX.value,
+                        trackRange,
+                        (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
+                    ), trackSize.height / 2
+                ),
+                strokeWidth = trackSize.height,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = foregroundPrimaryColor,
+                start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
+                end = Offset(
+                    transform(
+                        animatedPrimaryOffsetX.value,
                         trackRange,
                         (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
                     ), trackSize.height / 2
@@ -120,7 +154,7 @@ fun CustomSlider(
                 radius = thumbRadius,
                 center = Offset(
                     transform(
-                        animatedOffsetX.value,
+                        animatedPrimaryOffsetX.value,
                         trackRange,
                         (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
                     ), trackSize.height / 2
