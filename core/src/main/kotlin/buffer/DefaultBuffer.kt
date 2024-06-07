@@ -1,45 +1,41 @@
 package buffer
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
-internal class DefaultBuffer<T>(override var capacity: Int) : Buffer<T> {
+internal class DefaultBuffer<T>(initialCapacity: Int) : Buffer<T> {
+    private val lock = ReentrantLock()
 
-    private val mutex = Mutex()
+    private var capacity: Int = initialCapacity
 
-    override val list: MutableList<T> = mutableListOf()
+    private var queue = LinkedBlockingQueue<T>(capacity)
 
-    override suspend fun resize(capacity: Int) = mutex.withLock {
+    override fun resize(newCapacity: Int) = runCatching {
         check(capacity > 0) { "Invalid buffer capacity" }
 
-        this.capacity = capacity
+        lock.withLock {
+            if (newCapacity != capacity) {
+                val items = mutableListOf<T>()
 
-        if (capacity < list.size) list.dropLast(list.size - capacity)
+                queue.drainTo(items, newCapacity)
 
-        Unit
+                queue = LinkedBlockingQueue<T>(items)
+
+                capacity = newCapacity
+            }
+        }
     }
 
-    override suspend fun isEmpty() = mutex.withLock { list.isEmpty() }
-
-    override suspend fun isAvailable() = mutex.withLock { list.size < capacity }
-
-    override suspend fun peek() = mutex.withLock {
-        list.firstOrNull()
+    override fun poll() = runCatching {
+        queue.take()
     }
 
-    override suspend fun poll(): T? = mutex.withLock {
-        list.removeFirstOrNull()
+    override fun push(item: T) = runCatching {
+        queue.put(item)
     }
 
-    override suspend fun push(item: T) = mutex.withLock {
-        check(capacity > 0) { "Invalid buffer capacity" }
-
-        list.add(item)
-
-        Unit
-    }
-
-    override suspend fun flush() = mutex.withLock {
-        list.clear()
+    override fun flush() = runCatching {
+        queue.clear()
     }
 }

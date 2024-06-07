@@ -1,29 +1,16 @@
 package buffer
 
 interface Buffer<T> {
-    companion object {
-        fun <T> create(capacity: Int): Result<Buffer<T>> = when {
-            capacity > 0 -> Result.success(DefaultBuffer(capacity = capacity))
+    fun resize(newCapacity: Int): Result<Unit>
+    fun poll(): Result<T?>
+    fun push(item: T): Result<Unit>
+    fun flush(): Result<Unit>
 
-            else -> Result.failure(Exception("Unable to create buffer with $capacity capacity"))
+    companion object {
+        internal fun <T> create(capacity: Int): Result<Buffer<T>> = runCatching {
+            check(capacity > 0) { "Unable to create buffer with $capacity capacity" }
+
+            DefaultBuffer(initialCapacity = capacity)
         }
     }
-
-    val list: List<T>
-
-    val capacity: Int
-
-    suspend fun resize(capacity: Int)
-
-    suspend fun isEmpty(): Boolean
-
-    suspend fun isAvailable(): Boolean
-
-    suspend fun peek(): T?
-
-    suspend fun poll(): T?
-
-    suspend fun push(item: T)
-
-    suspend fun flush()
 }
