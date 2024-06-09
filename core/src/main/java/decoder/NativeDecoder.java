@@ -4,6 +4,8 @@ public class NativeDecoder {
 
     private final long id;
 
+    private String location;
+
     private NativeFormat format;
 
     public NativeDecoder() {
@@ -12,6 +14,10 @@ public class NativeDecoder {
 
     public long getId() {
         return id;
+    }
+
+    public String getLocation() {
+        return location;
     }
 
     public NativeFormat getFormat() {
@@ -29,8 +35,9 @@ public class NativeDecoder {
     private native void closeNative(long id);
 
     public boolean init(String location, boolean findAudioStream, boolean findVideoStream) {
+        this.location = location;
         this.format = initNative(id, location, findAudioStream, findVideoStream);
-        return this.format != null;
+        return true;
     }
 
     public NativeFrame nextFrame() {
