@@ -6,6 +6,6 @@ data class VideoFormat(
     val frameRate: Double,
 ) {
     companion object {
-        const val MIN_BUFFER_SIZE = 4
+        const val MIN_BUFFER_SIZE = 2
     }
 }
