@@ -1,101 +1,115 @@
 package decoder
 
-import converter.ByteArrayFrameConverter
-import frame.DecodedFrame
+import format.AudioFormat
+import format.VideoFormat
+import frame.Frame
+import media.Location
 import media.Media
-import org.bytedeco.ffmpeg.global.avcodec
-import org.bytedeco.ffmpeg.global.avutil
-import org.bytedeco.javacv.FFmpegFrameGrabber
-import org.bytedeco.javacv.FrameGrabber
 import java.io.File
-import javax.sound.sampled.AudioFormat
-import kotlin.time.Duration.Companion.microseconds
+import java.util.*
 
-interface Decoder : AutoCloseable {
-
-    object Configuration {
-        val sampleMode = FrameGrabber.SampleMode.SHORT
-        const val audioChannels = 2
-        const val audioCodec = avcodec.AV_CODEC_ID_AAC
-        const val sampleFormat = avutil.AV_SAMPLE_FMT_S16
-        const val sampleRate = 44_100
-
-        val imageMode = FrameGrabber.ImageMode.COLOR
-        const val videoCodec = avcodec.AV_CODEC_ID_HEVC
-        const val pixelFormat = avutil.AV_PIX_FMT_BGRA
-
-        const val numBuffers = 0
-    }
-
-    val isInitialized: Boolean
-
-    val media: Media?
-
-    suspend fun initialize(media: Media)
-
-    suspend fun dispose()
-
-    suspend fun snapshot(timestampMicros: Long): DecodedFrame.Video?
-
-    suspend fun nextFrame(): DecodedFrame?
-
-    suspend fun seekTo(timestampMicros: Long): Long?
+interface Decoder<Frame> : AutoCloseable {
+    val media: Media
+    suspend fun nextFrame(): Result<Frame?>
+    fun seekTo(micros: Long): Result<Unit>
+    fun reset(): Result<Unit>
 
     companion object {
-        fun createMedia(url: String) = runCatching {
-            FFmpegFrameGrabber(url).apply {
-                audioChannels = Configuration.audioChannels
-                audioCodec = Configuration.audioCodec
-                sampleMode = Configuration.sampleMode
-                sampleFormat = Configuration.sampleFormat
-                sampleRate = Configuration.sampleRate
+        private fun probe(
+            location: String,
+            findAudioStream: Boolean,
+            findVideoStream: Boolean,
+        ): Result<Media> = runCatching {
+            val decoder = NativeDecoder()
 
-                videoCodec = Configuration.videoCodec
-                imageMode = Configuration.imageMode
-                pixelFormat = Configuration.pixelFormat
+            val media = try {
+                decoder.takeIf { decoder.init(location, findAudioStream, findVideoStream) }?.format?.run {
+                    val id = Objects.hash(decoder.id, location).toLong()
 
-                numBuffers = Configuration.numBuffers
+                    val mediaLocation = File(location).takeIf(File::exists)?.run {
+                        Location.Local(fileName = name, path = path)
+                    } ?: Location.Remote(url = location)
 
-                startUnsafe()
-            }.use { infoGrabber ->
-                with(infoGrabber) {
-                    val durationNanos = lengthInTime.microseconds.inWholeNanoseconds
+                    val audioFormat = runCatching {
+                        if (findAudioStream) {
+                            check(sampleRate > 0 && channels > 0) { "Audio decoding is not supported by media" }
 
-                    val audioFormat = if (hasAudio()) AudioFormat(
-                        sampleRate.toFloat(),
-                        avutil.av_get_bytes_per_sample(sampleFormat) * 8,
-                        audioChannels,
-                        true,
-                        false
-                    ) else null
+                            AudioFormat(sampleRate = sampleRate, channels = channels)
+                        } else null
+                    }.getOrNull()
 
-                    val size = if (imageWidth > 0 && imageHeight > 0) imageWidth to imageHeight else null
+                    val videoFormat = runCatching {
+                        if (findVideoStream) {
+                            check(width > 0 && height > 0 && frameRate >= 0) { "Video decoding is not supported by media" }
 
-                    val frameRate = videoFrameRate.coerceIn(0.0, 60.0)
-
-                    val previewFrame = runCatching {
-                        grabImage()?.use { frame ->
-                            ByteArrayFrameConverter().use { converter ->
-                                converter.convert(frame)?.let { bytes ->
-                                    DecodedFrame.Video(frame.timestamp.microseconds.inWholeNanoseconds, bytes)
-                                }
-                            }
-                        }
+                            VideoFormat(width = width, height = height, frameRate = frameRate)
+                        } else null
                     }.getOrNull()
 
                     Media(
-                        url = url,
-                        name = File(url).takeIf(File::exists)?.name,
-                        durationNanos = durationNanos,
-                        frameRate = frameRate,
+                        id = id,
+                        durationMicros = durationMicros,
+                        location = mediaLocation,
                         audioFormat = audioFormat,
-                        size = size,
-                        previewFrame = previewFrame
+                        videoFormat = videoFormat
                     )
                 }
+            } catch (e: Exception) {
+                throw e
+            } finally {
+                decoder.close()
             }
-        }.onFailure(Throwable::printStackTrace).getOrNull()
 
-        fun create(): Decoder = DefaultDecoder()
+            checkNotNull(media) { "Unable to open media" }
+        }
+
+        internal fun createProbeDecoder(
+            location: String,
+            findAudioStream: Boolean,
+            findVideoStream: Boolean,
+        ): Result<Decoder<Nothing>> = probe(
+            location = location,
+            findAudioStream = findAudioStream,
+            findVideoStream = findVideoStream
+        ).mapCatching { media ->
+            NativeDecoder().apply {
+                init(location, findAudioStream, findVideoStream)
+            }.let { decoder ->
+                ProbeDecoder(
+                    decoder = decoder,
+                    media = media
+                )
+            }
+        }
+
+        internal fun createAudioDecoder(location: String): Result<Decoder<Frame.Audio>> = probe(
+            location = location,
+            findAudioStream = true,
+            findVideoStream = false
+        ).mapCatching { media ->
+            NativeDecoder().apply {
+                init(location, true, false)
+            }.let { decoder ->
+                AudioDecoder(
+                    decoder = decoder,
+                    media = media
+                )
+            }
+        }
+
+        internal fun createVideoDecoder(location: String): Result<Decoder<Frame.Video>> = probe(
+            location = location,
+            findAudioStream = false,
+            findVideoStream = true
+        ).mapCatching { media ->
+            NativeDecoder().apply {
+                init(location, false, true)
+            }.let { decoder ->
+                VideoDecoder(
+                    decoder = decoder,
+                    media = media
+                )
+            }
+        }
     }
 }
