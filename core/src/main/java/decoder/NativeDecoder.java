@@ -4,10 +4,6 @@ public class NativeDecoder {
 
     private final long id;
 
-    private String location;
-
-    private NativeFormat format;
-
     public NativeDecoder() {
         this.id = System.identityHashCode(this);
     }
@@ -16,15 +12,9 @@ public class NativeDecoder {
         return id;
     }
 
-    public String getLocation() {
-        return location;
-    }
+    private native boolean initNative(long id, String location, boolean findAudioStream, boolean findVideoStream);
 
-    public NativeFormat getFormat() {
-        return format;
-    }
-
-    private native NativeFormat initNative(long id, String location, boolean findAudioStream, boolean findVideoStream);
+    private native NativeFormat getFormatNative(long id);
 
     private native NativeFrame nextFrameNative(long id);
 
@@ -35,9 +25,11 @@ public class NativeDecoder {
     private native void closeNative(long id);
 
     public boolean init(String location, boolean findAudioStream, boolean findVideoStream) {
-        this.location = location;
-        this.format = initNative(id, location, findAudioStream, findVideoStream);
-        return true;
+        return initNative(id, location, findAudioStream, findVideoStream);
+    }
+
+    public NativeFormat getFormat() {
+        return getFormatNative(id);
     }
 
     public NativeFrame nextFrame() {

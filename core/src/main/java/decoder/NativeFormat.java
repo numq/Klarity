@@ -1,6 +1,7 @@
 package decoder;
 
 public class NativeFormat {
+    private final String location;
     private final long durationMicros;
     private final int sampleRate;
     private final int channels;
@@ -8,7 +9,8 @@ public class NativeFormat {
     private final int height;
     private final double frameRate;
 
-    public NativeFormat(long durationMicros, int sampleRate, int channels, int width, int height, double frameRate) {
+    public NativeFormat(String location, long durationMicros, int sampleRate, int channels, int width, int height, double frameRate) {
+        this.location = location;
         this.durationMicros = durationMicros;
         this.sampleRate = sampleRate;
         this.channels = channels;
@@ -17,8 +19,8 @@ public class NativeFormat {
         this.frameRate = frameRate;
     }
 
-    public int getChannels() {
-        return channels;
+    public String getLocation() {
+        return location;
     }
 
     public long getDurationMicros() {
@@ -27,6 +29,10 @@ public class NativeFormat {
 
     public int getSampleRate() {
         return sampleRate;
+    }
+
+    public int getChannels() {
+        return channels;
     }
 
     public int getWidth() {
