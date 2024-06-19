@@ -1,5 +1,5 @@
-#ifndef KLARITY_AUDIO_SAMPLER_H
-#define KLARITY_AUDIO_SAMPLER_H
+#ifndef KLARITY_SAMPLER_H
+#define KLARITY_SAMPLER_H
 
 #include <iostream>
 #include <memory>
@@ -9,68 +9,66 @@
 #include "openal/al.h"
 #include "openal/alext.h"
 #include "stretch/stretch.h"
+#include "media.h"
 
 class ISampler {
 public:
     virtual ~ISampler() = default;
 
-    virtual void setPlaybackSpeed(float factor) = 0;
+    virtual float getCurrentTime(uint64_t id) = 0;
 
-    virtual bool setVolume(float value) = 0;
+    virtual void setPlaybackSpeed(uint64_t id, float factor) = 0;
 
-    virtual bool play(uint8_t *samples, uint64_t size) = 0;
+    virtual bool setVolume(uint64_t id, float value) = 0;
 
-    virtual void pause() = 0;
+    virtual bool initialize(uint64_t id, uint32_t sampleRate, uint32_t channels, uint32_t numBuffers) = 0;
 
-    virtual void resume() = 0;
+    virtual bool play(uint64_t id, uint8_t *samples, uint64_t size) = 0;
 
-    virtual void stop() = 0;
+    virtual void pause(uint64_t id) = 0;
+
+    virtual void resume(uint64_t id) = 0;
+
+    virtual void stop(uint64_t id) = 0;
+
+    virtual void close(uint64_t id) = 0;
 };
 
 class Sampler : public ISampler {
 private:
-    const int32_t MIN_NUM_BUFFERS = 3;
     std::mutex mutex;
-    ALenum format = AL_NONE;
-    float playbackSpeedFactor = 1.0f;
-    uint32_t source;
-    uint32_t sampleRate;
-    uint32_t channels;
-    uint32_t numBuffers = MIN_NUM_BUFFERS;
     ALCdevice *device;
     ALCcontext *context;
-    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
+    std::unordered_map<uint64_t, Media *> mediaPool{};
 
     static void _checkALError(const char *file, int line);
 
-    static ALenum _getFormat(uint32_t channels);
+    Media *_acquireMedia(uint64_t id);
 
-    void _discardQueuedBuffers() const;
-
-    void _discardProcessedBuffers() const;
-
-    void _initialize(uint32_t channels);
-
-    void _cleanUp();
+    void _releaseMedia(uint64_t id);
 
 public:
-    Sampler(uint32_t sampleRate, uint32_t channels);
-
-    Sampler(uint32_t sampleRate, uint32_t channels, uint32_t numBuffers);
+    Sampler();
 
     ~Sampler() override;
 
-    void setPlaybackSpeed(float factor) override;
+    float getCurrentTime(uint64_t id) override;
 
-    bool setVolume(float value) override;
+    void setPlaybackSpeed(uint64_t id, float factor) override;
 
-    bool play(uint8_t *samples, uint64_t size) override;
+    bool setVolume(uint64_t id, float value) override;
 
-    void pause() override;
+    bool initialize(uint64_t id, uint32_t sampleRate, uint32_t channels, uint32_t numBuffers) override;
 
-    void resume() override;
+    bool play(uint64_t id, uint8_t *samples, uint64_t size) override;
 
-    void stop() override;
+    void pause(uint64_t id) override;
+
+    void resume(uint64_t id) override;
+
+    void stop(uint64_t id) override;
+
+    void close(uint64_t id) override;
 };
 
-#endif //KLARITY_AUDIO_SAMPLER_H
+#endif //KLARITY_SAMPLER_H

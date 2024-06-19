@@ -1,12 +1,12 @@
 #include <iostream>
+#include <memory>
 #include "sampler_NativeSampler.h"
-#include "pool.h"
 #include "klarity_sampler/sampler.h"
 
 static jclass exceptionClass;
 static jclass audioClass;
 static jmethodID audioConstructor;
-static Pool<ISampler> *pool;
+static std::unique_ptr<ISampler> sampler;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
     env->ThrowNew(exceptionClass, errorMessage.c_str());
@@ -38,7 +38,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    pool = new Pool<ISampler>();
+    sampler = std::make_unique<Sampler>();
 
     return JNI_VERSION_1_8;
 }
@@ -52,38 +52,16 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     if (audioClass) env->DeleteGlobalRef(audioClass);
 
-    delete pool;
+    sampler.reset();
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JII(
-        JNIEnv *env,
-        jobject thisObject,
-        jlong id,
-        jint sampleRate,
-        jint channels
-) {
+JNIEXPORT jfloat JNICALL Java_sampler_NativeSampler_getCurrentTimeNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        return pool->create(id, new Sampler((uint32_t) sampleRate, (uint32_t) channels));
+        return sampler->getCurrentTime(id);
     } catch (const std::exception &e) {
-        handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return false;
+        handleException(env, std::string("Exception in getCurrentTimeNative method: ") + e.what());
     }
-}
-
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII(
-        JNIEnv *env,
-        jobject thisObject,
-        jlong id,
-        jint sampleRate,
-        jint channels,
-        jint numBuffers
-) {
-    try {
-        return pool->create(id, new Sampler((uint32_t) sampleRate, (uint32_t) channels, (uint32_t) numBuffers));
-    } catch (const std::exception &e) {
-        handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return false;
-    }
+    return 0;
 }
 
 JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
@@ -92,19 +70,12 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
         jlong id,
         jfloat factor
 ) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            sampler->setPlaybackSpeed((float) factor);
-
-            return true;
-        }
+        sampler->setPlaybackSpeed(id, (float) factor);
+        return true;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in setPlaybackSpeedNative method: ") + e.what());
-        return false;
     }
-
     return false;
 }
 
@@ -114,17 +85,28 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setVolumeNative(
         jlong id,
         jfloat value
 ) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            return sampler->setVolume((float) value);
-        }
+        sampler->setVolume(id, (float) value);
+        return true;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in setVolumeNative method: ") + e.what());
-        return false;
     }
+    return false;
+}
 
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative(
+        JNIEnv *env,
+        jobject thisObject,
+        jlong id,
+        jint sampleRate,
+        jint channels,
+        jint numBuffers
+) {
+    try {
+        return sampler->initialize(id, (uint32_t) sampleRate, (uint32_t) channels, (uint32_t) numBuffers);
+    } catch (const std::exception &e) {
+        handleException(env, std::string("Exception in initNative method: ") + e.what());
+    }
     return false;
 }
 
@@ -135,64 +117,46 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative(
         jbyteArray bytes,
         jint size
 ) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
-            if (!byteArray) {
-                std::cerr << "Failed to get byte array elements." << std::endl;
-                return false;
-            }
-
-            std::vector<uint8_t> samples(
-                    reinterpret_cast<uint8_t *>(byteArray),
-                    reinterpret_cast<uint8_t *>(byteArray) + size
-            );
-
-            env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
-
-            return sampler->play(samples.data(), samples.size());
+        jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
+        if (!byteArray) {
+            std::cerr << "Failed to get byte array elements." << std::endl;
+            return false;
         }
+
+        std::vector<uint8_t> samples(
+                reinterpret_cast<uint8_t *>(byteArray),
+                reinterpret_cast<uint8_t *>(byteArray) + size
+        );
+
+        env->ReleaseByteArrayElements(bytes, byteArray, 0);
+
+        return sampler->play(id, samples.data(), samples.size());
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in playNative method: ") + e.what());
-        return false;
     }
-
     return false;
 }
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative(JNIEnv *env, jobject thisObject, jlong id) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            sampler->pause();
-        }
+        sampler->pause(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in pauseNative method: ") + e.what());
     }
 }
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative(JNIEnv *env, jobject thisObject, jlong id) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            sampler->resume();
-        }
+        sampler->resume(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in resumeNative method: ") + e.what());
     }
 }
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong id) {
-    ISampler *sampler;
-
     try {
-        if ((sampler = pool->acquire((uint64_t) id))) {
-            sampler->stop();
-        }
+        sampler->stop(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in stopNative method: ") + e.what());
     }
@@ -200,7 +164,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobjec
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_closeNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        pool->release((uint64_t) id);
+        sampler->close(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in closeNative method: ") + e.what());
     }

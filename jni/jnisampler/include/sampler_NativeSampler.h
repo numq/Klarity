@@ -9,19 +9,11 @@ extern "C" {
 #endif
 /*
  * Class:     sampler_NativeSampler
- * Method:    initNative
- * Signature: (JII)Z
+ * Method:    getCurrentTimeNative
+ * Signature: (J)F
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JII
-  (JNIEnv *, jobject, jlong, jint, jint);
-
-/*
- * Class:     sampler_NativeSampler
- * Method:    initNative
- * Signature: (JIII)Z
- */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative__JIII
-  (JNIEnv *, jobject, jlong, jint, jint, jint);
+JNIEXPORT jfloat JNICALL Java_sampler_NativeSampler_getCurrentTimeNative
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
@@ -38,6 +30,14 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative
  */
 JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setVolumeNative
   (JNIEnv *, jobject, jlong, jfloat);
+
+/*
+ * Class:     sampler_NativeSampler
+ * Method:    initNative
+ * Signature: (JIII)Z
+ */
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative
+  (JNIEnv *, jobject, jlong, jint, jint, jint);
 
 /*
  * Class:     sampler_NativeSampler
