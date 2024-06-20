@@ -3,8 +3,10 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 struct Format {
+    const char *location;
     uint64_t durationMicros;
     uint32_t sampleRate = 0;
     uint32_t channels = 0;
@@ -13,7 +15,7 @@ struct Format {
     double frameRate = 0.0;
 
 public:
-    explicit Format(uint64_t durationMicros);
+    explicit Format(const char *location, uint64_t durationMicros);
 
     ~Format();
 };

@@ -13,57 +13,52 @@ extern "C" {
 
 #include "format.h"
 #include "frame.h"
+#include "media.h"
 #include <mutex>
 #include <iostream>
+#include <unordered_map>
 
 class IDecoder {
 public:
-    Format *format = nullptr;
-
     virtual ~IDecoder() = default;
 
-    virtual Frame *nextFrame() = 0;
+    virtual bool initialize(uint64_t id, const char *location, bool findAudioStream, bool findVideoStream) = 0;
 
-    virtual void seekTo(long timestampMicros) = 0;
+    virtual Format *getFormat(uint64_t id) = 0;
 
-    virtual void reset() = 0;
+    virtual Frame *nextFrame(uint64_t id) = 0;
+
+    virtual void seekTo(uint64_t id, long timestampMicros) = 0;
+
+    virtual void reset(uint64_t id) = 0;
+
+    virtual void close(uint64_t id) = 0;
 };
 
 class Decoder : public IDecoder {
 private:
     std::mutex mutex;
 
-protected:
-    AVFormatContext *formatContext = nullptr;
-    AVCodecContext *audioCodecContext = nullptr;
-    AVCodecContext *videoCodecContext = nullptr;
-    AVStream *audioStream = nullptr;
-    AVStream *videoStream = nullptr;
-    SwsContext *swsContext = nullptr;
-    SwrContext *swrContext = nullptr;
+    std::unordered_map<uint64_t, Media *> mediaPool{};
 
-    Frame *_nextFrame();
+    Media *_acquireMedia(uint64_t id);
 
-    std::vector<uint8_t> _processVideoFrame(const AVFrame &src);
-
-    std::vector<uint8_t> _processAudioFrame(const AVFrame &src);
-
-    void _seekTo(long timestampMicros);
-
-    void _reset();
-
-    void _cleanUp();
+    void _releaseMedia(uint64_t id);
 
 public:
-    Decoder(const std::string &location, bool findAudioStream, bool findVideoStream);
-
     ~Decoder() override;
 
-    Frame *nextFrame() override;
+    bool initialize(uint64_t id, const char *location, bool findAudioStream, bool findVideoStream) override;
 
-    void seekTo(long timestampMicros) override;
+    Format *getFormat(uint64_t id) override;
 
-    void reset() override;
+    Frame *nextFrame(uint64_t id) override;
+
+    void seekTo(uint64_t id, long timestampMicros) override;
+
+    void reset(uint64_t id) override;
+
+    void close(uint64_t id) override;
 };
 
 #endif //KLARITY_DECODER_DECODER_H

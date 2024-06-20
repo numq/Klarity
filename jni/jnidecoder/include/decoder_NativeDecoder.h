@@ -10,10 +10,18 @@ extern "C" {
 /*
  * Class:     decoder_NativeDecoder
  * Method:    initNative
- * Signature: (JLjava/lang/String;ZZ)Ldecoder/NativeFormat;
+ * Signature: (JLjava/lang/String;ZZ)Z
  */
-JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_initNative
+JNIEXPORT jboolean JNICALL Java_decoder_NativeDecoder_initNative
   (JNIEnv *, jobject, jlong, jstring, jboolean, jboolean);
+
+/*
+ * Class:     decoder_NativeDecoder
+ * Method:    getFormatNative
+ * Signature: (J)Ldecoder/NativeFormat;
+ */
+JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     decoder_NativeDecoder
