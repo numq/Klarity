@@ -1,4 +1,4 @@
-rootProject.name = "jcmp"
+rootProject.name = "Klarity"
 
 include("core")
 include("compose")
