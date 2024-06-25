@@ -19,8 +19,8 @@ internal class DefaultRenderer(
     @Volatile
     override var playbackSpeedFactor: Float = 1.0f
 
-    override fun setPlaybackSpeed(factor: Float) = runCatching {
-        check(factor > 0f) { "Speed factor should be positive" }
+    override suspend fun setPlaybackSpeed(factor: Float) = runCatching {
+        require(factor > 0f) { "Speed factor should be positive" }
 
         playbackSpeedFactor = factor
     }

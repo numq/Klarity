@@ -9,7 +9,7 @@ interface Renderer : AutoCloseable {
     val preview: Frame.Video?
     val frame: StateFlow<Frame.Video.Content?>
     val playbackSpeedFactor: Float
-    fun setPlaybackSpeed(factor: Float): Result<Unit>
+    suspend fun setPlaybackSpeed(factor: Float): Result<Unit>
     suspend fun draw(frame: Frame.Video.Content): Result<Unit>
     suspend fun reset(): Result<Unit>
 

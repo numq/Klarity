@@ -1,5 +1,6 @@
 package buffer
 
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.locks.ReentrantLock
@@ -14,8 +15,10 @@ internal class DefaultBuffer<T>(
 
     private var queue = LinkedBlockingQueue<T>(capacity)
 
+    override val items = emptyFlow<T>()
+
     override suspend fun resize(newCapacity: Int) = runCatching {
-        check(capacity > 0) { "Invalid buffer capacity" }
+        require(capacity > 0) { "Invalid buffer capacity" }
 
         val items = mutableListOf<T>()
 
@@ -29,6 +32,8 @@ internal class DefaultBuffer<T>(
             }
         }
     }
+
+    override suspend fun peek() = runCatching { queue.peek() }
 
     override suspend fun poll() = runCatching {
         suspendCancellableCoroutine { continuation ->
