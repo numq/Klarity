@@ -145,7 +145,7 @@ internal class DefaultPlayerController(
         }
 
         if (newSettings.playbackSpeedFactor != playbackSpeedFactor) {
-            clock.getOrNull()?.setPlaybackSpeed(newSettings.playbackSpeedFactor.toDouble())
+            clock.getOrNull()?.setPlaybackSpeed(newSettings.playbackSpeedFactor.toDouble())?.getOrThrow()
 
             (internalState.value as? InternalState.Loaded)?.run {
                 when (val pipeline = pipeline) {

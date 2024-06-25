@@ -58,7 +58,7 @@ internal class DefaultPlaybackLoop(
                 null -> if (bufferLoop.isBuffering.get()) yield() else break
 
                 is Frame.Audio.Content -> {
-                    val elapsedTime = clock.getElapsedMicros().microseconds.also {
+                    val elapsedTime = clock.getElapsedMicros().getOrThrow().microseconds.also {
                         if (initialAudioLatency == Duration.INFINITE) initialAudioLatency = it
                     }.minus(initialAudioLatency)
 
@@ -100,7 +100,7 @@ internal class DefaultPlaybackLoop(
                 null -> if (bufferLoop.isBuffering.get()) yield() else break
 
                 is Frame.Video.Content -> {
-                    val elapsedTime = clock.getElapsedMicros().microseconds.also {
+                    val elapsedTime = clock.getElapsedMicros().getOrThrow().microseconds.also {
                         if (initialVideoLatency == Duration.INFINITE) initialVideoLatency = it
                     }.minus(initialVideoLatency)
 

@@ -38,7 +38,7 @@ target_link_libraries(jnidecoder PRIVATE
         swresample-4
         avcodec-59
         avformat-59
-        )
+)
 
 # KLARITY_DECODER
 
