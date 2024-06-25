@@ -8,6 +8,10 @@ public class NativeSampler {
         this.id = System.identityHashCode(this);
     }
 
+    public long getId() {
+        return id;
+    }
+
     private native float getCurrentTimeNative(long id);
 
     private native boolean setPlaybackSpeedNative(long id, float factor);

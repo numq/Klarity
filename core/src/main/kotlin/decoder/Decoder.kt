@@ -19,48 +19,38 @@ interface Decoder<Frame> : AutoCloseable {
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
-        ): Result<Media> = runCatching {
-            val decoder = NativeDecoder()
+        ): Result<Media> = NativeDecoder().runCatching {
+            check(init(location, findAudioStream, findVideoStream)) { "Unable to open media" }
 
-            val media = try {
-                decoder.takeIf { decoder.init(location, findAudioStream, findVideoStream) }?.format?.run {
-                    val id = Objects.hash(decoder.id, location).toLong()
+            val id = Objects.hash(id, location).toLong()
 
-                    val mediaLocation = File(location).takeIf(File::exists)?.run {
-                        Location.Local(fileName = name, path = path)
-                    } ?: Location.Remote(url = location)
+            val mediaLocation = File(location).takeIf(File::exists)?.run {
+                Location.Local(fileName = name, path = path)
+            } ?: Location.Remote(url = location)
 
-                    val audioFormat = runCatching {
-                        if (findAudioStream) {
-                            check(sampleRate > 0 && channels > 0) { "Audio decoding is not supported by media" }
+            val audioFormat = runCatching {
+                if (findAudioStream) {
+                    check(format.sampleRate > 0 && format.channels > 0) { "Audio decoding is not supported by media" }
 
-                            AudioFormat(sampleRate = sampleRate, channels = channels)
-                        } else null
-                    }.getOrNull()
+                    AudioFormat(sampleRate = format.sampleRate, channels = format.channels)
+                } else null
+            }.getOrNull()
 
-                    val videoFormat = runCatching {
-                        if (findVideoStream) {
-                            check(width > 0 && height > 0 && frameRate >= 0) { "Video decoding is not supported by media" }
+            val videoFormat = runCatching {
+                if (findVideoStream) {
+                    check(format.width > 0 && format.height > 0 && format.frameRate >= 0) { "Video decoding is not supported by media" }
 
-                            VideoFormat(width = width, height = height, frameRate = frameRate)
-                        } else null
-                    }.getOrNull()
+                    VideoFormat(width = format.width, height = format.height, frameRate = format.frameRate)
+                } else null
+            }.getOrNull()
 
-                    Media(
-                        id = id,
-                        durationMicros = durationMicros,
-                        location = mediaLocation,
-                        audioFormat = audioFormat,
-                        videoFormat = videoFormat
-                    )
-                }
-            } catch (e: Exception) {
-                throw e
-            } finally {
-                decoder.close()
-            }
-
-            checkNotNull(media) { "Unable to open media" }
+            Media(
+                id = id,
+                durationMicros = format.durationMicros,
+                location = mediaLocation,
+                audioFormat = audioFormat,
+                videoFormat = videoFormat
+            )
         }
 
         internal fun createProbeDecoder(
