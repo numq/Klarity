@@ -5,23 +5,31 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class ExternalClock : Clock {
-    private var playbackSpeedFactor = 1.0
+    @Volatile
     private var startNanos = Duration.INFINITE
 
-    override fun getElapsedMicros() = runCatching {
+    @Volatile
+    private var playbackSpeedFactor = 1.0
+
+    override suspend fun getElapsedMicros() = runCatching {
         check(startNanos.isFinite()) { "Clock has not started yet" }
 
-        ((System.nanoTime().nanoseconds - startNanos) * playbackSpeedFactor).inWholeMicroseconds
+        val elapsedTime = (System.nanoTime().nanoseconds - startNanos)
+
+        (elapsedTime * playbackSpeedFactor).inWholeMicroseconds
     }
 
-    override fun setPlaybackSpeed(factor: Double) = runCatching {
-        require(factor > 0f) { "Speed factor should be positive" }
-    }.mapCatching {
+    override suspend fun setPlaybackSpeed(factor: Double) = runCatching {
+        require(factor > 0) { "Speed factor should be positive" }
+
+        val currentElapsedMicros = getElapsedMicros().getOrThrow().microseconds
+
         playbackSpeedFactor = factor
-        startNanos = System.nanoTime().nanoseconds - getElapsedMicros().getOrThrow().microseconds / factor
+
+        startNanos = System.nanoTime().nanoseconds - (currentElapsedMicros / factor)
     }
 
-    override fun start(timeShiftMicros: Long) = runCatching {
+    override suspend fun start(timeShiftMicros: Long) = runCatching {
         startNanos = System.nanoTime().nanoseconds - timeShiftMicros.microseconds
     }
 }
