@@ -35,8 +35,8 @@ object Klarity {
 
     fun loadDecoder(
         ffmpegPath: String,
-        klarityDecoderPath: String,
-        jniDecoderPath: String,
+        klarityPath: String,
+        jniPath: String,
     ) = runCatching {
         arrayOf(
             AVUTIL,
@@ -46,20 +46,20 @@ object Klarity {
             AVFORMAT
         ).map { bin -> "$ffmpegPath\\$bin.$extension" }.forEach(System::load)
 
-        System.load("$klarityDecoderPath\\${Decoder.KLARITY_DECODER}.$extension")
+        System.load("$klarityPath\\${Decoder.KLARITY_DECODER}.$extension")
 
-        System.load("$jniDecoderPath\\${Decoder.JNI_DECODER}.$extension")
+        System.load("$jniPath\\${Decoder.JNI_DECODER}.$extension")
     }.onSuccess { isDecoderLoaded = true }
 
     fun loadSampler(
         softOalPath: String,
-        klaritySamplerPath: String,
-        jniSamplerPath: String,
+        klarityPath: String,
+        jniPath: String,
     ) = runCatching {
         System.load("$softOalPath\\${Sampler.SOFT_OAL}.$extension")
 
-        System.load("$klaritySamplerPath\\${Sampler.KLARITY_SAMPLER}.$extension")
+        System.load("$klarityPath\\${Sampler.KLARITY_SAMPLER}.$extension")
 
-        System.load("$jniSamplerPath\\${Sampler.JNI_SAMPLER}.$extension")
+        System.load("$jniPath\\${Sampler.JNI_SAMPLER}.$extension")
     }.onSuccess { isSamplerLoaded = true }
 }

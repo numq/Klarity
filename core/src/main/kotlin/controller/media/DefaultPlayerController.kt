@@ -340,13 +340,13 @@ internal class DefaultPlayerController(
 
                         playbackLoop.start(endOfMedia = { internalState.handlePlaybackCompletion() }).getOrThrow()
 
+                        loadedEvents.emit(Event.Playback.Resume)
+
                         updateState(
                             InternalState.Loaded.Playing(
                                 media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
                             )
                         )
-
-                        loadedEvents.emit(Event.Playback.Resume)
                     }
 
                     is Command.Stop -> {
@@ -378,12 +378,6 @@ internal class DefaultPlayerController(
                             }
                         }
 
-                        updateState(
-                            InternalState.Loaded.Stopped(
-                                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                            )
-                        )
-
                         coroutineScope.launch {
                             loadedEvents.emit(Event.Buffer.Timestamp(0L))
 
@@ -397,6 +391,12 @@ internal class DefaultPlayerController(
                                 is Pipeline.Video -> pipeline.renderer.reset().getOrThrow()
                             }
                         }.join()
+
+                        updateState(
+                            InternalState.Loaded.Stopped(
+                                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+                            )
+                        )
                     }
 
                     is Command.SeekTo -> {

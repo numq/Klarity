@@ -12,8 +12,6 @@ import pipeline.Pipeline
 import settings.Settings
 import state.InternalState
 import state.State
-import java.io.File
-import java.net.URL
 
 internal class DefaultKlarityPlayer(
     private val playerController: PlayerController,
@@ -67,17 +65,11 @@ internal class DefaultKlarityPlayer(
         enableVideo: Boolean,
     ) {
         when (state.value) {
-            is State.Empty -> {
-                playerController.prepare(
-                    location = when {
-                        File(location).exists() -> File(location).path
-
-                        else -> runCatching { URL(location).toURI().path }.getOrNull()
-                    } ?: return,
-                    audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
-                    videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0
-                )
-            }
+            is State.Empty -> playerController.prepare(
+                location = location,
+                audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
+                videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0
+            )
 
             is State.Loaded -> Unit
         }

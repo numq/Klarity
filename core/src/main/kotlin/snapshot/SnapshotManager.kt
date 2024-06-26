@@ -7,12 +7,28 @@ import kotlin.time.Duration.Companion.milliseconds
 object SnapshotManager {
     suspend fun snapshot(
         location: String,
-        millis: Long,
+        timestampMillis: Long,
     ) = Decoder.createVideoDecoder(location).mapCatching { decoder ->
         with(decoder) {
             use {
-                if (millis > 0) seekTo(micros = millis.milliseconds.inWholeMicroseconds).getOrThrow()
+                if (timestampMillis > 0) seekTo(micros = timestampMillis.milliseconds.inWholeMicroseconds).getOrThrow()
                 checkNotNull(nextFrame().getOrThrow() as? Frame.Video.Content) { "Unable to get snapshot" }
+            }
+        }
+    }
+
+    suspend fun snapshots(
+        location: String,
+        timestampsMillis: List<Long>,
+    ) = Decoder.createVideoDecoder(location).mapCatching { decoder ->
+        with(decoder) {
+            use {
+                buildList {
+                    for (timestampMillis in timestampsMillis) {
+                        if (timestampMillis > 0) seekTo(micros = timestampMillis.milliseconds.inWholeMicroseconds).getOrThrow()
+                        checkNotNull((nextFrame().getOrThrow() as? Frame.Video.Content)?.also(::add)) { "Unable to get snapshot" }
+                    }
+                }
             }
         }
     }

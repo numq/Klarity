@@ -6,6 +6,7 @@ import frame.Frame
 import media.Location
 import media.Media
 import java.io.File
+import java.net.URI
 import java.util.*
 
 interface Decoder<Frame> : AutoCloseable {
@@ -26,7 +27,11 @@ interface Decoder<Frame> : AutoCloseable {
 
             val mediaLocation = File(location).takeIf(File::exists)?.run {
                 Location.Local(fileName = name, path = path)
-            } ?: Location.Remote(url = location)
+            } ?: URI.create(location).takeIf(URI::isAbsolute)?.run {
+                Location.Remote(url = location)
+            }
+
+            checkNotNull(mediaLocation) { "Unable to find media" }
 
             val audioFormat = runCatching {
                 if (findAudioStream) {
@@ -58,46 +63,37 @@ interface Decoder<Frame> : AutoCloseable {
             findAudioStream: Boolean,
             findVideoStream: Boolean,
         ): Result<Decoder<Nothing>> = probe(
-            location = location,
-            findAudioStream = findAudioStream,
-            findVideoStream = findVideoStream
+            location = location, findAudioStream = findAudioStream, findVideoStream = findVideoStream
         ).mapCatching { media ->
             NativeDecoder().apply {
                 init(location, findAudioStream, findVideoStream)
             }.let { decoder ->
                 ProbeDecoder(
-                    decoder = decoder,
-                    media = media
+                    decoder = decoder, media = media
                 )
             }
         }
 
         internal fun createAudioDecoder(location: String): Result<Decoder<Frame.Audio>> = probe(
-            location = location,
-            findAudioStream = true,
-            findVideoStream = false
+            location = location, findAudioStream = true, findVideoStream = false
         ).mapCatching { media ->
             NativeDecoder().apply {
                 init(location, true, false)
             }.let { decoder ->
                 AudioDecoder(
-                    decoder = decoder,
-                    media = media
+                    decoder = decoder, media = media
                 )
             }
         }
 
         internal fun createVideoDecoder(location: String): Result<Decoder<Frame.Video>> = probe(
-            location = location,
-            findAudioStream = false,
-            findVideoStream = true
+            location = location, findAudioStream = false, findVideoStream = true
         ).mapCatching { media ->
             NativeDecoder().apply {
                 init(location, false, true)
             }.let { decoder ->
                 VideoDecoder(
-                    decoder = decoder,
-                    media = media
+                    decoder = decoder, media = media
                 )
             }
         }
