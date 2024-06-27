@@ -1,5 +1,7 @@
 package renderer
 
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
 import scale.ImageScale
 
 sealed interface Foreground {
@@ -11,6 +13,8 @@ sealed interface Foreground {
         val width: Int,
         val height: Int,
         val bytes: ByteArray,
+        val colorType: ColorType = ColorType.BGRA_8888,
+        val alphaType: ColorAlphaType = ColorAlphaType.PREMUL,
         override val scale: ImageScale = ImageScale.Fit,
     ) : Foreground {
         override fun equals(other: Any?): Boolean {
@@ -19,21 +23,24 @@ sealed interface Foreground {
 
             other as Cover
 
-            if (scale != other.scale) return false
             if (width != other.width) return false
             if (height != other.height) return false
             if (!bytes.contentEquals(other.bytes)) return false
+            if (colorType != other.colorType) return false
+            if (alphaType != other.alphaType) return false
+            if (scale != other.scale) return false
 
             return true
         }
 
         override fun hashCode(): Int {
-            var result = scale.hashCode()
-            result = 31 * result + width
+            var result = width
             result = 31 * result + height
             result = 31 * result + bytes.contentHashCode()
+            result = 31 * result + colorType.hashCode()
+            result = 31 * result + alphaType.hashCode()
+            result = 31 * result + scale.hashCode()
             return result
         }
-
     }
 }

@@ -27,6 +27,7 @@ fun Renderer(
     modifier: Modifier,
     foreground: Foreground,
     background: Background = Background.Transparent,
+    logRenderingTime: Boolean = false,
     placeholder: @Composable BoxWithConstraintsScope.() -> Unit = {},
 ) {
     val backgroundPaint = remember(background) {
@@ -75,7 +76,7 @@ fun Renderer(
                                 )
                             }
                         }
-                        println("Rendering time: $timeTaken ms")
+                        if (logRenderingTime) println("Rendering time: $timeTaken ms")
                     }
                 }
 
@@ -83,8 +84,8 @@ fun Renderer(
                     val imageInfo = ImageInfo(
                         width = width,
                         height = height,
-                        colorType = ColorType.BGRA_8888,
-                        alphaType = ColorAlphaType.PREMUL
+                        colorType = colorType,
+                        alphaType = alphaType
                     )
 
                     if (image?.isClosed == false) image.close()
