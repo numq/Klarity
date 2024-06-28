@@ -9,7 +9,7 @@ import kotlin.concurrent.withLock
 import kotlin.coroutines.resume
 
 internal class DefaultBuffer<T>(
-    private var capacity: Int,
+    override var capacity: Int,
 ) : Buffer<T> {
     private val lock = ReentrantLock()
 
