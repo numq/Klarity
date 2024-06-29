@@ -2,8 +2,8 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.8.0"
-    id("org.jetbrains.compose") version "1.3.0"
+    kotlin("jvm") version "1.9.0"
+    id("org.jetbrains.compose") version "1.5.10"
 }
 
 group = "com.github.numq"
@@ -17,7 +17,8 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.1.0")
+    implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.10")
+    implementation(project(":core"))
     implementation(project(":compose"))
 }
 
@@ -29,7 +30,7 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "15"
+    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
 }
 
 compose.desktop {
@@ -37,7 +38,7 @@ compose.desktop {
         mainClass = "ApplicationKt"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "jcmp"
+            packageName = "Klarity"
             packageVersion = "1.0.0"
         }
     }
