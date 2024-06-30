@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.Density
 import java.io.File
 
 @Composable
-fun SplashScreen(onEnd: () -> Unit) {
+fun SplashScreen(finish: () -> Unit) {
 
     val logoAnimBase = rememberSaveable {
         loadSvgPainter(File("media/logo_anim_base.svg").inputStream(), Density(1f))
@@ -37,7 +37,7 @@ fun SplashScreen(onEnd: () -> Unit) {
             targetValue = 180f
         )
 
-        onEnd()
+        finish()
     }
     Box(
         modifier = Modifier
