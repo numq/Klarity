@@ -1,3 +1,5 @@
+package extension
+
 fun Long.formatTimestamp(): String {
     val seconds = div(1000).toInt()
     val hours = seconds / 3600
