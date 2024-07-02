@@ -1,10 +1,7 @@
 package buffer
 
-import kotlinx.coroutines.flow.Flow
-
 interface Buffer<T> {
     val capacity: Int
-    val items: Flow<T>
     suspend fun resize(newCapacity: Int): Result<Unit>
     suspend fun peek(): Result<T?>
     suspend fun poll(): Result<T?>
