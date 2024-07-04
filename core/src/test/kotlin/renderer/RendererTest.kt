@@ -2,19 +2,23 @@ package renderer
 
 import frame.Frame
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
 class RendererTest {
-    companion object {
-        private lateinit var renderer: Renderer
-    }
+    private lateinit var renderer: Renderer
 
     @BeforeEach
     fun beforeEach() {
         renderer = Renderer.create(100, 100, null).getOrThrow()
+    }
+
+    @AfterEach
+    fun afterEach() {
+        renderer.close()
     }
 
     @Test
