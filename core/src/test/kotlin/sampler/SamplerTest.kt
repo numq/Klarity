@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import kotlin.random.Random
 
 class AudioSamplerTest {
     private lateinit var sampler: Sampler
@@ -55,5 +56,31 @@ class AudioSamplerTest {
         assertTrue(sampler.setMuted(true).isSuccess)
 
         assertTrue(sampler.setMuted(false).isSuccess)
+    }
+
+    @Test
+    fun `current time`() = runTest {
+        every { nativeSampler.currentTime } answers { 1f }
+
+        assertEquals(1f, sampler.getCurrentTime().getOrThrow())
+    }
+
+    @Test
+    fun `playback interaction`() = runTest {
+        every { nativeSampler.play(any(), any()) } answers { true }
+
+        every { nativeSampler.pause() } answers { }
+
+        every { nativeSampler.resume() } answers { }
+
+        every { nativeSampler.stop() } answers { }
+
+        assertTrue(sampler.play(Random(System.currentTimeMillis()).nextBytes(10)).getOrThrow())
+
+        assertTrue(sampler.pause().isSuccess)
+
+        assertTrue(sampler.resume().isSuccess)
+
+        assertTrue(sampler.stop().isSuccess)
     }
 }

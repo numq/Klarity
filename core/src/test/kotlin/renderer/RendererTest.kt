@@ -25,11 +25,11 @@ class RendererTest {
     fun `change playback speed`() = runTest {
         assertEquals(1f, renderer.playbackSpeedFactor)
 
-        renderer.setPlaybackSpeed(2f)
+        assertTrue(renderer.setPlaybackSpeed(2f).isSuccess)
 
         assertEquals(2f, renderer.playbackSpeedFactor)
 
-        renderer.setPlaybackSpeed(1f)
+        assertTrue(renderer.setPlaybackSpeed(1f).isSuccess)
 
         assertEquals(1f, renderer.playbackSpeedFactor)
     }
