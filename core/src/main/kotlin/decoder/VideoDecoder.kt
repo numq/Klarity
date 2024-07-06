@@ -15,7 +15,7 @@ internal class VideoDecoder(
                     bytes = bytes,
                     width = decoder.format.width,
                     height = decoder.format.height,
-                    frameRate = decoder.format.frameRate.toInt()
+                    frameRate = decoder.format.frameRate
                 )
 
                 else -> null

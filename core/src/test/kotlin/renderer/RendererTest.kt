@@ -41,7 +41,7 @@ class RendererTest {
             bytes = Random(System.currentTimeMillis()).nextBytes(10),
             width = 100,
             height = 100,
-            frameRate = 30
+            frameRate = 30.0
         )
 
         assertTrue(renderer.draw(frame).isSuccess)

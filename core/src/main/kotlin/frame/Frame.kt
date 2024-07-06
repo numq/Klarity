@@ -42,7 +42,7 @@ sealed interface Frame {
             val bytes: ByteArray,
             val width: Int,
             val height: Int,
-            val frameRate: Int,
+            val frameRate: Double,
         ) : Video {
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -64,9 +64,10 @@ sealed interface Frame {
                 result = 31 * result + bytes.contentHashCode()
                 result = 31 * result + width
                 result = 31 * result + height
-                result = 31 * result + frameRate
+                result = 31 * result + frameRate.hashCode()
                 return result
             }
+
         }
 
         data class EndOfMedia(override val timestampMicros: Long) : Video
