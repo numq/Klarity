@@ -21,8 +21,6 @@ class SnapshotManagerTest {
 
         every { decoder.close() } returns Unit
 
-        mockkObject(Decoder.Companion)
-
         coEvery { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
         val result = SnapshotManager.snapshot("", 0L)
@@ -32,8 +30,6 @@ class SnapshotManagerTest {
         coVerify { decoder.nextFrame() }
 
         verify { decoder.close() }
-
-        unmockkObject(Decoder.Companion)
     }
 
     @Test
@@ -48,8 +44,6 @@ class SnapshotManagerTest {
 
         every { decoder.close() } returns Unit
 
-        mockkObject(Decoder.Companion)
-
         every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
         val result = SnapshotManager.snapshots("", frames.map(Frame::timestampMicros))
@@ -59,8 +53,6 @@ class SnapshotManagerTest {
         coVerify(exactly = frames.size) { decoder.nextFrame() }
 
         verify { decoder.close() }
-
-        unmockkObject(Decoder.Companion)
     }
 
     companion object {

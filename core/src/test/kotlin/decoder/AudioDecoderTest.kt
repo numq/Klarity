@@ -16,9 +16,9 @@ import kotlin.random.Random
 class AudioDecoderTest {
     private lateinit var decoder: Decoder<Frame.Audio>
 
-    private val nativeDecoder: NativeDecoder = mockk()
+    private val nativeDecoder = mockk<NativeDecoder>()
 
-    private val media: Media = mockk()
+    private val media = mockk<Media>()
 
     @BeforeEach
     fun beforeEach() {

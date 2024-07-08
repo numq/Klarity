@@ -14,7 +14,7 @@ import kotlin.random.Random
 class AudioSamplerTest {
     private lateinit var sampler: Sampler
 
-    private val nativeSampler: NativeSampler = mockk()
+    private val nativeSampler = mockk<NativeSampler>()
 
     @BeforeEach
     fun beforeEach() {
