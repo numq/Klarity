@@ -1,7 +1,6 @@
 package decoder
 
 import io.mockk.clearMocks
-import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import media.Media
@@ -14,7 +13,7 @@ import org.junit.jupiter.api.Test
 class ProbeDecoderTest {
     private lateinit var decoder: Decoder<Nothing>
 
-    private val nativeDecoder = mockk<NativeDecoder>()
+    private val nativeDecoder = mockk<NativeDecoder>(relaxUnitFun = true)
 
     private val media = mockk<Media>()
 
@@ -31,22 +30,16 @@ class ProbeDecoderTest {
 
     @Test
     fun nextFrame() = runTest {
-        coEvery { nativeDecoder.nextFrame() } coAnswers { null }
-
         assertNull(decoder.nextFrame().getOrThrow())
     }
 
     @Test
     fun seekTo() = runTest {
-        coEvery { nativeDecoder.seekTo(any()) } returns Unit
-
         assertTrue(decoder.seekTo(0L).isSuccess)
     }
 
     @Test
     fun reset() = runTest {
-        coEvery { nativeDecoder.reset() } returns Unit
-
         assertTrue(decoder.reset().isSuccess)
     }
 }

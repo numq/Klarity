@@ -3,6 +3,7 @@ package decoder
 import frame.Frame
 import io.mockk.clearMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import media.Media
@@ -16,7 +17,7 @@ import kotlin.random.Random
 class VideoDecoderTest {
     private lateinit var decoder: Decoder<Frame.Video>
 
-    private val nativeDecoder = mockk<NativeDecoder>()
+    private val nativeDecoder = mockk<NativeDecoder>(relaxUnitFun = true)
 
     private val media = mockk<Media>()
 
@@ -49,6 +50,10 @@ class VideoDecoderTest {
         assertEquals(
             Frame.Video.Content(0L, frame.bytes, 100, 100, 30.0), decoder.nextFrame().getOrThrow()
         )
+
+        coVerify { nativeDecoder.format }
+
+        coVerify { nativeDecoder.nextFrame() }
     }
 
     @Test
@@ -56,6 +61,8 @@ class VideoDecoderTest {
         coEvery { nativeDecoder.seekTo(any()) } returns Unit
 
         assertTrue(decoder.seekTo(0L).isSuccess)
+
+        coVerify { nativeDecoder.seekTo(any()) }
     }
 
     @Test
@@ -63,5 +70,7 @@ class VideoDecoderTest {
         coEvery { nativeDecoder.reset() } returns Unit
 
         assertTrue(decoder.reset().isSuccess)
+
+        coVerify { nativeDecoder.reset() }
     }
 }

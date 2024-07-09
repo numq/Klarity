@@ -3,6 +3,7 @@ package sampler
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -14,7 +15,7 @@ import kotlin.random.Random
 class AudioSamplerTest {
     private lateinit var sampler: Sampler
 
-    private val nativeSampler = mockk<NativeSampler>()
+    private val nativeSampler = mockk<NativeSampler>(relaxUnitFun = true)
 
     @BeforeEach
     fun beforeEach() {
@@ -40,6 +41,8 @@ class AudioSamplerTest {
         assertTrue(sampler.setPlaybackSpeed(1f).isSuccess)
 
         assertEquals(1f, sampler.playbackSpeedFactor)
+
+        verify { nativeSampler.setPlaybackSpeed(any()) }
     }
 
     @Test
@@ -47,6 +50,8 @@ class AudioSamplerTest {
         every { nativeSampler.setVolume(any()) } answers { true }
 
         assertTrue(sampler.setVolume(.5f).isSuccess)
+
+        verify { nativeSampler.setVolume(any()) }
     }
 
     @Test
@@ -56,6 +61,8 @@ class AudioSamplerTest {
         assertTrue(sampler.setMuted(true).isSuccess)
 
         assertTrue(sampler.setMuted(false).isSuccess)
+
+        verify { nativeSampler.setVolume(any()) }
     }
 
     @Test
@@ -63,17 +70,13 @@ class AudioSamplerTest {
         every { nativeSampler.currentTime } answers { 1f }
 
         assertEquals(1f, sampler.getCurrentTime().getOrThrow())
+
+        verify { nativeSampler.currentTime }
     }
 
     @Test
     fun `playback interaction`() = runTest {
         every { nativeSampler.play(any(), any()) } answers { true }
-
-        every { nativeSampler.pause() } answers { }
-
-        every { nativeSampler.resume() } answers { }
-
-        every { nativeSampler.stop() } answers { }
 
         assertTrue(sampler.play(Random(System.currentTimeMillis()).nextBytes(10)).getOrThrow())
 
@@ -82,5 +85,13 @@ class AudioSamplerTest {
         assertTrue(sampler.resume().isSuccess)
 
         assertTrue(sampler.stop().isSuccess)
+
+        verify { nativeSampler.play(any(), any()) }
+
+        verify { nativeSampler.pause() }
+
+        verify { nativeSampler.resume() }
+
+        verify { nativeSampler.stop() }
     }
 }

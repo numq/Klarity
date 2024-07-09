@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
 class SnapshotManagerTest {
-    private val decoder = mockk<Decoder<Frame.Video>>()
+    private val decoder = mockk<Decoder<Frame.Video>>(relaxUnitFun = true)
 
     @Test
     fun `single snapshot`() = runTest {
@@ -19,13 +19,13 @@ class SnapshotManagerTest {
 
         coEvery { decoder.nextFrame() } returns Result.success(frame)
 
-        every { decoder.close() } returns Unit
-
         coEvery { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
         val result = SnapshotManager.snapshot("", 0L)
 
         assertEquals(Result.success(frame), result)
+
+        coVerify { Decoder.createVideoDecoder(any()) }
 
         coVerify { decoder.nextFrame() }
 
@@ -42,13 +42,13 @@ class SnapshotManagerTest {
 
         coEvery { decoder.nextFrame() } returnsMany frames.map { Result.success(it) }
 
-        every { decoder.close() } returns Unit
-
         every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
         val result = SnapshotManager.snapshots("", frames.map(Frame::timestampMicros))
 
         assertEquals(Result.success(frames), result)
+
+        coVerify { Decoder.createVideoDecoder(any()) }
 
         coVerify(exactly = frames.size) { decoder.nextFrame() }
 
