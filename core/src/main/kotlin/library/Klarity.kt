@@ -18,7 +18,7 @@ object Klarity {
     }
 
     private object Sampler {
-        const val SOFT_OAL = "soft_oal"
+        const val OPENAL = "soft_oal"
         const val KLARITY_SAMPLER = "libklarity_sampler"
         const val JNI_SAMPLER = "libjnisampler"
     }
@@ -39,11 +39,7 @@ object Klarity {
         jniPath: String,
     ) = runCatching {
         arrayOf(
-            AVUTIL,
-            SWSCALE,
-            SWRESAMPLE,
-            AVCODEC,
-            AVFORMAT
+            AVUTIL, SWSCALE, SWRESAMPLE, AVCODEC, AVFORMAT
         ).map { bin -> "$ffmpegPath\\$bin.$extension" }.forEach(System::load)
 
         System.load("$klarityPath\\${Decoder.KLARITY_DECODER}.$extension")
@@ -52,11 +48,11 @@ object Klarity {
     }.onSuccess { isDecoderLoaded = true }
 
     fun loadSampler(
-        softOalPath: String,
+        openalPath: String,
         klarityPath: String,
         jniPath: String,
     ) = runCatching {
-        System.load("$softOalPath\\${Sampler.SOFT_OAL}.$extension")
+        System.load("$openalPath\\${Sampler.OPENAL}.$extension")
 
         System.load("$klarityPath\\${Sampler.KLARITY_SAMPLER}.$extension")
 
