@@ -14,6 +14,8 @@ struct Media {
     uint32_t numBuffers;
     ALenum format = AL_NONE;
     ALuint source = AL_NONE;
+    ALCdevice *device = nullptr;
+    ALCcontext *context = nullptr;
     signalsmith::stretch::SignalsmithStretch<float> *stretch;
     float playbackSpeedFactor = 1.0f;
 
