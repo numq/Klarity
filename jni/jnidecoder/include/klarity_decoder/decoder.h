@@ -38,7 +38,6 @@ public:
 class Decoder : public IDecoder {
 private:
     std::mutex mutex;
-
     std::unordered_map<uint64_t, Media *> mediaPool{};
 
     Media *_acquireMedia(uint64_t id);
