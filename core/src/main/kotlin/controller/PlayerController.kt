@@ -1,4 +1,4 @@
-package controller.media
+package controller
 
 import buffer.Buffer
 import buffer.BufferFactory

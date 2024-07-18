@@ -3,7 +3,7 @@ package player
 import buffer.Buffer
 import buffer.BufferFactory
 import clock.ClockFactory
-import controller.media.PlayerControllerFactory
+import controller.PlayerControllerFactory
 import decoder.Decoder
 import decoder.DecoderFactory
 import event.Event

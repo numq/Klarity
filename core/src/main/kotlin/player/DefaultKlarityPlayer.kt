@@ -1,7 +1,7 @@
 package player
 
 import command.Command
-import controller.media.PlayerController
+import controller.PlayerController
 import event.Event
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
