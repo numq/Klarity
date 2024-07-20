@@ -6,8 +6,6 @@
 #include <mutex>
 #include <vector>
 #include "openal/alc.h"
-#include "openal/al.h"
-#include "openal/alext.h"
 #include "stretch/stretch.h"
 #include "media.h"
 
@@ -37,6 +35,8 @@ public:
 class Sampler : public ISampler {
 private:
     std::mutex mutex;
+    ALCdevice *device = nullptr;
+    ALCcontext *context = nullptr;
     std::unordered_map<uint64_t, Media *> mediaPool{};
 
     static void _checkALError(const char *file, int line);
@@ -46,6 +46,8 @@ private:
     void _releaseMedia(uint64_t id);
 
 public:
+    explicit Sampler();
+
     ~Sampler() override;
 
     float getCurrentTime(uint64_t id) override;

@@ -5,7 +5,6 @@
 #include <mutex>
 #include "stretch/stretch.h"
 #include "al.h"
-#include "alc.h"
 #include "alext.h"
 
 struct Media {
@@ -14,8 +13,6 @@ struct Media {
     uint32_t numBuffers;
     ALenum format = AL_NONE;
     ALuint source = AL_NONE;
-    ALCdevice *device = nullptr;
-    ALCcontext *context = nullptr;
     signalsmith::stretch::SignalsmithStretch<float> *stretch;
     float playbackSpeedFactor = 1.0f;
 
@@ -39,7 +36,7 @@ public:
 
     bool setVolume(float value);
 
-    bool play(uint8_t *samples, uint64_t size);
+    bool play(const uint8_t *samples, uint64_t size);
 
     void pause();
 
