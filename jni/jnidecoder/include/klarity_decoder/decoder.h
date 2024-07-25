@@ -22,42 +22,42 @@ class IDecoder {
 public:
     virtual ~IDecoder() = default;
 
-    virtual bool initialize(uint64_t id, const char *location, bool findAudioStream, bool findVideoStream) = 0;
+    virtual bool initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) = 0;
 
-    virtual Format *getFormat(uint64_t id) = 0;
+    virtual Format *getFormat(int64_t id) = 0;
 
-    virtual Frame *nextFrame(uint64_t id) = 0;
+    virtual Frame *nextFrame(int64_t id) = 0;
 
-    virtual void seekTo(uint64_t id, long timestampMicros) = 0;
+    virtual void seekTo(int64_t id, long timestampMicros) = 0;
 
-    virtual void reset(uint64_t id) = 0;
+    virtual void reset(int64_t id) = 0;
 
-    virtual void close(uint64_t id) = 0;
+    virtual void close(int64_t id) = 0;
 };
 
 class Decoder : public IDecoder {
 private:
     std::mutex mutex;
-    std::unordered_map<uint64_t, Media *> mediaPool{};
+    std::unordered_map<int64_t, Media *> mediaPool{};
 
-    Media *_acquireMedia(uint64_t id);
+    Media *_acquireMedia(int64_t id);
 
-    void _releaseMedia(uint64_t id);
+    void _releaseMedia(int64_t id);
 
 public:
     ~Decoder() override;
 
-    bool initialize(uint64_t id, const char *location, bool findAudioStream, bool findVideoStream) override;
+    bool initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) override;
 
-    Format *getFormat(uint64_t id) override;
+    Format *getFormat(int64_t id) override;
 
-    Frame *nextFrame(uint64_t id) override;
+    Frame *nextFrame(int64_t id) override;
 
-    void seekTo(uint64_t id, long timestampMicros) override;
+    void seekTo(int64_t id, long timestampMicros) override;
 
-    void reset(uint64_t id) override;
+    void reset(int64_t id) override;
 
-    void close(uint64_t id) override;
+    void close(int64_t id) override;
 };
 
 #endif //KLARITY_DECODER_DECODER_H
