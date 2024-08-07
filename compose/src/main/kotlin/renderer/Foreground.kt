@@ -7,12 +7,21 @@ import scale.ImageScale
 sealed interface Foreground {
     val scale: ImageScale
 
+    data object Empty : Foreground {
+        override val scale = ImageScale.None
+    }
+
     data class Source(val renderer: Renderer, override val scale: ImageScale = ImageScale.Fit) : Foreground
 
+    data class Frame(
+        val frame: frame.Frame.Video.Content,
+        override val scale: ImageScale = ImageScale.Fit,
+    ) : Foreground
+
     data class Cover(
+        val bytes: ByteArray,
         val width: Int,
         val height: Int,
-        val bytes: ByteArray,
         val colorType: ColorType = ColorType.BGRA_8888,
         val alphaType: ColorAlphaType = ColorAlphaType.PREMUL,
         override val scale: ImageScale = ImageScale.Fit,
@@ -23,9 +32,9 @@ sealed interface Foreground {
 
             other as Cover
 
+            if (!bytes.contentEquals(other.bytes)) return false
             if (width != other.width) return false
             if (height != other.height) return false
-            if (!bytes.contentEquals(other.bytes)) return false
             if (colorType != other.colorType) return false
             if (alphaType != other.alphaType) return false
             if (scale != other.scale) return false
@@ -34,9 +43,9 @@ sealed interface Foreground {
         }
 
         override fun hashCode(): Int {
-            var result = width
+            var result = bytes.contentHashCode()
+            result = 31 * result + width
             result = 31 * result + height
-            result = 31 * result + bytes.contentHashCode()
             result = 31 * result + colorType.hashCode()
             result = 31 * result + alphaType.hashCode()
             result = 31 * result + scale.hashCode()

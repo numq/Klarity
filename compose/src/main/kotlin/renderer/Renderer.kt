@@ -28,7 +28,7 @@ fun Renderer(
     foreground: Foreground,
     background: Background = Background.Transparent,
     logRenderingTime: Boolean = false,
-    placeholder: @Composable BoxWithConstraintsScope.() -> Unit = {},
+    placeholder: @Composable (BoxWithConstraintsScope.() -> Unit)? = null,
 ) {
     val backgroundPaint = remember(background) {
         Paint().apply {
@@ -44,19 +44,40 @@ fun Renderer(
         }
     }
 
-    val (image, setImage) = remember { mutableStateOf<Image?>(null) }
+    val (previewFrameImage, setPreviewFrameImage) = remember { mutableStateOf<Image?>(null) }
+
+    val (playingFrameImage, setPlayingFrameImage) = remember { mutableStateOf<Image?>(null) }
 
     DisposableEffect(Unit) {
         onDispose {
             if (!backgroundPaint.isClosed) backgroundPaint.close()
-            if (image?.isClosed == false) image.close()
+            if (previewFrameImage?.isClosed == false) previewFrameImage.close()
+            if (playingFrameImage?.isClosed == false) playingFrameImage.close()
         }
     }
 
     LaunchedEffect(foreground) {
         withContext(Dispatchers.Default) {
-            when (foreground) {
+            /*when (foreground) {
+                is Foreground.Empty -> Unit
+
                 is Foreground.Source -> with(foreground) {
+                    renderer.preview?.run {
+                        val imageInfo = ImageInfo(
+                            width = width,
+                            height = height,
+                            colorType = ColorType.RGB_565,
+                            alphaType = ColorAlphaType.OPAQUE
+                        )
+
+                        if (previewFrameImage?.isClosed == false) previewFrameImage.close()
+
+                        setPreviewFrameImage(
+                            Image.makeRaster(
+                                imageInfo, bytes, imageInfo.width * imageInfo.bytesPerPixel
+                            )
+                        )
+                    }
                     renderer.frame.filterNotNull().filterIsInstance<Frame.Video.Content>().collectLatest { frame ->
                         val timeTaken = measureTimeMillis {
                             with(frame) {
@@ -67,9 +88,9 @@ fun Renderer(
                                     alphaType = ColorAlphaType.OPAQUE
                                 )
 
-                                if (image?.isClosed == false) image.close()
+                                if (playingFrameImage?.isClosed == false) playingFrameImage.close()
 
-                                setImage(
+                                setPlayingFrameImage(
                                     Image.makeRaster(
                                         imageInfo, bytes, imageInfo.width * imageInfo.bytesPerPixel
                                     )
@@ -80,12 +101,26 @@ fun Renderer(
                     }
                 }
 
+                is Foreground.Frame -> with(foreground) {
+                    val imageInfo = ImageInfo(
+                        width = frame.width,
+                        height = frame.height,
+                        colorType = ColorType.RGB_565,
+                        alphaType = ColorAlphaType.OPAQUE
+                    )
+
+                    if (image?.isClosed == false) image.close()
+
+                    setImage(
+                        Image.makeRaster(
+                            imageInfo, frame.bytes, imageInfo.width * imageInfo.bytesPerPixel
+                        )
+                    )
+                }
+
                 is Foreground.Cover -> with(foreground) {
                     val imageInfo = ImageInfo(
-                        width = width,
-                        height = height,
-                        colorType = colorType,
-                        alphaType = alphaType
+                        width = width, height = height, colorType = colorType, alphaType = alphaType
                     )
 
                     if (image?.isClosed == false) image.close()
@@ -96,83 +131,244 @@ fun Renderer(
                         )
                     )
                 }
+            }*/
+            when (foreground) {
+                is Foreground.Source -> with(foreground) {
+                    renderer.preview?.run {
+                        val imageInfo = ImageInfo(
+                            width = width,
+                            height = height,
+                            colorType = ColorType.RGB_565,
+                            alphaType = ColorAlphaType.OPAQUE
+                        )
+
+                        if (previewFrameImage?.isClosed == false) previewFrameImage.close()
+
+                        setPreviewFrameImage(
+                            Image.makeRaster(
+                                imageInfo, bytes, imageInfo.width * imageInfo.bytesPerPixel
+                            )
+                        )
+                    }
+                    renderer.frame.filterNotNull().filterIsInstance<Frame.Video.Content>().collectLatest { frame ->
+                        val timeTaken = measureTimeMillis {
+                            with(frame) {
+                                val imageInfo = ImageInfo(
+                                    width = width,
+                                    height = height,
+                                    colorType = ColorType.RGB_565,
+                                    alphaType = ColorAlphaType.OPAQUE
+                                )
+
+                                if (playingFrameImage?.isClosed == false) playingFrameImage.close()
+
+                                setPlayingFrameImage(
+                                    Image.makeRaster(
+                                        imageInfo, bytes, imageInfo.width * imageInfo.bytesPerPixel
+                                    )
+                                )
+                            }
+                        }
+                        if (logRenderingTime) println("Rendering time: $timeTaken ms")
+                    }
+                }
+
+                else -> Unit
             }
         }
     }
 
     BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
-        if (image != null) {
-            val backgroundSize = remember(background.scale, image.width, image.height, maxWidth, maxHeight) {
-                when (background) {
-                    is Background.Blur -> background.scale.scaleDp(
-                        DpSize(image.width.dp, image.height.dp),
-                        DpSize(maxWidth, maxHeight)
-                    )
+        when {
+            playingFrameImage != null -> {
+                val backgroundSize = remember(
+                    background.scale,
+                    playingFrameImage.width,
+                    playingFrameImage.height,
+                    maxWidth,
+                    maxHeight
+                ) {
+                    when (background) {
+                        is Background.Blur -> background.scale.scaleDp(
+                            DpSize(playingFrameImage.width.dp, playingFrameImage.height.dp),
+                            DpSize(maxWidth, maxHeight)
+                        )
 
-                    else -> DpSize.Zero
+                        else -> DpSize.Zero
+                    }
                 }
-            }
 
-            val backgroundOffset = remember(backgroundSize.width, backgroundSize.height, maxWidth, maxHeight) {
-                when (background) {
-                    is Background.Blur -> DpOffset(
-                        (maxWidth - backgroundSize.width).div(2f),
-                        (maxHeight - backgroundSize.height).div(2f),
-                    )
+                val backgroundOffset = remember(backgroundSize.width, backgroundSize.height, maxWidth, maxHeight) {
+                    when (background) {
+                        is Background.Blur -> DpOffset(
+                            (maxWidth - backgroundSize.width).div(2f),
+                            (maxHeight - backgroundSize.height).div(2f),
+                        )
 
-                    else -> DpOffset.Zero
+                        else -> DpOffset.Zero
+                    }
                 }
-            }
 
-            val foregroundSize = remember(image.width, image.height, foreground.scale, maxWidth, maxHeight) {
-                foreground.scale.scaleDp(
-                    DpSize(image.width.dp, image.height.dp),
-                    DpSize(maxWidth, maxHeight)
-                )
-            }
+                val foregroundSize = remember(
+                    playingFrameImage.width,
+                    playingFrameImage.height,
+                    foreground.scale,
+                    maxWidth,
+                    maxHeight
+                ) {
+                    foreground.scale.scaleDp(
+                        DpSize(playingFrameImage.width.dp, playingFrameImage.height.dp), DpSize(maxWidth, maxHeight)
+                    )
+                }
 
-            val foregroundOffset = remember(foregroundSize.width, foregroundSize.height, maxWidth, maxHeight) {
-                DpOffset(
-                    (maxWidth - foregroundSize.width).div(2f),
-                    (maxHeight - foregroundSize.height).div(2f),
-                )
-            }
+                val foregroundOffset = remember(foregroundSize.width, foregroundSize.height, maxWidth, maxHeight) {
+                    DpOffset(
+                        (maxWidth - foregroundSize.width).div(2f),
+                        (maxHeight - foregroundSize.height).div(2f),
+                    )
+                }
 
-            Surface {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawIntoCanvas { canvas ->
-                        when (background) {
-                            is Background.Blur -> {
-                                canvas.nativeCanvas.drawImageRect(
-                                    image,
-                                    Rect(0f, 0f, image.width.toFloat(), image.height.toFloat()),
-                                    Rect(
-                                        backgroundOffset.x.toPx(),
-                                        backgroundOffset.y.toPx(),
-                                        backgroundOffset.x.toPx() + backgroundSize.width.toPx(),
-                                        backgroundOffset.y.toPx() + backgroundSize.height.toPx(),
-                                    ),
-                                    backgroundPaint
-                                )
+                Surface {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawIntoCanvas { canvas ->
+                            when (background) {
+                                is Background.Blur -> {
+                                    canvas.nativeCanvas.drawImageRect(
+                                        playingFrameImage,
+                                        Rect(
+                                            0f,
+                                            0f,
+                                            playingFrameImage.width.toFloat(),
+                                            playingFrameImage.height.toFloat()
+                                        ),
+                                        Rect(
+                                            backgroundOffset.x.toPx(),
+                                            backgroundOffset.y.toPx(),
+                                            backgroundOffset.x.toPx() + backgroundSize.width.toPx(),
+                                            backgroundOffset.y.toPx() + backgroundSize.height.toPx(),
+                                        ),
+                                        backgroundPaint
+                                    )
+                                }
+
+                                else -> canvas.nativeCanvas.drawPaint(backgroundPaint)
                             }
 
-                            else -> canvas.nativeCanvas.drawPaint(backgroundPaint)
+                            canvas.nativeCanvas.drawImageRect(
+                                playingFrameImage,
+                                Rect(
+                                    0f,
+                                    0f,
+                                    playingFrameImage.width.toFloat(),
+                                    playingFrameImage.height.toFloat()
+                                ),
+                                Rect(
+                                    foregroundOffset.x.toPx(),
+                                    foregroundOffset.y.toPx(),
+                                    foregroundOffset.x.toPx() + foregroundSize.width.toPx(),
+                                    foregroundOffset.y.toPx() + foregroundSize.height.toPx(),
+                                ), Paint()
+                            )
                         }
-
-                        canvas.nativeCanvas.drawImageRect(
-                            image,
-                            Rect(0f, 0f, image.width.toFloat(), image.height.toFloat()),
-                            Rect(
-                                foregroundOffset.x.toPx(),
-                                foregroundOffset.y.toPx(),
-                                foregroundOffset.x.toPx() + foregroundSize.width.toPx(),
-                                foregroundOffset.y.toPx() + foregroundSize.height.toPx(),
-                            ),
-                            Paint()
-                        )
                     }
                 }
             }
-        } else placeholder()
+
+            previewFrameImage != null -> {
+                val backgroundSize = remember(
+                    background.scale,
+                    previewFrameImage.width,
+                    previewFrameImage.height,
+                    maxWidth,
+                    maxHeight
+                ) {
+                    when (background) {
+                        is Background.Blur -> background.scale.scaleDp(
+                            DpSize(previewFrameImage.width.dp, previewFrameImage.height.dp),
+                            DpSize(maxWidth, maxHeight)
+                        )
+
+                        else -> DpSize.Zero
+                    }
+                }
+
+                val backgroundOffset = remember(backgroundSize.width, backgroundSize.height, maxWidth, maxHeight) {
+                    when (background) {
+                        is Background.Blur -> DpOffset(
+                            (maxWidth - backgroundSize.width).div(2f),
+                            (maxHeight - backgroundSize.height).div(2f),
+                        )
+
+                        else -> DpOffset.Zero
+                    }
+                }
+
+                val foregroundSize = remember(
+                    previewFrameImage.width,
+                    previewFrameImage.height,
+                    foreground.scale,
+                    maxWidth,
+                    maxHeight
+                ) {
+                    foreground.scale.scaleDp(
+                        DpSize(previewFrameImage.width.dp, previewFrameImage.height.dp), DpSize(maxWidth, maxHeight)
+                    )
+                }
+
+                val foregroundOffset = remember(foregroundSize.width, foregroundSize.height, maxWidth, maxHeight) {
+                    DpOffset(
+                        (maxWidth - foregroundSize.width).div(2f),
+                        (maxHeight - foregroundSize.height).div(2f),
+                    )
+                }
+
+                Surface {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawIntoCanvas { canvas ->
+                            when (background) {
+                                is Background.Blur -> {
+                                    canvas.nativeCanvas.drawImageRect(
+                                        previewFrameImage,
+                                        Rect(
+                                            0f,
+                                            0f,
+                                            previewFrameImage.width.toFloat(),
+                                            previewFrameImage.height.toFloat()
+                                        ),
+                                        Rect(
+                                            backgroundOffset.x.toPx(),
+                                            backgroundOffset.y.toPx(),
+                                            backgroundOffset.x.toPx() + backgroundSize.width.toPx(),
+                                            backgroundOffset.y.toPx() + backgroundSize.height.toPx(),
+                                        ),
+                                        backgroundPaint
+                                    )
+                                }
+
+                                else -> canvas.nativeCanvas.drawPaint(backgroundPaint)
+                            }
+
+                            canvas.nativeCanvas.drawImageRect(
+                                previewFrameImage,
+                                Rect(
+                                    0f,
+                                    0f,
+                                    previewFrameImage.width.toFloat(),
+                                    previewFrameImage.height.toFloat()
+                                ),
+                                Rect(
+                                    foregroundOffset.x.toPx(),
+                                    foregroundOffset.y.toPx(),
+                                    foregroundOffset.x.toPx() + foregroundSize.width.toPx(),
+                                    foregroundOffset.y.toPx() + foregroundSize.height.toPx(),
+                                ), Paint()
+                            )
+                        }
+                    }
+                }
+            }
+
+            else -> placeholder?.invoke(this)
+        }
     }
 }
