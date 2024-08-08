@@ -19,15 +19,15 @@ else ()
     message(FATAL_ERROR "JNI not found.")
 endif ()
 
-# OPENAL
+# PORTAUDIO
 
-SET(OPENAL_INCLUDE_PATH "include/openal")
-target_include_directories(jni_sampler PRIVATE ${OPENAL_INCLUDE_PATH})
+SET(PORTAUDIO_INCLUDE_PATH "include/portaudio")
+target_include_directories(jni_sampler PRIVATE ${PORTAUDIO_INCLUDE_PATH})
 
-SET(OPENAL_BIN_PATH "bin/openal")
-target_link_directories(jni_sampler PRIVATE ${OPENAL_BIN_PATH})
+SET(PORTAUDIO_BIN_PATH "bin/portaudio")
+target_link_directories(jni_sampler PRIVATE ${PORTAUDIO_BIN_PATH})
 
-target_link_libraries(jni_sampler PRIVATE soft_oal)
+target_link_libraries(jni_sampler PRIVATE libportaudio)
 
 # KLARITY_SAMPLER
 

@@ -9,35 +9,43 @@ extern "C" {
 #endif
 /*
  * Class:     sampler_NativeSampler
- * Method:    getCurrentTimeNative
- * Signature: (J)F
+ * Method:    getElapsedTimeSecondsNative
+ * Signature: (J)D
  */
-JNIEXPORT jfloat JNICALL Java_sampler_NativeSampler_getCurrentTimeNative
+JNIEXPORT jdouble JNICALL Java_sampler_NativeSampler_getElapsedTimeSecondsNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    setPlaybackSpeedNative
- * Signature: (JF)Z
+ * Signature: (JF)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative
   (JNIEnv *, jobject, jlong, jfloat);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    setVolumeNative
- * Signature: (JF)Z
+ * Signature: (JF)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_setVolumeNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative
   (JNIEnv *, jobject, jlong, jfloat);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    initNative
- * Signature: (JIII)Z
+ * Signature: (JII)Z
  */
 JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative
-  (JNIEnv *, jobject, jlong, jint, jint, jint);
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     sampler_NativeSampler
+ * Method:    startNative
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_startNative
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
@@ -50,25 +58,25 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative
 /*
  * Class:     sampler_NativeSampler
  * Method:    pauseNative
- * Signature: (J)V
+ * Signature: (J)Z
  */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_pauseNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    resumeNative
- * Signature: (J)V
+ * Signature: (J)Z
  */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_resumeNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    stopNative
- * Signature: (J)V
+ * Signature: (J)Z
  */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative
+JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_stopNative
   (JNIEnv *, jobject, jlong);
 
 /*
