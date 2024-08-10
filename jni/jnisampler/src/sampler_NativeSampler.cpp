@@ -9,33 +9,29 @@ static jmethodID audioConstructor;
 static std::unique_ptr<ISampler> sampler;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(exceptionClass, errorMessage.c_str());
+    env->ThrowNew(exceptionClass, ("JNI ERROR: " + errorMessage).c_str());
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
-    if (vm->GetEnv((void **) &env, JNI_VERSION_1_8) != JNI_OK) {
-        std::cerr << "Failed to get JNI environment" << std::endl;
-        return JNI_ERR;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8) != JNI_OK) {
+        throw std::runtime_error("Failed to get JNI environment");
     }
 
-    exceptionClass = (jclass) env->NewGlobalRef(env->FindClass("java/lang/RuntimeException"));
+    exceptionClass = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("java/lang/RuntimeException")));
     if (exceptionClass == nullptr) {
-        std::cerr << "Failed to find java/lang/RuntimeException class" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find java/lang/RuntimeException class");
     }
 
-    audioClass = (jclass) env->NewGlobalRef(env->FindClass("sampler/NativeSampler"));
+    audioClass = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("sampler/NativeSampler")));
     if (audioClass == nullptr) {
-        std::cerr << "Failed to find sampler/NativeSampler class" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find sampler/NativeSampler class");
     }
 
     audioConstructor = env->GetMethodID(audioClass, "<init>", "()V");
     if (audioConstructor == nullptr) {
-        std::cerr << "Failed to find sampler/NativeSampler <init>" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find sampler/NativeSampler <init>");
     }
 
     sampler = std::make_unique<Sampler>();
@@ -46,7 +42,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
-    if (vm->GetEnv((void **) &env, JNI_VERSION_1_8) != JNI_OK) return;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8) != JNI_OK) return;
 
     if (exceptionClass) env->DeleteGlobalRef(exceptionClass);
 
@@ -81,7 +77,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative(
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_initNative(
         JNIEnv *env,
         jobject thisObject,
         jlong id,
@@ -89,23 +85,21 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative(
         jint channels
 ) {
     try {
-        return sampler->initialize(id, static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels));
+        sampler->initialize(id, static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels));
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jlong id) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        return sampler->start(id);
+        sampler->start(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in startNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative(
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
         JNIEnv *env,
         jobject thisObject,
         jlong id,
@@ -115,8 +109,7 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative(
     try {
         jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
         if (!byteArray) {
-            std::cerr << "Failed to get byte array elements." << std::endl;
-            return JNI_FALSE;
+            throw std::runtime_error("Failed to get byte array elements");
         }
 
         std::vector<uint8_t> samples(
@@ -126,37 +119,33 @@ JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative(
 
         env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
 
-        return sampler->play(id, samples.data(), samples.size());
+        sampler->play(id, samples.data(), samples.size());
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in playNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_pauseNative(JNIEnv *env, jobject thisObject, jlong id) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        return sampler->pause(id);
+        sampler->pause(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in pauseNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_resumeNative(JNIEnv *env, jobject thisObject, jlong id) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        return sampler->resume(id);
+        sampler->resume(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in resumeNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong id) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
-        return sampler->stop(id);
+        sampler->stop(id);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in stopNative method: ") + e.what());
-        return JNI_FALSE;
     }
 }
 

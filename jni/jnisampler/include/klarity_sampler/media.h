@@ -1,8 +1,10 @@
 #ifndef KLARITY_SAMPLER_MEDIA_H
 #define KLARITY_SAMPLER_MEDIA_H
 
+#include <cstring>
 #include <iostream>
 #include <mutex>
+#include "exception.h"
 #include "stretch/stretch.h"
 #include "portaudio.h"
 
@@ -26,15 +28,15 @@ public:
 
     void setVolume(float value);
 
-    bool start();
+    void start();
 
-    bool play(const uint8_t *samples, uint64_t size);
+    void play(const uint8_t *samples, uint64_t size);
 
-    bool pause();
+    void pause();
 
-    bool resume();
+    void resume();
 
-    bool stop();
+    void stop();
 };
 
 #endif //KLARITY_SAMPLER_MEDIA_H

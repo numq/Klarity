@@ -16,17 +16,17 @@ public:
 
     virtual void setVolume(int64_t id, float value) = 0;
 
-    virtual bool initialize(int64_t id, uint32_t sampleRate, uint32_t channels) = 0;
+    virtual void initialize(int64_t id, uint32_t sampleRate, uint32_t channels) = 0;
 
-    virtual bool start(int64_t id) = 0;
+    virtual void start(int64_t id) = 0;
 
-    virtual bool play(int64_t id, uint8_t *samples, uint64_t size) = 0;
+    virtual void play(int64_t id, uint8_t *samples, uint64_t size) = 0;
 
-    virtual bool pause(int64_t id) = 0;
+    virtual void pause(int64_t id) = 0;
 
-    virtual bool resume(int64_t id) = 0;
+    virtual void resume(int64_t id) = 0;
 
-    virtual bool stop(int64_t id) = 0;
+    virtual void stop(int64_t id) = 0;
 
     virtual void close(int64_t id) = 0;
 };
@@ -49,17 +49,17 @@ public:
 
     void setVolume(int64_t id, float value) override;
 
-    bool initialize(int64_t id, uint32_t sampleRate, uint32_t channels) override;
+    void initialize(int64_t id, uint32_t sampleRate, uint32_t channels) override;
 
-    bool start(int64_t id) override;
+    void start(int64_t id) override;
 
-    bool play(int64_t id, uint8_t *samples, uint64_t size) override;
+    void play(int64_t id, uint8_t *samples, uint64_t size) override;
 
-    bool pause(int64_t id) override;
+    void pause(int64_t id) override;
 
-    bool resume(int64_t id) override;
+    void resume(int64_t id) override;
 
-    bool stop(int64_t id) override;
+    void stop(int64_t id) override;
 
     void close(int64_t id) override;
 };

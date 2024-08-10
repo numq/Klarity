@@ -34,49 +34,49 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative
 /*
  * Class:     sampler_NativeSampler
  * Method:    initNative
- * Signature: (JII)Z
+ * Signature: (JII)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_initNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_initNative
   (JNIEnv *, jobject, jlong, jint, jint);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    startNative
- * Signature: (J)Z
+ * Signature: (J)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_startNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    playNative
- * Signature: (J[BI)Z
+ * Signature: (J[BI)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_playNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative
   (JNIEnv *, jobject, jlong, jbyteArray, jint);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    pauseNative
- * Signature: (J)Z
+ * Signature: (J)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_pauseNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    resumeNative
- * Signature: (J)Z
+ * Signature: (J)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_resumeNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative
   (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     sampler_NativeSampler
  * Method:    stopNative
- * Signature: (J)Z
+ * Signature: (J)V
  */
-JNIEXPORT jboolean JNICALL Java_sampler_NativeSampler_stopNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative
   (JNIEnv *, jobject, jlong);
 
 /*
