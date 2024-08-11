@@ -1,26 +1,26 @@
 package sampler;
 
+import java.util.UUID;
+
 public class NativeSampler {
 
     private final long id;
 
     public NativeSampler() {
-        this.id = System.identityHashCode(this);
+        this.id = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
     }
 
-    public long getId() {
-        return id;
-    }
+    private native double getElapsedTimeSecondsNative(long id);
 
-    private native float getCurrentTimeNative(long id);
+    private native void setPlaybackSpeedNative(long id, float factor);
 
-    private native boolean setPlaybackSpeedNative(long id, float factor);
+    private native void setVolumeNative(long id, float value);
 
-    private native boolean setVolumeNative(long id, float value);
+    private native void initNative(long id, int sampleRate, int channels);
 
-    private native boolean initNative(long id, int sampleRate, int channels, int numBuffers);
+    private native void startNative(long id);
 
-    private native boolean playNative(long id, byte[] bytes, int size);
+    private native void playNative(long id, byte[] bytes, int size);
 
     private native void pauseNative(long id);
 
@@ -30,24 +30,28 @@ public class NativeSampler {
 
     private native void closeNative(long id);
 
-    public float getCurrentTime() {
-        return getCurrentTimeNative(id);
+    public double getElapsedTimeSeconds() {
+        return getElapsedTimeSecondsNative(id);
     }
 
-    public boolean setPlaybackSpeed(float factor) {
-        return setPlaybackSpeedNative(id, factor);
+    public void setPlaybackSpeed(float factor) {
+        setPlaybackSpeedNative(id, factor);
     }
 
-    public boolean setVolume(float value) {
-        return setVolumeNative(id, value);
+    public void setVolume(float value) {
+        setVolumeNative(id, value);
     }
 
-    public boolean init(int sampleRate, int channels, int numBuffers) {
-        return initNative(id, sampleRate, channels, numBuffers);
+    public void init(int sampleRate, int channels) {
+        initNative(id, sampleRate, channels);
     }
 
-    public boolean play(byte[] data, int size) {
-        return playNative(id, data, size);
+    public void start() {
+        startNative(id);
+    }
+
+    public void play(byte[] data, int size) {
+        playNative(id, data, size);
     }
 
     public void pause() {
