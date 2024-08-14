@@ -19,12 +19,12 @@ internal class AudioDecoder(
 
                 else -> null
             }
-        } ?: Frame.Audio.EndOfMedia(
-            timestampMicros = decoder.format.durationMicros
-        )
+        } ?: Frame.Audio.EndOfStream
     }
 
     override fun seekTo(micros: Long) = runCatching {
+        require(micros in 0..decoder.format.durationMicros) { "Illegal seek timestamp" }
+
         decoder.seekTo(micros)
     }
 

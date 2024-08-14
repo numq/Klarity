@@ -4,19 +4,21 @@ import java.util.UUID;
 
 public class NativeSampler {
 
-    private final long id;
+    public final long id;
 
     public NativeSampler() {
         this.id = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
     }
 
-    private native double getElapsedTimeSecondsNative(long id);
+    public long getId() {
+        return id;
+    }
 
     private native void setPlaybackSpeedNative(long id, float factor);
 
     private native void setVolumeNative(long id, float value);
 
-    private native void initNative(long id, int sampleRate, int channels);
+    private native void initializeNative(long id, int sampleRate, int channels);
 
     private native void startNative(long id);
 
@@ -30,10 +32,6 @@ public class NativeSampler {
 
     private native void closeNative(long id);
 
-    public double getElapsedTimeSeconds() {
-        return getElapsedTimeSecondsNative(id);
-    }
-
     public void setPlaybackSpeed(float factor) {
         setPlaybackSpeedNative(id, factor);
     }
@@ -42,8 +40,8 @@ public class NativeSampler {
         setVolumeNative(id, value);
     }
 
-    public void init(int sampleRate, int channels) {
-        initNative(id, sampleRate, channels);
+    public void initialize(int sampleRate, int channels) {
+        initializeNative(id, sampleRate, channels);
     }
 
     public void start() {

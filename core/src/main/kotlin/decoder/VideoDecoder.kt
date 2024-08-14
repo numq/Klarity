@@ -20,12 +20,12 @@ internal class VideoDecoder(
 
                 else -> null
             }
-        } ?: Frame.Video.EndOfMedia(
-            timestampMicros = decoder.format.durationMicros
-        )
+        } ?: Frame.Video.EndOfStream
     }
 
     override fun seekTo(micros: Long) = runCatching {
+        require(micros in 0..decoder.format.durationMicros) { "Illegal seek timestamp" }
+
         decoder.seekTo(micros)
     }
 

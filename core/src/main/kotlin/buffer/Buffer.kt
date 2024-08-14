@@ -4,7 +4,7 @@ interface Buffer<T> {
     val capacity: Int
     suspend fun resize(newCapacity: Int): Result<Unit>
     suspend fun peek(): Result<T?>
-    suspend fun poll(): Result<T?>
+    suspend fun poll(): Result<T>
     suspend fun push(item: T): Result<Unit>
     suspend fun flush(): Result<Unit>
 

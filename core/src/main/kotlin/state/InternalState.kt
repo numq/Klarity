@@ -5,7 +5,7 @@ import loop.playback.PlaybackLoop
 import media.Media
 import pipeline.Pipeline
 
-sealed interface InternalState {
+internal sealed interface InternalState {
     data object Empty : InternalState
 
     sealed interface Loaded : InternalState {

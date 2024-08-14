@@ -14,13 +14,13 @@ object Klarity {
         const val AVCODEC = "avcodec-59"
         const val AVFORMAT = "avformat-59"
         const val KLARITY_DECODER = "libklarity_decoder"
-        const val JNI_DECODER = "libjnidecoder"
+        const val JNI_DECODER = "libjni_decoder"
     }
 
     private object Sampler {
-        const val OPENAL = "soft_oal"
+        const val PORTAUDIO = "libportaudio"
         const val KLARITY_SAMPLER = "libklarity_sampler"
-        const val JNI_SAMPLER = "libjnisampler"
+        const val JNI_SAMPLER = "libjni_sampler"
     }
 
     private val extension = System.getProperty("os.name")?.let { property ->
@@ -48,11 +48,11 @@ object Klarity {
     }.onSuccess { isDecoderLoaded = true }
 
     fun loadSampler(
-        openalPath: String,
+        portAudioPath: String,
         klarityPath: String,
         jniPath: String,
     ) = runCatching {
-        System.load("$openalPath\\${Sampler.OPENAL}.$extension")
+        System.load("$portAudioPath\\${Sampler.PORTAUDIO}.$extension")
 
         System.load("$klarityPath\\${Sampler.KLARITY_SAMPLER}.$extension")
 

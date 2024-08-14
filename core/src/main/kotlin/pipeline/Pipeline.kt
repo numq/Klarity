@@ -7,7 +7,10 @@ import renderer.Renderer
 import sampler.Sampler
 
 sealed interface Pipeline : AutoCloseable {
+    val media: media.Media
+
     data class Media(
+        override val media: media.Media,
         val audioDecoder: Decoder<Frame.Audio>,
         val videoDecoder: Decoder<Frame.Video>,
         val audioBuffer: Buffer<Frame.Audio>,
@@ -24,6 +27,7 @@ sealed interface Pipeline : AutoCloseable {
     }
 
     data class Audio(
+        override val media: media.Media,
         val decoder: Decoder<Frame.Audio>,
         val buffer: Buffer<Frame.Audio>,
         val sampler: Sampler,
@@ -35,6 +39,7 @@ sealed interface Pipeline : AutoCloseable {
     }
 
     data class Video(
+        override val media: media.Media,
         val decoder: Decoder<Frame.Video>,
         val buffer: Buffer<Frame.Video>,
         val renderer: Renderer,

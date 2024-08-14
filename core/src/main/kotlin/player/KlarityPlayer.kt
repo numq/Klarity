@@ -2,7 +2,6 @@ package player
 
 import buffer.Buffer
 import buffer.BufferFactory
-import clock.ClockFactory
 import controller.PlayerControllerFactory
 import decoder.Decoder
 import decoder.DecoderFactory
@@ -19,11 +18,14 @@ import renderer.RendererFactory
 import sampler.SamplerFactory
 import settings.Settings
 import state.State
+import timestamp.Timestamp
 
 interface KlarityPlayer : AutoCloseable {
-    val renderer: StateFlow<Renderer?>
     val settings: StateFlow<Settings>
     val state: StateFlow<State>
+    val bufferTimestamp: StateFlow<Timestamp>
+    val playbackTimestamp: StateFlow<Timestamp>
+    val renderer: StateFlow<Renderer?>
     val events: Flow<Event>
     suspend fun changeSettings(settings: Settings)
     suspend fun resetSettings()
@@ -31,6 +33,7 @@ interface KlarityPlayer : AutoCloseable {
     suspend fun unload()
     suspend fun play()
     suspend fun pause()
+    suspend fun resume()
     suspend fun stop()
     suspend fun seekTo(millis: Long)
 
@@ -42,8 +45,7 @@ interface KlarityPlayer : AutoCloseable {
         }.mapCatching {
             PlayerControllerFactory.create(
                 parameters = PlayerControllerFactory.Parameters(
-                    defaultSettings = null,
-                    clockFactory = ClockFactory,
+                    initialSettings = null,
                     probeDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Nothing>>,
                     audioDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
                     videoDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Frame.Video>>,

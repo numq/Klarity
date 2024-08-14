@@ -4,9 +4,15 @@ import java.io.File
 import java.net.URI
 
 sealed interface Location {
-    data class Local(val fileName: String, val path: String) : Location
+    val value: String
 
-    data class Remote(val url: String) : Location
+    data class Local(val fileName: String, val path: String) : Location {
+        override val value = path
+    }
+
+    data class Remote(val url: String) : Location {
+        override val value = url
+    }
 
     companion object {
         fun create(location: String): Result<Location> = runCatching {

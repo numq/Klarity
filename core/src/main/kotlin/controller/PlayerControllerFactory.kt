@@ -2,8 +2,6 @@ package controller
 
 import buffer.Buffer
 import buffer.BufferFactory
-import clock.Clock
-import clock.ClockFactory
 import decoder.Decoder
 import decoder.DecoderFactory
 import factory.Factory
@@ -20,8 +18,7 @@ import settings.Settings
 
 object PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
-        val defaultSettings: Settings?,
-        val clockFactory: Factory<ClockFactory.Parameters, Clock>,
+        val initialSettings: Settings?,
         val probeDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Nothing>>,
         val audioDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
         val videoDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
@@ -35,8 +32,7 @@ object PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, Pla
 
     override fun create(parameters: Parameters) = with(parameters) {
         PlayerController.create(
-            defaultSettings = defaultSettings,
-            clockFactory = clockFactory,
+            initialSettings = initialSettings,
             probeDecoderFactory = probeDecoderFactory,
             audioDecoderFactory = audioDecoderFactory,
             videoDecoderFactory = videoDecoderFactory,

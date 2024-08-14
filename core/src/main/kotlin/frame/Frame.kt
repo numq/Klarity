@@ -1,11 +1,9 @@
 package frame
 
 sealed interface Frame {
-    val timestampMicros: Long
-
     sealed interface Audio : Frame {
         data class Content(
-            override val timestampMicros: Long,
+            val timestampMicros: Long,
             val bytes: ByteArray,
             val channels: Int,
             val sampleRate: Int,
@@ -33,12 +31,12 @@ sealed interface Frame {
             }
         }
 
-        data class EndOfMedia(override val timestampMicros: Long) : Audio
+        data object EndOfStream : Audio
     }
 
     sealed interface Video : Frame {
         data class Content(
-            override val timestampMicros: Long,
+            val timestampMicros: Long,
             val bytes: ByteArray,
             val width: Int,
             val height: Int,
@@ -67,9 +65,8 @@ sealed interface Frame {
                 result = 31 * result + frameRate.hashCode()
                 return result
             }
-
         }
 
-        data class EndOfMedia(override val timestampMicros: Long) : Video
+        data object EndOfStream : Video
     }
 }

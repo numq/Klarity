@@ -4,49 +4,54 @@ import buffer.Buffer
 import decoder.Decoder
 import frame.Frame
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import pipeline.Pipeline
+import timestamp.Timestamp
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.time.Duration.Companion.microseconds
 
 internal class DefaultBufferLoop(
     private val pipeline: Pipeline,
 ) : BufferLoop {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Volatile
     private var job: Job? = null
 
-    private val audioTimestamps = MutableSharedFlow<Long>(replay = 1)
-
-    private val videoTimestamps = MutableSharedFlow<Long>(replay = 1)
-
     override val isBuffering = AtomicBoolean(false)
+    override val isWaiting = AtomicBoolean(true)
 
-    override val isWaiting = AtomicBoolean(false)
+    private val audioTimestamp = MutableStateFlow(Timestamp.ZERO)
+    private val videoTimestamp = MutableStateFlow(Timestamp.ZERO)
 
-    override val timestamp = audioTimestamps.combine(videoTimestamps, ::minOf).stateIn(
-        scope = coroutineScope,
-        started = SharingStarted.Lazily,
-        initialValue = 0L
-    )
+    private suspend fun setAudioTimestamp(timestamp: Timestamp) {
+        if (isBuffering.get() && timestamp.micros in (0L..pipeline.media.durationMicros)) {
+            audioTimestamp.emit(timestamp)
+        }
+    }
+
+    private suspend fun setVideoTimestamp(timestamp: Timestamp) {
+        if (isBuffering.get() && timestamp.micros in (0L..pipeline.media.durationMicros)) {
+            videoTimestamp.emit(timestamp)
+        }
+    }
 
     private suspend fun handleAudioBuffer(
         decoder: Decoder<Frame.Audio>,
         buffer: Buffer<Frame.Audio>,
         onWaiting: suspend () -> Unit,
-    ) = with(currentCoroutineContext()) {
-        while (isActive) {
+    ) {
+        isWaiting.set(true)
+
+        while (currentCoroutineContext().isActive && isBuffering.get()) {
             when (val frame = decoder.nextFrame().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
                     onWaiting()
 
-                    Thread.onSpinWait()
+                    yield()
+
+                    continue
                 }
 
                 else -> {
@@ -55,13 +60,13 @@ internal class DefaultBufferLoop(
                     when (frame) {
                         is Frame.Audio.Content -> {
                             buffer.push(frame)
-                            audioTimestamps.tryEmit(frame.timestampMicros.microseconds.inWholeMilliseconds)
+
+                            setAudioTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
-
-                        is Frame.Audio.EndOfMedia -> {
+                        is Frame.Audio.EndOfStream -> {
                             buffer.push(frame)
-                            audioTimestamps.tryEmit(frame.timestampMicros.microseconds.inWholeMilliseconds)
+
                             break
                         }
                     }
@@ -74,15 +79,19 @@ internal class DefaultBufferLoop(
         decoder: Decoder<Frame.Video>,
         buffer: Buffer<Frame.Video>,
         onWaiting: suspend () -> Unit,
-    ) = with(currentCoroutineContext()) {
-        while (isActive) {
+    ) {
+        isWaiting.set(true)
+
+        while (currentCoroutineContext().isActive && isBuffering.get()) {
             when (val frame = decoder.nextFrame().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
                     onWaiting()
 
-                    Thread.onSpinWait()
+                    yield()
+
+                    continue
                 }
 
                 else -> {
@@ -91,12 +100,13 @@ internal class DefaultBufferLoop(
                     when (frame) {
                         is Frame.Video.Content -> {
                             buffer.push(frame)
-                            videoTimestamps.tryEmit(frame.timestampMicros.microseconds.inWholeMilliseconds)
+
+                            setVideoTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
-                        is Frame.Video.EndOfMedia -> {
+                        is Frame.Video.EndOfStream -> {
                             buffer.push(frame)
-                            videoTimestamps.tryEmit(frame.timestampMicros.microseconds.inWholeMilliseconds)
+
                             break
                         }
                     }
@@ -105,10 +115,16 @@ internal class DefaultBufferLoop(
         }
     }
 
+    override val timestamp: StateFlow<Timestamp> = audioTimestamp.combine(videoTimestamp) { audio, video ->
+        if (audio.micros >= video.micros) audio else video
+    }.stateIn(scope = coroutineScope, started = SharingStarted.Lazily, initialValue = Timestamp.ZERO)
+
     override suspend fun start(
         onWaiting: suspend () -> Unit,
         endOfMedia: suspend () -> Unit,
     ) = runCatching {
+        check(!isBuffering.get()) { "Unable to start buffer loop, call stop first." }
+
         job = coroutineScope.launch(
             context = CoroutineExceptionHandler { _, throwable ->
                 if (throwable !is CancellationException) throw throwable
@@ -161,19 +177,15 @@ internal class DefaultBufferLoop(
                 }
             }
 
-            endOfMedia()
-
             isBuffering.set(false)
 
-            job = null
+            endOfMedia()
         }
     }.onFailure {
         isBuffering.set(false)
     }
 
-    override suspend fun stop() = runCatching {
-        isBuffering.set(false)
-
+    override suspend fun stop(resetTime: Boolean) = runCatching {
         job?.cancelAndJoin()
         job = null
 
@@ -188,7 +200,20 @@ internal class DefaultBufferLoop(
 
             is Pipeline.Video -> pipeline.buffer.flush().getOrThrow()
         }
+
+        if (resetTime) {
+            audioTimestamp.emit(Timestamp.ZERO)
+            videoTimestamp.emit(Timestamp.ZERO)
+        }
+
+        isBuffering.set(false)
+
+        isWaiting.set(false)
+    }.onFailure {
+        isBuffering.set(false)
     }
 
-    override fun close() = runCatching { coroutineScope.cancel() }.getOrDefault(Unit)
+    override fun close() = runCatching {
+        coroutineScope.cancel()
+    }.getOrDefault(Unit)
 }

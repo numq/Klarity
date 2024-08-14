@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 internal class DefaultRenderer(
     override val width: Int,
     override val height: Int,
+    override val frameRate: Double,
     override val preview: Frame.Video.Content?,
 ) : Renderer {
     private val coroutineScope = CoroutineScope(Dispatchers.Default)

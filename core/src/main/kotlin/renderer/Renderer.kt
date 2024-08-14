@@ -6,7 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 interface Renderer : AutoCloseable {
     val width: Int
     val height: Int
-    val preview: Frame.Video?
+    val frameRate: Double
+    val preview: Frame.Video.Content?
     val frame: StateFlow<Frame.Video.Content?>
     val playbackSpeedFactor: Float
     suspend fun setPlaybackSpeed(factor: Float): Result<Unit>
@@ -14,8 +15,13 @@ interface Renderer : AutoCloseable {
     suspend fun reset(): Result<Unit>
 
     companion object {
-        internal fun create(width: Int, height: Int, preview: Frame.Video.Content?): Result<Renderer> = runCatching {
-            DefaultRenderer(width = width, height = height, preview = preview)
+        internal fun create(
+            width: Int,
+            height: Int,
+            frameRate: Double,
+            preview: Frame.Video.Content?,
+        ): Result<Renderer> = runCatching {
+            DefaultRenderer(width = width, height = height, frameRate = frameRate, preview = preview)
         }
     }
 }
