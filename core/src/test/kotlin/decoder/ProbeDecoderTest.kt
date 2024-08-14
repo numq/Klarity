@@ -5,13 +5,13 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import media.Media
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class ProbeDecoderTest {
-    private lateinit var decoder: Decoder<Nothing>
+    private lateinit var decoder: Decoder<Unit>
 
     private val nativeDecoder = mockk<NativeDecoder>(relaxUnitFun = true)
 
@@ -19,18 +19,18 @@ class ProbeDecoderTest {
 
     @BeforeEach
     fun beforeEach() {
-        clearMocks(nativeDecoder, media)
-        decoder = ProbeDecoder(decoder = nativeDecoder, media = media)
+        decoder = ProbeDecoder(media = media)
     }
 
     @AfterEach
     fun afterEach() {
         decoder.close()
+        clearMocks(nativeDecoder, media)
     }
 
     @Test
     fun nextFrame() = runTest {
-        assertNull(decoder.nextFrame().getOrThrow())
+        assertEquals(Unit, decoder.nextFrame().getOrThrow())
     }
 
     @Test

@@ -1,7 +1,6 @@
 package sampler
 
 import io.mockk.clearMocks
-import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
@@ -12,26 +11,24 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
-class AudioSamplerTest {
+class SamplerTest {
     private lateinit var sampler: Sampler
 
     private val nativeSampler = mockk<NativeSampler>(relaxUnitFun = true)
 
     @BeforeEach
     fun beforeEach() {
-        clearMocks(nativeSampler)
         sampler = DefaultSampler(nativeSampler)
     }
 
     @AfterEach
     fun afterEach() {
         sampler.close()
+        clearMocks(nativeSampler)
     }
 
     @Test
     fun `change playback speed`() = runTest {
-        every { nativeSampler.setPlaybackSpeed(any()) } answers { true }
-
         assertEquals(1f, sampler.playbackSpeedFactor)
 
         assertTrue(sampler.setPlaybackSpeed(2f).isSuccess)
@@ -47,8 +44,6 @@ class AudioSamplerTest {
 
     @Test
     fun `change volume`() = runTest {
-        every { nativeSampler.setVolume(any()) } answers { true }
-
         assertTrue(sampler.setVolume(.5f).isSuccess)
 
         verify { nativeSampler.setVolume(any()) }
@@ -56,8 +51,6 @@ class AudioSamplerTest {
 
     @Test
     fun `toggle mute`() = runTest {
-        every { nativeSampler.setVolume(any()) } answers { true }
-
         assertTrue(sampler.setMuted(true).isSuccess)
 
         assertTrue(sampler.setMuted(false).isSuccess)
@@ -66,19 +59,8 @@ class AudioSamplerTest {
     }
 
     @Test
-    fun `current time`() = runTest {
-        every { nativeSampler.currentTime } answers { 1f }
-
-        assertEquals(1f, sampler.getCurrentTime().getOrThrow())
-
-        verify { nativeSampler.currentTime }
-    }
-
-    @Test
     fun `playback interaction`() = runTest {
-        every { nativeSampler.play(any(), any()) } answers { true }
-
-        assertTrue(sampler.play(Random(System.currentTimeMillis()).nextBytes(10)).getOrThrow())
+        assertTrue(sampler.play(Random(System.currentTimeMillis()).nextBytes(10)).isSuccess)
 
         assertTrue(sampler.pause().isSuccess)
 

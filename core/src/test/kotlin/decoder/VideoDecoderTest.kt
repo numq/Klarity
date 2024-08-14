@@ -23,8 +23,6 @@ class VideoDecoderTest {
 
     @BeforeEach
     fun beforeEach() {
-        clearMocks(nativeDecoder, media)
-
         coEvery { nativeDecoder.format } coAnswers {
             NativeFormat(
                 "", 1000L, 0, 0, 100, 100, 30.0
@@ -37,6 +35,7 @@ class VideoDecoderTest {
     @AfterEach
     fun afterEach() {
         decoder.close()
+        clearMocks(nativeDecoder, media)
     }
 
     @Test

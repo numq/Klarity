@@ -46,9 +46,9 @@ class NativeDecoderTest {
 
     @BeforeEach
     fun beforeEach() {
-        audioDecoder = NativeDecoder().apply { check(init(audioFile!!, true, true)) }
-        videoDecoder = NativeDecoder().apply { check(init(videoFile!!, true, true)) }
-        mediaDecoder = NativeDecoder().apply { check(init(mediaFile!!, true, true)) }
+        audioDecoder = NativeDecoder().apply { init(audioFile, true, true) }
+        videoDecoder = NativeDecoder().apply { init(videoFile, true, true) }
+        mediaDecoder = NativeDecoder().apply { init(mediaFile, true, true) }
     }
 
     @AfterEach

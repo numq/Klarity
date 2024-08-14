@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import pipeline.Pipeline
+import timestamp.Timestamp
 
 class BufferLoopTest {
     private lateinit var pipeline: Pipeline
@@ -43,9 +44,9 @@ class BufferLoopTest {
 
         assertTrue(bufferLoop.isBuffering.get())
 
-        assertTrue(bufferLoop.stop().isSuccess)
+        assertTrue(bufferLoop.stop(resetTime = true).isSuccess)
 
-        delay(1_000L)
+        assertEquals(Timestamp.ZERO, bufferLoop.timestamp.value)
 
         assertFalse(bufferLoop.isBuffering.get())
     }
@@ -58,7 +59,6 @@ class BufferLoopTest {
 
         every { pipeline.decoder } returns decoder
         every { pipeline.buffer } returns buffer
-
         coEvery { decoder.nextFrame() } returns Result.success(Frame.Audio.Content(0, byteArrayOf(), 2, 44100))
 
         val bufferLoop = DefaultBufferLoop(pipeline)
@@ -68,9 +68,17 @@ class BufferLoopTest {
 
         assertTrue(bufferLoop.start(onWaiting, endOfMedia).isSuccess)
 
+        assertTrue(bufferLoop.isWaiting.get())
+
+        bufferLoop.timestamp.first()
+
+        delay(1_000L)
+
         assertFalse(bufferLoop.isWaiting.get())
 
-        assertTrue(bufferLoop.stop().isSuccess)
+        assertTrue(bufferLoop.stop(resetTime = true).isSuccess)
+
+        assertEquals(Timestamp.ZERO, bufferLoop.timestamp.value)
     }
 
     @Test
@@ -81,7 +89,6 @@ class BufferLoopTest {
 
         every { pipeline.decoder } returns decoder
         every { pipeline.buffer } returns buffer
-
         coEvery { decoder.nextFrame() } returns Result.success(Frame.Audio.Content(0, byteArrayOf(), 2, 44100))
 
         val bufferLoop = DefaultBufferLoop(pipeline)
@@ -91,8 +98,10 @@ class BufferLoopTest {
 
         assertTrue(bufferLoop.start(onWaiting, endOfMedia).isSuccess)
 
-        assertEquals(0L, bufferLoop.timestamp.first())
+        assertEquals(Timestamp.ZERO, bufferLoop.timestamp.first())
 
-        assertTrue(bufferLoop.stop().isSuccess)
+        assertTrue(bufferLoop.stop(resetTime = true).isSuccess)
+
+        assertEquals(Timestamp.ZERO, bufferLoop.timestamp.value)
     }
 }

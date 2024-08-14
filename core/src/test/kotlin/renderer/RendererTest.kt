@@ -13,7 +13,7 @@ class RendererTest {
 
     @BeforeEach
     fun beforeEach() {
-        renderer = Renderer.create(100, 100, null).getOrThrow()
+        renderer = Renderer.create(100, 100, 30.0, null).getOrThrow()
     }
 
     @AfterEach

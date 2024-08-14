@@ -1,9 +1,11 @@
 package loop
 
 import buffer.Buffer
-import clock.Clock
 import frame.Frame
-import io.mockk.*
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.unmockkAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import loop.buffer.BufferLoop
@@ -14,15 +16,14 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import pipeline.Pipeline
+import timestamp.Timestamp
 
 class PlaybackLoopTest {
-    private lateinit var clock: Clock
     private lateinit var bufferLoop: BufferLoop
     private lateinit var pipeline: Pipeline
 
     @BeforeEach
     fun beforeEach() {
-        clock = mockk(relaxed = true)
         bufferLoop = mockk(relaxed = true)
         pipeline = mockk<Pipeline.Media>(relaxed = true)
     }
@@ -34,13 +35,15 @@ class PlaybackLoopTest {
 
     @Test
     fun `test start and stop lifecycle`() = runTest {
-        val playbackLoop = DefaultPlaybackLoop(clock, bufferLoop, pipeline)
+        val playbackLoop = DefaultPlaybackLoop(bufferLoop, pipeline)
 
         val endOfMedia: suspend () -> Unit = {}
 
         assertTrue(playbackLoop.start(endOfMedia).isSuccess)
 
-        assertTrue(playbackLoop.stop().isSuccess)
+        assertTrue(playbackLoop.stop(resetTime = true).isSuccess)
+
+        assertEquals(Timestamp.ZERO, playbackLoop.timestamp.value)
     }
 
     @Test
@@ -56,15 +59,15 @@ class PlaybackLoopTest {
         coEvery { audioBuffer.peek() } returns Result.success(audioFrame)
         coEvery { videoBuffer.peek() } returns Result.success(videoFrame)
 
-        val playbackLoop = DefaultPlaybackLoop(clock, bufferLoop, pipeline)
+        val playbackLoop = DefaultPlaybackLoop(bufferLoop, pipeline)
 
         val endOfMedia: suspend () -> Unit = {}
 
         assertTrue(playbackLoop.start(endOfMedia).isSuccess)
 
-        coVerify { clock.start(1000) }
+        assertTrue(playbackLoop.stop(resetTime = true).isSuccess)
 
-        assertTrue(playbackLoop.stop().isSuccess)
+        assertEquals(Timestamp.ZERO, playbackLoop.timestamp.value)
     }
 
     @Test
@@ -76,14 +79,16 @@ class PlaybackLoopTest {
         every { pipeline.buffer } returns buffer
         coEvery { buffer.peek() } returns Result.success(frame)
 
-        val playbackLoop = DefaultPlaybackLoop(clock, bufferLoop, pipeline)
+        val playbackLoop = DefaultPlaybackLoop(bufferLoop, pipeline)
 
         val endOfMedia: suspend () -> Unit = {}
 
         assertTrue(playbackLoop.start(endOfMedia).isSuccess)
 
-        assertEquals(0L, playbackLoop.timestamp.first())
+        assertEquals(Timestamp.ZERO, playbackLoop.timestamp.first())
 
-        assertTrue(playbackLoop.stop().isSuccess)
+        assertTrue(playbackLoop.stop(resetTime = true).isSuccess)
+
+        assertEquals(Timestamp.ZERO, playbackLoop.timestamp.value)
     }
 }

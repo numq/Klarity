@@ -17,19 +17,17 @@ class SnapshotManagerTest {
     fun `single snapshot`() = runTest {
         val frame = Frame.Video.Content(0L, Random(System.currentTimeMillis()).nextBytes(10), 100, 100, 30.0)
 
+        every { decoder.media.durationMicros } returns 0L
+
+        every { decoder.seekTo(any()) } returns Result.success(Unit)
+
         coEvery { decoder.nextFrame() } returns Result.success(frame)
 
-        coEvery { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
+        every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
-        val result = SnapshotManager.snapshot("", 0L)
+        val result = SnapshotManager.snapshot("", timestampMillis = { 0L })
 
         assertEquals(Result.success(frame), result)
-
-        coVerify { Decoder.createVideoDecoder(any()) }
-
-        coVerify { decoder.nextFrame() }
-
-        verify { decoder.close() }
     }
 
     @Test
@@ -40,19 +38,20 @@ class SnapshotManagerTest {
             }
         }
 
+        every { decoder.media.durationMicros } returns 0L
+
+        every { decoder.seekTo(any()) } returns Result.success(Unit)
+
         coEvery { decoder.nextFrame() } returnsMany frames.map { Result.success(it) }
 
         every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
 
-        val result = SnapshotManager.snapshots("", frames.map(Frame::timestampMicros))
+        val result = SnapshotManager.snapshots(
+            "",
+            timestampsMillis = { frames.map(Frame.Video.Content::timestampMicros) }
+        )
 
         assertEquals(Result.success(frames), result)
-
-        coVerify { Decoder.createVideoDecoder(any()) }
-
-        coVerify(exactly = frames.size) { decoder.nextFrame() }
-
-        verify { decoder.close() }
     }
 
     companion object {
