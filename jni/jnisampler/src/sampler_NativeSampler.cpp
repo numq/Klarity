@@ -77,7 +77,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_initNative(
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_initializeNative(
         JNIEnv *env,
         jobject thisObject,
         jlong id,

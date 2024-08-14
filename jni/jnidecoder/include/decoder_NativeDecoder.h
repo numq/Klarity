@@ -10,9 +10,9 @@ extern "C" {
 /*
  * Class:     decoder_NativeDecoder
  * Method:    initNative
- * Signature: (JLjava/lang/String;ZZ)Z
+ * Signature: (JLjava/lang/String;ZZ)V
  */
-JNIEXPORT jboolean JNICALL Java_decoder_NativeDecoder_initNative
+JNIEXPORT void JNICALL Java_decoder_NativeDecoder_initNative
   (JNIEnv *, jobject, jlong, jstring, jboolean, jboolean);
 
 /*

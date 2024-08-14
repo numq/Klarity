@@ -3,6 +3,13 @@
 
 #define __STDC_CONSTANT_MACROS
 
+#include <mutex>
+#include <iostream>
+#include <unordered_map>
+#include "format.h"
+#include "frame.h"
+#include "media.h"
+
 extern "C" {
 #include "libavutil/imgutils.h"
 #include "libswresample/swresample.h"
@@ -11,18 +18,11 @@ extern "C" {
 #include "libavformat/avformat.h"
 }
 
-#include "format.h"
-#include "frame.h"
-#include "media.h"
-#include <mutex>
-#include <iostream>
-#include <unordered_map>
-
 class IDecoder {
 public:
     virtual ~IDecoder() = default;
 
-    virtual bool initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) = 0;
+    virtual void initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) = 0;
 
     virtual Format *getFormat(int64_t id) = 0;
 
@@ -47,7 +47,7 @@ private:
 public:
     ~Decoder() override;
 
-    bool initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) override;
+    void initialize(int64_t id, const char *location, bool findAudioStream, bool findVideoStream) override;
 
     Format *getFormat(int64_t id) override;
 

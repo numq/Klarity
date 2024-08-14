@@ -9,14 +9,6 @@ extern "C" {
 #endif
 /*
  * Class:     sampler_NativeSampler
- * Method:    getElapsedTimeSecondsNative
- * Signature: (J)D
- */
-JNIEXPORT jdouble JNICALL Java_sampler_NativeSampler_getElapsedTimeSecondsNative
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     sampler_NativeSampler
  * Method:    setPlaybackSpeedNative
  * Signature: (JF)V
  */
@@ -33,10 +25,10 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative
 
 /*
  * Class:     sampler_NativeSampler
- * Method:    initNative
+ * Method:    initializeNative
  * Signature: (JII)V
  */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_initNative
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_initializeNative
   (JNIEnv *, jobject, jlong, jint, jint);
 
 /*

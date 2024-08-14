@@ -1,11 +1,12 @@
 #ifndef KLARITY_DECODER_MEDIA_H
 #define KLARITY_DECODER_MEDIA_H
 
-#include "frame.h"
-#include "format.h"
 #include <string>
 #include <mutex>
 #include <iostream>
+#include "frame.h"
+#include "format.h"
+#include "exception.h"
 
 extern "C" {
 #include "libavutil/imgutils.h"

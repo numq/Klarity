@@ -10,45 +10,39 @@ static jmethodID frameConstructor;
 static std::unique_ptr<IDecoder> decoder;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(exceptionClass, errorMessage.c_str());
+    env->ThrowNew(exceptionClass, ("JNI ERROR: " + errorMessage).c_str());
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
     if (vm->GetEnv((void **) &env, JNI_VERSION_1_8) != JNI_OK) {
-        std::cerr << "Failed to get JNI environment" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to get JNI environment");
     }
 
     exceptionClass = (jclass) env->NewGlobalRef(env->FindClass("java/lang/RuntimeException"));
     if (exceptionClass == nullptr) {
-        std::cerr << "Failed to find java/lang/RuntimeException class" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find java/lang/RuntimeException class");
     }
 
     formatClass = (jclass) env->NewGlobalRef(env->FindClass("decoder/NativeFormat"));
     if (formatClass == nullptr) {
-        std::cerr << "Failed to find decoder/NativeFormat class" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find decoder/NativeFormat class");
     }
 
     frameClass = (jclass) env->NewGlobalRef(env->FindClass("decoder/NativeFrame"));
     if (frameClass == nullptr) {
-        std::cerr << "Failed to find decoder/NativeFrame class" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find decoder/NativeFrame class");
     }
 
     formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIID)V");
     if (formatConstructor == nullptr) {
-        std::cerr << "Failed to find decoder/NativeFormat <init>" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find decoder/NativeFormat <init>");
     }
 
     frameConstructor = env->GetMethodID(frameClass, "<init>", "(IJ[B)V");
     if (frameConstructor == nullptr) {
-        std::cerr << "Failed to find decoder/NativeFrame <init>" << std::endl;
-        return JNI_ERR;
+        throw std::runtime_error("Failed to find decoder/NativeFrame <init>");
     }
 
     decoder = std::make_unique<Decoder>();
@@ -70,7 +64,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     decoder.reset();
 }
 
-JNIEXPORT jboolean JNICALL Java_decoder_NativeDecoder_initNative(
+JNIEXPORT void JNICALL Java_decoder_NativeDecoder_initNative(
         JNIEnv *env,
         jobject obj,
         jlong id,
@@ -81,18 +75,16 @@ JNIEXPORT jboolean JNICALL Java_decoder_NativeDecoder_initNative(
     try {
         const char *locationChars = env->GetStringUTFChars(location, nullptr);
         if (!locationChars) {
-            handleException(env, "Failed to get location string.");
-            return JNI_FALSE;
+            throw std::runtime_error("Failed to get location string");
         }
 
         std::string locationStr(locationChars);
         env->ReleaseStringUTFChars(location, locationChars);
 
-        return decoder->initialize(id, locationStr.c_str(), findAudioStream, findVideoStream);
+        decoder->initialize(id, locationStr.c_str(), findAudioStream, findVideoStream);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
     }
-    return JNI_FALSE;
 }
 
 JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(
@@ -101,8 +93,10 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(
         jlong id
 ) {
     try {
-        Format *format = decoder->getFormat(id);
-        if (!format) return nullptr;
+        auto format = decoder->getFormat(id);
+        if (!format) {
+            throw std::runtime_error("Failed to get format");
+        }
 
         jstring location = env->NewStringUTF(format->location);
 
@@ -118,8 +112,6 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(
                 static_cast<jdouble>(format->frameRate)
         );
 
-        delete format;
-
         return javaObject;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in getFormatNative method: ") + e.what());
@@ -129,7 +121,7 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(
 
 JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong id) {
     try {
-        Frame *frame = decoder->nextFrame(id);
+        auto frame = decoder->nextFrame(id);
         if (!frame) {
             return nullptr;
         }
@@ -140,9 +132,7 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env
 
         jbyteArray byteArray = env->NewByteArray(static_cast<jsize>(frame->bytes.size()));
         if (byteArray == nullptr) {
-            delete frame;
-            handleException(env, "Failed to allocate byte array for frame data.");
-            return nullptr;
+            throw std::runtime_error("Failed to allocate byte array for frame data");
         }
 
         env->SetByteArrayRegion(byteArray, 0, static_cast<jsize>(frame->bytes.size()),
@@ -156,8 +146,6 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env
                 byteArray
         );
 
-        delete frame;
-
         return javaObject;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in nextFrameNative method: ") + e.what());
@@ -166,8 +154,12 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env
     return nullptr;
 }
 
-JNIEXPORT void JNICALL
-Java_decoder_NativeDecoder_seekToNative(JNIEnv *env, jobject obj, jlong id, jlong timestampMicros) {
+JNIEXPORT void JNICALL Java_decoder_NativeDecoder_seekToNative(
+        JNIEnv *env,
+        jobject obj,
+        jlong id,
+        jlong timestampMicros
+) {
     try {
         decoder->seekTo(id, static_cast<long>(timestampMicros));
     } catch (const std::exception &e) {
