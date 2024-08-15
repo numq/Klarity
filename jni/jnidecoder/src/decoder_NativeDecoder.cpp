@@ -127,11 +127,13 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env
         }
 
         if (frame->bytes.empty()) {
+            delete frame;
             return nullptr;
         }
 
         jbyteArray byteArray = env->NewByteArray(static_cast<jsize>(frame->bytes.size()));
         if (byteArray == nullptr) {
+            delete frame;
             throw std::runtime_error("Failed to allocate byte array for frame data");
         }
 
@@ -145,6 +147,8 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env
                 static_cast<jlong>(frame->timestampMicros),
                 byteArray
         );
+
+        delete frame;
 
         return javaObject;
     } catch (const std::exception &e) {
