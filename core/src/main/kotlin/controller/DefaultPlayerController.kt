@@ -209,23 +209,27 @@ internal class DefaultPlayerController(
         }.onFailure { t -> handlePlaybackError(t) }.getOrDefault(Unit)
     }
 
-    private suspend fun handlePrepare(command: Command.Prepare) = runCatching {
+    private suspend fun handlePrepare(
+        location: String,
+        audioBufferSize: Int,
+        videoBufferSize: Int,
+    ) = runCatching {
         if (internalState is InternalState.Empty) {
             val probeDecoder = probeDecoderFactory.create(
                 DecoderFactory.Parameters.Probe(
-                    location = command.location,
-                    findAudioStream = command.audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
-                    findVideoStream = command.videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
+                    location = location,
+                    findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
+                    findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
                 )
             ).getOrThrow()
 
             val audioPipeline = probeDecoder.media.audioFormat?.run {
                 val decoder = audioDecoderFactory.create(
-                    parameters = DecoderFactory.Parameters.Audio(location = command.location)
+                    parameters = DecoderFactory.Parameters.Audio(location = location)
                 ).getOrThrow()
 
                 val buffer = audioBufferFactory.create(
-                    parameters = BufferFactory.Parameters.Audio(capacity = command.audioBufferSize)
+                    parameters = BufferFactory.Parameters.Audio(capacity = audioBufferSize)
                 ).getOrThrow()
 
                 val sampler = samplerFactory.create(
@@ -237,11 +241,11 @@ internal class DefaultPlayerController(
 
             val videoPipeline = probeDecoder.media.videoFormat?.run {
                 val decoder = videoDecoderFactory.create(
-                    parameters = DecoderFactory.Parameters.Video(location = command.location)
+                    parameters = DecoderFactory.Parameters.Video(location = location)
                 ).getOrThrow()
 
                 val buffer = videoBufferFactory.create(
-                    parameters = BufferFactory.Parameters.Video(capacity = command.videoBufferSize)
+                    parameters = BufferFactory.Parameters.Video(capacity = videoBufferSize)
                 ).getOrThrow()
 
                 val renderer = rendererFactory.create(
@@ -421,7 +425,7 @@ internal class DefaultPlayerController(
         }
     }
 
-    private suspend fun handleSeekTo(command: Command.SeekTo) = executePlaybackCommand {
+    private suspend fun handleSeekTo(millis: Long) = executePlaybackCommand {
         if (internalState is InternalState.Loaded.Playing || internalState is InternalState.Loaded.Paused || internalState is InternalState.Loaded.Stopped || internalState is InternalState.Loaded.Completed) {
             updateState(
                 InternalState.Loaded.Seeking(
@@ -440,11 +444,11 @@ internal class DefaultPlayerController(
                     sampler.stop().getOrThrow()
 
                     audioDecoder.seekTo(
-                        micros = command.millis.milliseconds.inWholeMicroseconds
+                        micros = millis.milliseconds.inWholeMicroseconds
                     ).getOrThrow()
 
                     videoDecoder.seekTo(
-                        micros = command.millis.milliseconds.inWholeMicroseconds
+                        micros = millis.milliseconds.inWholeMicroseconds
                     ).getOrThrow()
 
                     sampler.start().getOrThrow()
@@ -456,7 +460,7 @@ internal class DefaultPlayerController(
                     sampler.stop().getOrThrow()
 
                     decoder.seekTo(
-                        micros = command.millis.milliseconds.inWholeMicroseconds
+                        micros = millis.milliseconds.inWholeMicroseconds
                     ).getOrThrow()
 
                     sampler.start().getOrThrow()
@@ -466,7 +470,7 @@ internal class DefaultPlayerController(
 
                 is Pipeline.Video -> with(pipeline) {
                     decoder.seekTo(
-                        micros = command.millis.milliseconds.inWholeMicroseconds
+                        micros = millis.milliseconds.inWholeMicroseconds
                     ).getOrThrow()
                 }
             }
@@ -474,7 +478,7 @@ internal class DefaultPlayerController(
             bufferLoop.start(onWaiting = ::handleBufferWaiting, endOfMedia = ::handleBufferCompletion).getOrThrow()
 
             playbackLoop.seekTo(
-                timestamp = Timestamp(micros = command.millis.milliseconds.inWholeMicroseconds)
+                timestamp = Timestamp(micros = millis.milliseconds.inWholeMicroseconds)
             ).getOrThrow()
 
             playbackEvents.emit(Event.Seeking.Complete)
@@ -514,22 +518,42 @@ internal class DefaultPlayerController(
             (internalState as? InternalState.Loaded)?.run {
                 applySettings(pipeline, newSettings).getOrThrow()
             }
+
             settings.emit(newSettings)
+
+            settings.first { it == newSettings }
+
+            Unit
         }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
     }
 
-    override suspend fun resetSettings() {
-        settings.emit(initialSettings ?: defaultSettings)
+    override suspend fun resetSettings() = commandMutex.withLock {
+        runCatching {
+            val newSettings = initialSettings ?: defaultSettings
+
+            settings.emit(newSettings)
+
+            settings.first { it == newSettings }
+
+            Unit
+        }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
     }
 
     override suspend fun execute(command: Command) {
         when (command) {
-            is Command.Prepare -> handlePrepare(command)
+            is Command.Prepare -> with(command) {
+                handlePrepare(
+                    location = location,
+                    audioBufferSize = audioBufferSize,
+                    videoBufferSize = videoBufferSize
+                )
+            }
+
             is Command.Play -> handlePlay()
             is Command.Pause -> handlePause()
             is Command.Resume -> handleResume()
             is Command.Stop -> handleStop()
-            is Command.SeekTo -> handleSeekTo(command)
+            is Command.SeekTo -> handleSeekTo(millis = command.millis)
             is Command.Release -> handleRelease()
         }
     }
