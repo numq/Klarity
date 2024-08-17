@@ -1,4 +1,4 @@
-package component
+package component.slider
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
@@ -15,11 +15,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 
-private fun transform(value: Float, source: ClosedRange<Float>, target: ClosedRange<Float>): Float {
-    if (source.endInclusive - source.start == 0f) return target.start
-    return ((value - source.start) / (source.endInclusive - source.start)) * (target.endInclusive - target.start) + target.start
-}
-
 @Composable
 fun CustomSlider(
     primaryValue: Float,
@@ -33,7 +28,6 @@ fun CustomSlider(
     thumbColor: Color = Color.White,
     interactionThumbColor: Color? = null,
 ) {
-
     val coroutineScope = rememberCoroutineScope()
 
     BoxWithConstraints(modifier = modifier) {
@@ -48,9 +42,9 @@ fun CustomSlider(
 
         val trackRange = remember(trackSize.width) { (0f..trackSize.width) }
 
-        val animatedPrimaryOffsetX = remember { Animatable(transform(primaryValue, valueRange, trackRange)) }
+        val animatedPrimaryOffsetX = remember { Animatable(sliderTransform(primaryValue, valueRange, trackRange)) }
 
-        val animatedSecondaryOffsetX = remember { Animatable(transform(primaryValue, valueRange, trackRange)) }
+        val animatedSecondaryOffsetX = remember { Animatable(sliderTransform(primaryValue, valueRange, trackRange)) }
 
         /**
          * Thumb
@@ -64,7 +58,7 @@ fun CustomSlider(
 
         LaunchedEffect(primaryValue) {
             if (!(isThumbPressed || isThumbDragging)) animatedPrimaryOffsetX.animateTo(
-                transform(
+                sliderTransform(
                     primaryValue,
                     valueRange,
                     trackRange
@@ -80,7 +74,7 @@ fun CustomSlider(
 
         if (secondaryValue != null) LaunchedEffect(secondaryValue) {
             animatedSecondaryOffsetX.animateTo(
-                transform(
+                sliderTransform(
                     secondaryValue,
                     valueRange,
                     trackRange
@@ -90,7 +84,7 @@ fun CustomSlider(
 
         Canvas(modifier = Modifier.fillMaxSize().pointerInput(trackRange, valueRange) {
             detectTapGestures(onTap = { (x, _) ->
-                onPrimaryValueChange(transform(x, trackRange, valueRange))
+                onPrimaryValueChange(sliderTransform(x, trackRange, valueRange))
             }, onPress = {
                 isThumbPressed = true
                 awaitRelease()
@@ -105,7 +99,7 @@ fun CustomSlider(
             }, onDragCancel = {
                 isThumbDragging = false
             }, onDragEnd = {
-                onPrimaryValueChange(transform(animatedPrimaryOffsetX.value, trackRange, valueRange))
+                onPrimaryValueChange(sliderTransform(animatedPrimaryOffsetX.value, trackRange, valueRange))
 
                 isThumbDragging = false
             }) { change, (x, _) ->
@@ -127,7 +121,7 @@ fun CustomSlider(
                 color = foregroundSecondaryColor,
                 start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
                 end = Offset(
-                    transform(
+                    sliderTransform(
                         animatedSecondaryOffsetX.value,
                         trackRange,
                         (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
@@ -140,7 +134,7 @@ fun CustomSlider(
                 color = foregroundPrimaryColor,
                 start = Offset(trackRange.start + thumbRadius, trackSize.height / 2),
                 end = Offset(
-                    transform(
+                    sliderTransform(
                         animatedPrimaryOffsetX.value,
                         trackRange,
                         (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)
@@ -153,7 +147,7 @@ fun CustomSlider(
                 color = interactionThumbColor.takeIf { isThumbPressed || isThumbDragging } ?: thumbColor,
                 radius = thumbRadius,
                 center = Offset(
-                    transform(
+                    sliderTransform(
                         animatedPrimaryOffsetX.value,
                         trackRange,
                         (trackRange.start + thumbRadius..trackRange.endInclusive - thumbRadius)

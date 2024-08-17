@@ -8,7 +8,6 @@ import androidx.compose.material.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
@@ -21,13 +20,16 @@ import java.awt.Point
 import kotlin.math.roundToInt
 
 @Composable
-fun ComposeWindow.DecorationBox(exitApplication: () -> Unit, content: @Composable RowScope.() -> Unit) {
+fun DecorationBox(
+    window: ComposeWindow,
+    close: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) = with(window) {
+    var decorationOffsetX by remember { mutableStateOf(0f) }
 
-    var decorationOffsetX by rememberSaveable { mutableStateOf(0f) }
+    var decorationOffsetY by remember { mutableStateOf(0f) }
 
-    var decorationOffsetY by rememberSaveable { mutableStateOf(0f) }
-
-    val decorationOffset by rememberSaveable(decorationOffsetX, decorationOffsetY) {
+    val decorationOffset by remember(decorationOffsetX, decorationOffsetY) {
         derivedStateOf {
             Point(
                 (location.x + decorationOffsetX).roundToInt(), (location.y + decorationOffsetY).roundToInt()
@@ -35,7 +37,7 @@ fun ComposeWindow.DecorationBox(exitApplication: () -> Unit, content: @Composabl
         }
     }
 
-    val (windowPlacement, setWindowPlacement) = rememberSaveable { mutableStateOf(placement) }
+    val (windowPlacement, setWindowPlacement) = remember { mutableStateOf(placement) }
 
     fun changeWindowPlacement() =
         setWindowPlacement(if (placement == WindowPlacement.Floating) WindowPlacement.Maximized else WindowPlacement.Floating)
@@ -91,7 +93,7 @@ fun ComposeWindow.DecorationBox(exitApplication: () -> Unit, content: @Composabl
             )
         }
         Box(modifier = Modifier.fillMaxHeight().aspectRatio(1f).clickable {
-            exitApplication()
+            close()
         }, contentAlignment = Alignment.Center) {
             Icon(
                 Icons.Rounded.Close, "close window", tint = Color.White
