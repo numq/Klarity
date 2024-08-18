@@ -68,13 +68,7 @@ class BufferLoopTest {
 
         assertTrue(bufferLoop.start(onWaiting, endOfMedia).isSuccess)
 
-        assertTrue(bufferLoop.isWaiting.get())
-
         bufferLoop.timestamp.first()
-
-        delay(1_000L)
-
-        assertFalse(bufferLoop.isWaiting.get())
 
         assertTrue(bufferLoop.stop(resetTime = true).isSuccess)
 

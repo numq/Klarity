@@ -3,7 +3,6 @@ package decoder;
 import java.util.UUID;
 
 public class NativeDecoder {
-
     private final long id;
 
     public NativeDecoder() {

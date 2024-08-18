@@ -9,7 +9,7 @@ public class NativeFrame {
     private final long timestampMicros;
     private final byte[] bytes;
 
-    public NativeFrame(int type, long timestampMicros, byte[] bytes) {
+    NativeFrame(int type, long timestampMicros, byte[] bytes) {
         this.type = type;
         this.timestampMicros = timestampMicros;
         this.bytes = bytes;

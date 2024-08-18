@@ -3,7 +3,6 @@ package sampler;
 import java.util.UUID;
 
 public class NativeSampler {
-
     public final long id;
 
     public NativeSampler() {
