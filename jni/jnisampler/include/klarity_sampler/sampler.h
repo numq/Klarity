@@ -22,10 +22,6 @@ public:
 
     virtual void play(int64_t id, uint8_t *samples, uint64_t size) = 0;
 
-    virtual void pause(int64_t id) = 0;
-
-    virtual void resume(int64_t id) = 0;
-
     virtual void stop(int64_t id) = 0;
 
     virtual void close(int64_t id) = 0;
@@ -54,10 +50,6 @@ public:
     void start(int64_t id) override;
 
     void play(int64_t id, uint8_t *samples, uint64_t size) override;
-
-    void pause(int64_t id) override;
-
-    void resume(int64_t id) override;
 
     void stop(int64_t id) override;
 

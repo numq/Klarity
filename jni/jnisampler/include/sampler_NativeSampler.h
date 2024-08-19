@@ -49,22 +49,6 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative
 
 /*
  * Class:     sampler_NativeSampler
- * Method:    pauseNative
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     sampler_NativeSampler
- * Method:    resumeNative
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     sampler_NativeSampler
  * Method:    stopNative
  * Signature: (J)V
  */

@@ -125,22 +125,6 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_pauseNative(JNIEnv *env, jobject thisObject, jlong id) {
-    try {
-        sampler->pause(id);
-    } catch (const std::exception &e) {
-        handleException(env, std::string("Exception in pauseNative method: ") + e.what());
-    }
-}
-
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_resumeNative(JNIEnv *env, jobject thisObject, jlong id) {
-    try {
-        sampler->resume(id);
-    } catch (const std::exception &e) {
-        handleException(env, std::string("Exception in resumeNative method: ") + e.what());
-    }
-}
-
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong id) {
     try {
         sampler->stop(id);
