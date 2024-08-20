@@ -1,6 +1,5 @@
 package loop.buffer
 
-import kotlinx.coroutines.flow.StateFlow
 import pipeline.Pipeline
 import timestamp.Timestamp
 import java.util.concurrent.atomic.AtomicBoolean
@@ -8,9 +7,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 interface BufferLoop {
     val isBuffering: AtomicBoolean
     val isWaiting: AtomicBoolean
-    val timestamp: StateFlow<Timestamp>
-    suspend fun start(onWaiting: suspend () -> Unit, endOfMedia: suspend () -> Unit): Result<Unit>
-    suspend fun stop(resetTime: Boolean): Result<Unit>
+    suspend fun start(
+        onTimestamp: suspend (Timestamp) -> Unit,
+        onWaiting: suspend () -> Unit,
+        endOfMedia: suspend () -> Unit,
+    ): Result<Unit>
+
+    suspend fun stop(): Result<Unit>
     fun close()
 
     companion object {

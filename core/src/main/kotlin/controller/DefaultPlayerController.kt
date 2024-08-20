@@ -8,7 +8,10 @@ import decoder.DecoderFactory
 import event.Event
 import factory.Factory
 import frame.Frame
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,12 +50,6 @@ internal class DefaultPlayerController(
     private val mutex = Mutex()
 
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
-    @Volatile
-    private var bufferTimestampJob: Job? = null
-
-    @Volatile
-    private var playbackTimestampJob: Job? = null
 
     /**
      * Settings
@@ -119,8 +116,6 @@ internal class DefaultPlayerController(
 
         renderer.emit(updatedRenderer)
 
-        renderer.first { it == updatedRenderer }
-
         val updatedState = when (val updatedInternalState = internalState) {
             is InternalState.Empty -> State.Empty
 
@@ -136,16 +131,6 @@ internal class DefaultPlayerController(
         }
 
         state.emit(updatedState)
-
-        state.first { it == updatedState }
-    }
-
-    private suspend fun InternalState.Loaded.handlePlaybackCompletion() {
-        updateState(
-            InternalState.Loaded.Completed(
-                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-            )
-        )
     }
 
     /**
@@ -155,6 +140,14 @@ internal class DefaultPlayerController(
     override val bufferTimestamp = MutableStateFlow(Timestamp.ZERO)
 
     override val playbackTimestamp = MutableStateFlow(Timestamp.ZERO)
+
+    private suspend fun handleBufferTimestamp(timestamp: Timestamp) {
+        bufferTimestamp.emit(timestamp)
+    }
+
+    private suspend fun handlePlaybackTimestamp(timestamp: Timestamp) {
+        playbackTimestamp.emit(timestamp)
+    }
 
     /**
      * Events
@@ -176,21 +169,55 @@ internal class DefaultPlayerController(
         playbackEvents.emit(Event.Buffer.Waiting)
     }
 
-    private suspend fun handleBufferCompletion() {
+    /**
+     * Completion
+     */
+
+    private suspend fun InternalState.Loaded.handleBufferCompletion() {
+        bufferLoop.stop().getOrThrow()
+
+        bufferTimestamp.emit(Timestamp(micros = media.durationMicros))
+
         playbackEvents.emit(Event.Buffer.Complete)
+    }
+
+    private suspend fun InternalState.Loaded.handlePlaybackCompletion() {
+        playbackLoop.stop().getOrThrow()
+
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> pipeline.sampler.stop().getOrThrow()
+
+            is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
+
+            is Pipeline.Video -> Unit
+        }
+
+        playbackTimestamp.emit(Timestamp(micros = media.durationMicros))
+
+        updateState(
+            InternalState.Loaded.Completed(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     /**
      * Command
      */
 
-    private suspend fun executePlaybackCommand(
-        onInternalState: suspend InternalState.Loaded.() -> Unit,
+    private suspend fun executeMediaCommand(
+        command: suspend () -> Unit,
     ) = mutex.withLock {
         runCatching {
-            check(internalState is InternalState.Loaded) { "Unable to execute playback command" }
+            command()
+        }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+    }
 
-            onInternalState(internalState as InternalState.Loaded)
+    private suspend fun executePlaybackCommand(
+        command: suspend InternalState.Loaded.() -> Unit,
+    ) = mutex.withLock {
+        runCatching {
+            command(internalState as InternalState.Loaded)
         }.onFailure { t -> handlePlaybackError(t) }.getOrDefault(Unit)
     }
 
@@ -198,303 +225,270 @@ internal class DefaultPlayerController(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
-    ) = mutex.withLock {
-        runCatching {
-            if (internalState is InternalState.Empty) {
-                val probeDecoder = probeDecoderFactory.create(
-                    DecoderFactory.Parameters.Probe(
-                        location = location,
-                        findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
-                        findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
-                    )
-                ).getOrThrow()
+    ) = executeMediaCommand {
+        val probeDecoder = probeDecoderFactory.create(
+            DecoderFactory.Parameters.Probe(
+                location = location,
+                findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
+                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
+            )
+        ).getOrThrow()
 
-                val audioPipeline = probeDecoder.media.audioFormat?.run {
-                    val decoder = audioDecoderFactory.create(
-                        parameters = DecoderFactory.Parameters.Audio(location = location)
-                    ).getOrThrow()
+        val audioPipeline = probeDecoder.media.audioFormat?.run {
+            val decoder = audioDecoderFactory.create(
+                parameters = DecoderFactory.Parameters.Audio(location = location)
+            ).getOrThrow()
 
-                    val buffer = audioBufferFactory.create(
-                        parameters = BufferFactory.Parameters.Audio(capacity = audioBufferSize)
-                    ).getOrThrow()
+            val buffer = audioBufferFactory.create(
+                parameters = BufferFactory.Parameters.Audio(capacity = audioBufferSize)
+            ).getOrThrow()
 
-                    val sampler = samplerFactory.create(
-                        parameters = SamplerFactory.Parameters(sampleRate = sampleRate, channels = channels)
-                    ).getOrThrow()
+            val sampler = samplerFactory.create(
+                parameters = SamplerFactory.Parameters(sampleRate = sampleRate, channels = channels)
+            ).getOrThrow()
 
-                    Pipeline.Audio(media = probeDecoder.media, decoder = decoder, buffer = buffer, sampler = sampler)
-                }
+            Pipeline.Audio(media = probeDecoder.media, decoder = decoder, buffer = buffer, sampler = sampler)
+        }
 
-                val videoPipeline = probeDecoder.media.videoFormat?.run {
-                    val decoder = videoDecoderFactory.create(
-                        parameters = DecoderFactory.Parameters.Video(location = location)
-                    ).getOrThrow()
+        val videoPipeline = probeDecoder.media.videoFormat?.run {
+            val decoder = videoDecoderFactory.create(
+                parameters = DecoderFactory.Parameters.Video(location = location)
+            ).getOrThrow()
 
-                    val buffer = videoBufferFactory.create(
-                        parameters = BufferFactory.Parameters.Video(capacity = videoBufferSize)
-                    ).getOrThrow()
+            val buffer = videoBufferFactory.create(
+                parameters = BufferFactory.Parameters.Video(capacity = videoBufferSize)
+            ).getOrThrow()
 
-                    val renderer = rendererFactory.create(
-                        parameters = RendererFactory.Parameters(width = width,
-                            height = height,
-                            frameRate = frameRate,
-                            preview = with(decoder) {
-                                val frame = nextFrame().getOrNull() as? Frame.Video.Content
+            val renderer = rendererFactory.create(
+                parameters = RendererFactory.Parameters(width = width,
+                    height = height,
+                    frameRate = frameRate,
+                    preview = with(decoder) {
+                        val frame = nextFrame().getOrNull() as? Frame.Video.Content
 
-                                reset()
+                        reset()
 
-                                frame
-                            })
-                    ).getOrThrow()
+                        frame
+                    })
+            ).getOrThrow()
 
-                    Pipeline.Video(media = probeDecoder.media, decoder = decoder, buffer = buffer, renderer = renderer)
-                }
+            Pipeline.Video(media = probeDecoder.media, decoder = decoder, buffer = buffer, renderer = renderer)
+        }
 
-                val pipeline = when {
-                    audioPipeline != null && videoPipeline != null -> Pipeline.Media(
-                        media = probeDecoder.media,
-                        audioDecoder = audioPipeline.decoder,
-                        videoDecoder = videoPipeline.decoder,
-                        audioBuffer = audioPipeline.buffer,
-                        videoBuffer = videoPipeline.buffer,
-                        sampler = audioPipeline.sampler,
-                        renderer = videoPipeline.renderer
-                    )
+        val pipeline = when {
+            audioPipeline != null && videoPipeline != null -> Pipeline.Media(
+                media = probeDecoder.media,
+                audioDecoder = audioPipeline.decoder,
+                videoDecoder = videoPipeline.decoder,
+                audioBuffer = audioPipeline.buffer,
+                videoBuffer = videoPipeline.buffer,
+                sampler = audioPipeline.sampler,
+                renderer = videoPipeline.renderer
+            )
 
-                    audioPipeline != null -> audioPipeline
+            audioPipeline != null -> audioPipeline
 
-                    videoPipeline != null -> videoPipeline
+            videoPipeline != null -> videoPipeline
 
-                    else -> null
-                }
+            else -> null
+        }
 
-                checkNotNull(pipeline) { "Unsupported media" }
+        checkNotNull(pipeline) { "Unsupported media" }
 
-                applySettings(pipeline, settings.value)
+        applySettings(pipeline, settings.value)
 
-                val bufferLoop = bufferLoopFactory.create(
-                    parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
-                ).getOrThrow()
+        val bufferLoop = bufferLoopFactory.create(
+            parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
+        ).getOrThrow()
 
-                val playbackLoop = playbackLoopFactory.create(
-                    parameters = PlaybackLoopFactory.Parameters(bufferLoop = bufferLoop, pipeline = pipeline)
-                ).getOrThrow()
+        val playbackLoop = playbackLoopFactory.create(
+            parameters = PlaybackLoopFactory.Parameters(bufferLoop = bufferLoop, pipeline = pipeline)
+        ).getOrThrow()
 
-                bufferTimestampJob = coroutineScope.launch {
-                    bufferTimestamp.emitAll(bufferLoop.timestamp)
-                }
-
-                playbackTimestampJob = coroutineScope.launch {
-                    playbackTimestamp.emitAll(playbackLoop.timestamp)
-                }
-
-                updateState(
-                    InternalState.Loaded.Stopped(
-                        media = probeDecoder.media,
-                        pipeline = pipeline,
-                        bufferLoop = bufferLoop,
-                        playbackLoop = playbackLoop
-                    )
-                )
-            }
-        }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+        updateState(
+            InternalState.Loaded.Stopped(
+                media = probeDecoder.media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     private suspend fun handlePlay() = executePlaybackCommand {
-        if (internalState is InternalState.Loaded.Stopped) {
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> pipeline.sampler.start().getOrThrow()
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> pipeline.sampler.start().getOrThrow()
 
-                is Pipeline.Audio -> pipeline.sampler.start().getOrThrow()
+            is Pipeline.Audio -> pipeline.sampler.start().getOrThrow()
 
-                is Pipeline.Video -> Unit
-            }
-
-            bufferLoop.start(
-                onWaiting = ::handleBufferWaiting, endOfMedia = ::handleBufferCompletion
-            ).getOrThrow()
-
-            playbackLoop.start(endOfMedia = { handlePlaybackCompletion() }).getOrThrow()
-
-            updateState(
-                InternalState.Loaded.Playing(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
-            )
+            is Pipeline.Video -> Unit
         }
+
+        bufferLoop.start(
+            onTimestamp = ::handleBufferTimestamp,
+            onWaiting = ::handleBufferWaiting,
+            endOfMedia = { handleBufferCompletion() }
+        ).getOrThrow()
+
+        playbackLoop.start(
+            onTimestamp = ::handlePlaybackTimestamp,
+            endOfMedia = { handlePlaybackCompletion() }
+        ).getOrThrow()
+
+        updateState(
+            InternalState.Loaded.Playing(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     private suspend fun handlePause() = executePlaybackCommand {
-        if (internalState is InternalState.Loaded.Playing) {
-            playbackLoop.stop(resetTime = false).getOrThrow()
+        playbackLoop.stop().getOrThrow()
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> pipeline.sampler.pause().getOrThrow()
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> pipeline.sampler.stop().getOrThrow()
 
-                is Pipeline.Audio -> pipeline.sampler.pause().getOrThrow()
+            is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
 
-                is Pipeline.Video -> Unit
-            }
-
-            updateState(
-                InternalState.Loaded.Paused(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
-            )
+            is Pipeline.Video -> Unit
         }
+
+        updateState(
+            InternalState.Loaded.Paused(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     private suspend fun handleResume() = executePlaybackCommand {
-        if (internalState is InternalState.Loaded.Paused) {
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> pipeline.sampler.resume().getOrThrow()
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> pipeline.sampler.start().getOrThrow()
 
-                is Pipeline.Audio -> pipeline.sampler.resume().getOrThrow()
+            is Pipeline.Audio -> pipeline.sampler.start().getOrThrow()
 
-                is Pipeline.Video -> Unit
-            }
-
-            playbackLoop.start(endOfMedia = { handlePlaybackCompletion() }).getOrThrow()
-
-            playbackEvents.emit(Event.Playback.Resume)
-
-            updateState(
-                InternalState.Loaded.Playing(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
-            )
+            is Pipeline.Video -> Unit
         }
+
+        playbackLoop.start(
+            onTimestamp = ::handlePlaybackTimestamp,
+            endOfMedia = { handlePlaybackCompletion() }
+        ).getOrThrow()
+
+        playbackEvents.emit(Event.Playback.Resume)
+
+        updateState(
+            InternalState.Loaded.Playing(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     private suspend fun handleStop() = executePlaybackCommand {
-        if (internalState is InternalState.Loaded.Playing || internalState is InternalState.Loaded.Paused || internalState is InternalState.Loaded.Completed || internalState is InternalState.Loaded.Seeking) {
-            playbackLoop.stop(resetTime = true).getOrThrow()
+        playbackLoop.stop().getOrThrow()
 
-            bufferLoop.stop(resetTime = true).getOrThrow()
+        bufferLoop.stop().getOrThrow()
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> with(pipeline) {
-                    sampler.stop().getOrThrow()
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> with(pipeline) {
+                sampler.stop().getOrThrow()
 
-                    renderer.reset().getOrThrow()
+                renderer.reset().getOrThrow()
 
-                    audioDecoder.reset().getOrThrow()
+                audioDecoder.reset().getOrThrow()
 
-                    videoDecoder.reset().getOrThrow()
-                }
-
-                is Pipeline.Audio -> with(pipeline) {
-                    sampler.stop().getOrThrow()
-
-                    decoder.reset().getOrThrow()
-                }
-
-                is Pipeline.Video -> with(pipeline) {
-                    renderer.reset().getOrThrow()
-
-                    decoder.reset().getOrThrow()
-                }
+                videoDecoder.reset().getOrThrow()
             }
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> pipeline.renderer.reset().getOrThrow()
+            is Pipeline.Audio -> with(pipeline) {
+                sampler.stop().getOrThrow()
 
-                is Pipeline.Audio -> Unit
-
-                is Pipeline.Video -> pipeline.renderer.reset().getOrThrow()
+                decoder.reset().getOrThrow()
             }
 
-            updateState(
-                InternalState.Loaded.Stopped(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
-            )
+            is Pipeline.Video -> with(pipeline) {
+                renderer.reset().getOrThrow()
+
+                decoder.reset().getOrThrow()
+            }
         }
+
+        handleBufferTimestamp(Timestamp.ZERO)
+
+        handlePlaybackTimestamp(Timestamp.ZERO)
+
+        updateState(
+            InternalState.Loaded.Stopped(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
     private suspend fun handleSeekTo(millis: Long) = executePlaybackCommand {
-        if (internalState is InternalState.Loaded.Playing || internalState is InternalState.Loaded.Paused || internalState is InternalState.Loaded.Stopped || internalState is InternalState.Loaded.Completed) {
-            updateState(
-                InternalState.Loaded.Seeking(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
+        updateState(
+            InternalState.Loaded.Seeking(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
             )
+        )
 
-            playbackEvents.emit(Event.Seeking.Start)
+        playbackEvents.emit(Event.Seeking.Start)
 
-            playbackLoop.stop(resetTime = false).getOrThrow()
+        playbackLoop.stop().getOrThrow()
 
-            bufferLoop.stop(resetTime = false).getOrThrow()
+        bufferLoop.stop().getOrThrow()
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Media -> with(pipeline) {
-                    sampler.stop().getOrThrow()
+        when (val pipeline = pipeline) {
+            is Pipeline.Media -> with(pipeline) {
+                sampler.stop().getOrThrow()
 
-                    audioDecoder.seekTo(
-                        micros = millis.milliseconds.inWholeMicroseconds
-                    ).getOrThrow()
+                audioDecoder.seekTo(
+                    micros = millis.milliseconds.inWholeMicroseconds
+                ).getOrThrow()
 
-                    videoDecoder.seekTo(
-                        micros = millis.milliseconds.inWholeMicroseconds
-                    ).getOrThrow()
-
-                    sampler.start().getOrThrow()
-
-                    sampler.pause().getOrThrow()
-                }
-
-                is Pipeline.Audio -> with(pipeline) {
-                    sampler.stop().getOrThrow()
-
-                    decoder.seekTo(
-                        micros = millis.milliseconds.inWholeMicroseconds
-                    ).getOrThrow()
-
-                    sampler.start().getOrThrow()
-
-                    sampler.pause().getOrThrow()
-                }
-
-                is Pipeline.Video -> with(pipeline) {
-                    decoder.seekTo(
-                        micros = millis.milliseconds.inWholeMicroseconds
-                    ).getOrThrow()
-                }
+                videoDecoder.seekTo(
+                    micros = millis.milliseconds.inWholeMicroseconds
+                ).getOrThrow()
             }
 
-            bufferLoop.start(onWaiting = ::handleBufferWaiting, endOfMedia = ::handleBufferCompletion).getOrThrow()
+            is Pipeline.Audio -> with(pipeline) {
+                sampler.stop().getOrThrow()
 
-            playbackLoop.seekTo(
-                timestamp = Timestamp(micros = millis.milliseconds.inWholeMicroseconds)
-            ).getOrThrow()
+                decoder.seekTo(
+                    micros = millis.milliseconds.inWholeMicroseconds
+                ).getOrThrow()
+            }
 
-            playbackEvents.emit(Event.Seeking.Complete)
-
-            updateState(
-                InternalState.Loaded.Paused(
-                    media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
-                )
-            )
+            is Pipeline.Video -> with(pipeline) {
+                decoder.seekTo(
+                    micros = millis.milliseconds.inWholeMicroseconds
+                ).getOrThrow()
+            }
         }
+
+        bufferLoop.start(onTimestamp = ::handleBufferTimestamp,
+            onWaiting = ::handleBufferWaiting,
+            endOfMedia = { handleBufferCompletion() }).getOrThrow()
+
+        playbackEvents.emit(Event.Seeking.Complete)
+
+        updateState(
+            InternalState.Loaded.Paused(
+                media = media, pipeline = pipeline, bufferLoop = bufferLoop, playbackLoop = playbackLoop
+            )
+        )
     }
 
-    private suspend fun handleRelease() = mutex.withLock {
-        runCatching {
-            val currentInternalState = internalState
-            if (currentInternalState is InternalState.Loaded) {
-                bufferTimestampJob?.cancelAndJoin()
-                bufferTimestampJob = null
+    private suspend fun handleRelease() = executeMediaCommand {
+        val currentInternalState = internalState
+        if (currentInternalState is InternalState.Loaded) {
+            currentInternalState.playbackLoop.close()
 
-                playbackTimestampJob?.cancelAndJoin()
-                playbackTimestampJob = null
+            currentInternalState.bufferLoop.close()
 
-                currentInternalState.playbackLoop.close()
-                currentInternalState.bufferLoop.close()
-                currentInternalState.pipeline.close()
+            currentInternalState.pipeline.close()
 
-                updateState(InternalState.Empty)
-            }
-        }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+            handleBufferTimestamp(Timestamp.ZERO)
+
+            handlePlaybackTimestamp(Timestamp.ZERO)
+
+            updateState(InternalState.Empty)
+        }
     }
 
     override val events = merge(mediaEvents,
@@ -509,37 +503,48 @@ internal class DefaultPlayerController(
         }
 
         settings.emit(newSettings)
-
-        settings.first { it == newSettings }
-
-        Unit
     }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
 
     override suspend fun resetSettings() = runCatching {
         val newSettings = initialSettings ?: defaultSettings
 
         settings.emit(newSettings)
-
-        settings.first { it == newSettings }
-
-        Unit
     }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
 
-    override suspend fun execute(command: Command) = when (command) {
-        is Command.Prepare -> with(command) {
-            handlePrepare(
-                location = location,
-                audioBufferSize = audioBufferSize,
-                videoBufferSize = videoBufferSize
-            )
-        }
+    override suspend fun execute(command: Command) {
+        when (command) {
+            is Command.Prepare -> if (state.value is State.Empty) {
+                with(command) {
+                    handlePrepare(
+                        location = location, audioBufferSize = audioBufferSize, videoBufferSize = videoBufferSize
+                    )
+                }
+            }
 
-        is Command.Play -> handlePlay()
-        is Command.Pause -> handlePause()
-        is Command.Resume -> handleResume()
-        is Command.Stop -> handleStop()
-        is Command.SeekTo -> handleSeekTo(millis = command.millis)
-        is Command.Release -> handleRelease()
+            is Command.Play -> if (state.value is State.Loaded.Stopped) {
+                handlePlay()
+            }
+
+            is Command.Pause -> if (state.value is State.Loaded.Playing) {
+                handlePause()
+            }
+
+            is Command.Resume -> if (state.value is State.Loaded.Paused) {
+                handleResume()
+            }
+
+            is Command.Stop -> if (state.value is State.Loaded.Playing || state.value is State.Loaded.Paused || state.value is State.Loaded.Completed || state.value is State.Loaded.Seeking) {
+                handleStop()
+            }
+
+            is Command.SeekTo -> if (state.value is State.Loaded.Playing || state.value is State.Loaded.Paused || state.value is State.Loaded.Stopped || state.value is State.Loaded.Completed) {
+                handleSeekTo(millis = command.millis)
+            }
+
+            is Command.Release -> if (state.value is State.Loaded) {
+                handleRelease()
+            }
+        }
     }
 
     override fun close() = runCatching {

@@ -37,14 +37,6 @@ internal class DefaultSampler(
         nativeSampler.play(bytes, bytes.size)
     }
 
-    override suspend fun pause() = runCatching {
-        nativeSampler.pause()
-    }
-
-    override suspend fun resume() = runCatching {
-        nativeSampler.resume()
-    }
-
     override suspend fun stop() = runCatching {
         nativeSampler.stop()
     }

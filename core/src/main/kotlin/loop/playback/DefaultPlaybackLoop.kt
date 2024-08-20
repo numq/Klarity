@@ -3,9 +3,6 @@ package loop.playback
 import buffer.Buffer
 import frame.Frame
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import loop.buffer.BufferLoop
@@ -22,6 +19,8 @@ internal class DefaultPlaybackLoop(
     private val bufferLoop: BufferLoop,
     private val pipeline: Pipeline,
 ) : PlaybackLoop {
+    private val mutex = Mutex()
+
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Volatile
@@ -29,21 +28,14 @@ internal class DefaultPlaybackLoop(
 
     private val isPlaying = AtomicBoolean(false)
 
-    private val _timestamp = MutableStateFlow(Timestamp.ZERO)
-
-    private suspend fun setTimestamp(timestamp: Timestamp) {
-        if (isPlaying.get() && timestamp.micros in (0L..pipeline.media.durationMicros)) {
-            _timestamp.emit(timestamp)
-        }
-    }
-
     private suspend fun handleMediaPlayback(
         audioBuffer: Buffer<Frame.Audio>,
         videoBuffer: Buffer<Frame.Video>,
         sampler: Sampler,
         renderer: Renderer,
+        onTimestamp: suspend (Timestamp) -> Unit,
     ) {
-        val mutex = Mutex()
+        val mediaMutex = Mutex()
 
         var lastAudioTimestamp = Duration.INFINITE
 
@@ -57,11 +49,15 @@ internal class DefaultPlaybackLoop(
 
                 when (val frame = audioBuffer.poll().getOrThrow()) {
                     is Frame.Audio.Content -> {
-                        mutex.withLock {
+                        mediaMutex.withLock {
                             lastAudioTimestamp = frame.timestampMicros.microseconds
                         }
 
-                        setTimestamp(Timestamp(micros = frame.timestampMicros))
+                        ensureActive()
+
+                        onTimestamp(Timestamp(micros = frame.timestampMicros))
+
+                        ensureActive()
 
                         sampler.play(bytes = frame.bytes).getOrThrow()
                     }
@@ -87,10 +83,16 @@ internal class DefaultPlaybackLoop(
                     }
 
                     is Frame.Video.Content -> if (lastAudioTimestamp.isFinite()) {
-                        if (frame.timestampMicros.microseconds <= mutex.withLock { lastAudioTimestamp }) {
+                        if (frame.timestampMicros.microseconds <= mediaMutex.withLock { lastAudioTimestamp }) {
+                            ensureActive()
+
                             videoBuffer.poll().getOrThrow()
 
-                            setTimestamp(Timestamp(micros = frame.timestampMicros))
+                            ensureActive()
+
+                            onTimestamp(Timestamp(micros = frame.timestampMicros))
+
+                            ensureActive()
 
                             renderer.draw(frame).getOrThrow()
                         }
@@ -107,6 +109,7 @@ internal class DefaultPlaybackLoop(
     private suspend fun handleAudioPlayback(
         buffer: Buffer<Frame.Audio>,
         sampler: Sampler,
+        onTimestamp: suspend (Timestamp) -> Unit,
     ) {
         while (currentCoroutineContext().isActive && isPlaying.get()) {
             if (bufferLoop.isWaiting.get()) {
@@ -117,7 +120,11 @@ internal class DefaultPlaybackLoop(
 
             when (val frame = buffer.poll().getOrThrow()) {
                 is Frame.Audio.Content -> {
-                    setTimestamp(Timestamp(micros = frame.timestampMicros))
+                    currentCoroutineContext().ensureActive()
+
+                    onTimestamp(Timestamp(micros = frame.timestampMicros))
+
+                    currentCoroutineContext().ensureActive()
 
                     sampler.play(bytes = frame.bytes).getOrThrow()
                 }
@@ -130,6 +137,7 @@ internal class DefaultPlaybackLoop(
     private suspend fun handleVideoPlayback(
         buffer: Buffer<Frame.Video>,
         renderer: Renderer,
+        onTimestamp: suspend (Timestamp) -> Unit,
     ) {
         val startTime = System.nanoTime().nanoseconds
 
@@ -153,6 +161,7 @@ internal class DefaultPlaybackLoop(
             when (val frame = buffer.peek().getOrThrow()) {
                 null -> {
                     yield()
+
                     continue
                 }
 
@@ -161,9 +170,15 @@ internal class DefaultPlaybackLoop(
                         timeShift = frame.timestampMicros.microseconds
                     }
                     if (frame.timestampMicros.microseconds <= elapsedTime + timeShift) {
-                        setTimestamp(Timestamp(micros = frame.timestampMicros))
+                        currentCoroutineContext().ensureActive()
+
+                        onTimestamp(Timestamp(micros = frame.timestampMicros))
+
+                        currentCoroutineContext().ensureActive()
 
                         renderer.draw(frame).getOrThrow()
+
+                        currentCoroutineContext().ensureActive()
 
                         buffer.poll().getOrThrow()
                     }
@@ -174,93 +189,51 @@ internal class DefaultPlaybackLoop(
         }
     }
 
-    override val timestamp = _timestamp.asStateFlow()
-
-    override suspend fun start(endOfMedia: suspend () -> Unit) = runCatching {
+    override suspend fun start(onTimestamp: suspend (Timestamp) -> Unit, endOfMedia: suspend () -> Unit) = runCatching {
         check(!isPlaying.get()) { "Unable to start playback loop, call stop first." }
 
-        job = coroutineScope.launch(context = CoroutineExceptionHandler { _, throwable ->
-            if (throwable !is CancellationException) throw throwable
-        }) {
-            isPlaying.set(true)
+        mutex.withLock {
+            job = coroutineScope.launch(context = CoroutineExceptionHandler { _, throwable ->
+                if (throwable !is CancellationException) throw throwable
+            }) {
+                isPlaying.set(true)
 
-            with(pipeline) {
-                when (this) {
-                    is Pipeline.Media -> handleMediaPlayback(audioBuffer, videoBuffer, sampler, renderer)
+                with(pipeline) {
+                    when (this) {
+                        is Pipeline.Media -> handleMediaPlayback(
+                            audioBuffer,
+                            videoBuffer,
+                            sampler,
+                            renderer,
+                            onTimestamp
+                        )
 
-                    is Pipeline.Audio -> handleAudioPlayback(buffer, sampler)
+                        is Pipeline.Audio -> handleAudioPlayback(buffer, sampler, onTimestamp)
 
-                    is Pipeline.Video -> handleVideoPlayback(buffer, renderer)
+                        is Pipeline.Video -> handleVideoPlayback(buffer, renderer, onTimestamp)
+                    }
                 }
+
+                isPlaying.set(false)
+
+                ensureActive()
+
+                endOfMedia()
             }
+        }
+    }.onFailure {
+        isPlaying.set(false)
+    }
+
+    override suspend fun stop() = runCatching {
+        mutex.withLock {
+            job?.cancelAndJoin()
+            job = null
 
             isPlaying.set(false)
-
-            endOfMedia()
         }
     }.onFailure {
         isPlaying.set(false)
-    }
-
-    override suspend fun stop(resetTime: Boolean) = runCatching {
-        job?.cancelAndJoin()
-        job = null
-
-        if (resetTime) {
-            _timestamp.emit(Timestamp.ZERO)
-        }
-
-        isPlaying.set(false)
-    }.onFailure {
-        isPlaying.set(false)
-    }
-
-    override suspend fun seekTo(timestamp: Timestamp) = runCatching {
-        val targetTimestamp: Timestamp
-
-        while (currentCoroutineContext().isActive) {
-            targetTimestamp = when (pipeline) {
-                is Pipeline.Media -> when (
-                    val frame = pipeline.audioBuffer.peek().getOrThrow()
-                        ?: pipeline.videoBuffer.peek().getOrThrow()
-                        ?: continue
-                ) {
-                    is Frame.Audio.Content -> Timestamp(micros = frame.timestampMicros)
-
-                    is Frame.Video.Content -> {
-                        pipeline.renderer.draw(frame)
-
-                        Timestamp(micros = frame.timestampMicros)
-                    }
-
-                    is Frame.Audio.EndOfStream,
-                    is Frame.Video.EndOfStream,
-                    -> Timestamp(micros = pipeline.media.durationMicros)
-                }
-
-                is Pipeline.Audio -> when (val frame = pipeline.buffer.peek().getOrThrow() ?: continue) {
-                    is Frame.Audio.Content -> Timestamp(micros = frame.timestampMicros)
-
-                    is Frame.Audio.EndOfStream -> Timestamp(micros = pipeline.media.durationMicros)
-                }
-
-                is Pipeline.Video -> when (val frame = pipeline.buffer.peek().getOrThrow() ?: continue) {
-                    is Frame.Video.Content -> {
-                        pipeline.renderer.draw(frame)
-
-                        Timestamp(micros = frame.timestampMicros)
-                    }
-
-                    is Frame.Video.EndOfStream -> Timestamp(micros = pipeline.media.durationMicros)
-                }
-            }
-
-            _timestamp.emit(targetTimestamp)
-
-            _timestamp.first()
-
-            break
-        }
     }
 
     override fun close() = runCatching {

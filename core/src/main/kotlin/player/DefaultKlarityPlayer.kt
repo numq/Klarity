@@ -2,9 +2,6 @@ package player
 
 import command.Command
 import controller.PlayerController
-import event.Event
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.merge
 import settings.Settings
 
 internal class DefaultKlarityPlayer(
@@ -20,9 +17,7 @@ internal class DefaultKlarityPlayer(
 
     override val renderer = playerController.renderer
 
-    private val _events = MutableSharedFlow<Event>()
-
-    override val events = merge(playerController.events, _events)
+    override val events = playerController.events
 
     override suspend fun changeSettings(settings: Settings) = playerController.changeSettings(settings)
 

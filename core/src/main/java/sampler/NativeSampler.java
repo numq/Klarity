@@ -23,10 +23,6 @@ public class NativeSampler {
 
     private native void playNative(long id, byte[] bytes, int size);
 
-    private native void pauseNative(long id);
-
-    private native void resumeNative(long id);
-
     private native void stopNative(long id);
 
     private native void closeNative(long id);
@@ -49,14 +45,6 @@ public class NativeSampler {
 
     public void play(byte[] data, int size) {
         playNative(id, data, size);
-    }
-
-    public void pause() {
-        pauseNative(id);
-    }
-
-    public void resume() {
-        resumeNative(id);
     }
 
     public void stop() {
