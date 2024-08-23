@@ -26,18 +26,18 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative
 /*
  * Class:     decoder_NativeDecoder
  * Method:    nextFrameNative
- * Signature: (J)Ldecoder/NativeFrame;
+ * Signature: (JII)Ldecoder/NativeFrame;
  */
 JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong, jint, jint);
 
 /*
  * Class:     decoder_NativeDecoder
  * Method:    seekToNative
- * Signature: (JJ)V
+ * Signature: (JJZ)V
  */
 JNIEXPORT void JNICALL Java_decoder_NativeDecoder_seekToNative
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jboolean);
 
 /*
  * Class:     decoder_NativeDecoder

@@ -28,7 +28,7 @@ struct Media {
     SwrContext *swrContext = nullptr;
 
 private:
-    std::vector<uint8_t> _processVideoFrame(const AVFrame &src);
+    std::vector<uint8_t> _processVideoFrame(const AVFrame &src, int64_t width, int64_t height);
 
     std::vector<uint8_t> _processAudioFrame(const AVFrame &src);
 
@@ -37,9 +37,9 @@ public:
 
     ~Media();
 
-    Frame *nextFrame();
+    Frame *nextFrame(int64_t width, int64_t height);
 
-    void seekTo(long timestampMicros);
+    void seekTo(long timestampMicros, bool keyFramesOnly);
 
     void reset();
 };

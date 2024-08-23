@@ -119,9 +119,10 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(
     return nullptr;
 }
 
-JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong id) {
+JNIEXPORT jobject JNICALL
+Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong id, jint width, jint height) {
     try {
-        auto frame = decoder->nextFrame(id);
+        auto frame = decoder->nextFrame(id, width, height);
         if (!frame) {
             return nullptr;
         }
@@ -162,10 +163,11 @@ JNIEXPORT void JNICALL Java_decoder_NativeDecoder_seekToNative(
         JNIEnv *env,
         jobject obj,
         jlong id,
-        jlong timestampMicros
+        jlong timestampMicros,
+        jboolean keyFramesOnly
 ) {
     try {
-        decoder->seekTo(id, static_cast<long>(timestampMicros));
+        decoder->seekTo(id, static_cast<long>(timestampMicros), keyFramesOnly);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in seekToNative method: ") + e.what());
     }
