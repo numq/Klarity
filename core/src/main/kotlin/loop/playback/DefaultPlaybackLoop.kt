@@ -11,6 +11,7 @@ import renderer.Renderer
 import sampler.Sampler
 import timestamp.Timestamp
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.nanoseconds
@@ -23,7 +24,6 @@ internal class DefaultPlaybackLoop(
 
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    @Volatile
     private var job: Job? = null
 
     private val isPlaying = AtomicBoolean(false)
@@ -34,13 +34,11 @@ internal class DefaultPlaybackLoop(
         sampler: Sampler,
         renderer: Renderer,
         onTimestamp: suspend (Timestamp) -> Unit,
-    ) {
-        val mediaMutex = Mutex()
+    ) = with(currentCoroutineContext()) {
+        val lastAudioTimestamp = AtomicReference(Duration.INFINITE)
 
-        var lastAudioTimestamp = Duration.INFINITE
-
-        val audioJob = CoroutineScope(currentCoroutineContext()).launch {
-            while (isActive && isPlaying.get()) {
+        val audioJob = CoroutineScope(this).launch {
+            while (isActive) {
                 if (bufferLoop.isWaiting.get()) {
                     yield()
 
@@ -49,9 +47,9 @@ internal class DefaultPlaybackLoop(
 
                 when (val frame = audioBuffer.poll().getOrThrow()) {
                     is Frame.Audio.Content -> {
-                        mediaMutex.withLock {
-                            lastAudioTimestamp = frame.timestampMicros.microseconds
-                        }
+                        ensureActive()
+
+                        lastAudioTimestamp.set(frame.timestampMicros.microseconds)
 
                         ensureActive()
 
@@ -67,8 +65,8 @@ internal class DefaultPlaybackLoop(
             }
         }
 
-        val videoJob = CoroutineScope(currentCoroutineContext()).launch {
-            while (isActive && isPlaying.get()) {
+        val videoJob = CoroutineScope(this).launch {
+            while (isActive) {
                 if (bufferLoop.isWaiting.get()) {
                     yield()
 
@@ -82,8 +80,8 @@ internal class DefaultPlaybackLoop(
                         continue
                     }
 
-                    is Frame.Video.Content -> if (lastAudioTimestamp.isFinite()) {
-                        if (frame.timestampMicros.microseconds <= mediaMutex.withLock { lastAudioTimestamp }) {
+                    is Frame.Video.Content -> if (lastAudioTimestamp.get().isFinite()) {
+                        if (audioJob.isCompleted || frame.timestampMicros.microseconds <= lastAudioTimestamp.get()) {
                             ensureActive()
 
                             videoBuffer.poll().getOrThrow()
@@ -110,8 +108,8 @@ internal class DefaultPlaybackLoop(
         buffer: Buffer<Frame.Audio>,
         sampler: Sampler,
         onTimestamp: suspend (Timestamp) -> Unit,
-    ) {
-        while (currentCoroutineContext().isActive && isPlaying.get()) {
+    ) = with(currentCoroutineContext()) {
+        while (isActive) {
             if (bufferLoop.isWaiting.get()) {
                 yield()
 
@@ -120,11 +118,11 @@ internal class DefaultPlaybackLoop(
 
             when (val frame = buffer.poll().getOrThrow()) {
                 is Frame.Audio.Content -> {
-                    currentCoroutineContext().ensureActive()
+                    ensureActive()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
 
-                    currentCoroutineContext().ensureActive()
+                    ensureActive()
 
                     sampler.play(bytes = frame.bytes).getOrThrow()
                 }
@@ -138,7 +136,7 @@ internal class DefaultPlaybackLoop(
         buffer: Buffer<Frame.Video>,
         renderer: Renderer,
         onTimestamp: suspend (Timestamp) -> Unit,
-    ) {
+    ) = with(currentCoroutineContext()) {
         val startTime = System.nanoTime().nanoseconds
 
         val playbackSpeedFactor = renderer.playbackSpeedFactor.toDouble()
@@ -147,7 +145,7 @@ internal class DefaultPlaybackLoop(
 
         var elapsedTime: Duration
 
-        while (currentCoroutineContext().isActive && isPlaying.get()) {
+        while (isActive) {
             if (bufferLoop.isWaiting.get()) {
                 yield()
 
@@ -170,15 +168,15 @@ internal class DefaultPlaybackLoop(
                         timeShift = frame.timestampMicros.microseconds
                     }
                     if (frame.timestampMicros.microseconds <= elapsedTime + timeShift) {
-                        currentCoroutineContext().ensureActive()
+                        ensureActive()
 
                         onTimestamp(Timestamp(micros = frame.timestampMicros))
 
-                        currentCoroutineContext().ensureActive()
+                        ensureActive()
 
                         renderer.draw(frame).getOrThrow()
 
-                        currentCoroutineContext().ensureActive()
+                        ensureActive()
 
                         buffer.poll().getOrThrow()
                     }
@@ -189,10 +187,13 @@ internal class DefaultPlaybackLoop(
         }
     }
 
-    override suspend fun start(onTimestamp: suspend (Timestamp) -> Unit, endOfMedia: suspend () -> Unit) = runCatching {
-        check(!isPlaying.get()) { "Unable to start playback loop, call stop first." }
+    override suspend fun start(
+        onTimestamp: suspend (Timestamp) -> Unit,
+        endOfMedia: suspend () -> Unit,
+    ) = mutex.withLock {
+        runCatching {
+            check(!isPlaying.get()) { "Unable to start playback loop, call stop first." }
 
-        mutex.withLock {
             job = coroutineScope.launch(context = CoroutineExceptionHandler { _, throwable ->
                 if (throwable !is CancellationException) throw throwable
             }) {
@@ -225,18 +226,16 @@ internal class DefaultPlaybackLoop(
         isPlaying.set(false)
     }
 
-    override suspend fun stop() = runCatching {
-        mutex.withLock {
+    override suspend fun stop() = mutex.withLock {
+        val result = runCatching {
             job?.cancelAndJoin()
             job = null
-
-            isPlaying.set(false)
         }
-    }.onFailure {
+
         isPlaying.set(false)
+
+        result
     }
 
-    override fun close() = runCatching {
-        coroutineScope.cancel()
-    }.getOrDefault(Unit)
+    override fun close() = runCatching { coroutineScope.cancel() }.getOrDefault(Unit)
 }

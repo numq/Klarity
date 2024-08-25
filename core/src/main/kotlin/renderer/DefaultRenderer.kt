@@ -1,11 +1,8 @@
 package renderer
 
 import frame.Frame
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 internal class DefaultRenderer(
     override val width: Int,
@@ -13,7 +10,7 @@ internal class DefaultRenderer(
     override val frameRate: Double,
     override val preview: Frame.Video.Content?,
 ) : Renderer {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     override val frame = MutableStateFlow<Frame.Video.Content?>(null)
 

@@ -2,37 +2,50 @@ package snapshot
 
 import decoder.Decoder
 import frame.Frame
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
 object SnapshotManager {
+    private val coroutineContext = Dispatchers.Default + SupervisorJob()
+
     suspend fun snapshot(
         location: String,
+        keyframesOnly: Boolean = false,
         timestampMillis: (durationMillis: Long) -> (Long),
-    ) = Decoder.createVideoDecoder(location).mapCatching { decoder ->
-        with(decoder) {
-            use {
-                seekTo(micros = timestampMillis(media.durationMicros.microseconds.inWholeMilliseconds)).getOrThrow()
+    ) = withContext(coroutineContext) {
+        Decoder.createVideoDecoder(location).mapCatching { decoder ->
+            with(decoder) {
+                use {
+                    seekTo(
+                        micros = timestampMillis(media.durationMicros.microseconds.inWholeMilliseconds),
+                        keyframesOnly = keyframesOnly
+                    ).getOrThrow()
 
-                checkNotNull((nextFrame().getOrThrow() as? Frame.Video.Content)) { "Unable to get snapshot" }
+                    nextFrame().getOrThrow() as? Frame.Video.Content
+                }
             }
         }
     }
 
     suspend fun snapshots(
         location: String,
+        keyframesOnly: Boolean = false,
         timestampsMillis: (durationMillis: Long) -> (List<Long>),
-    ) = Decoder.createVideoDecoder(location).mapCatching { decoder ->
-        with(decoder) {
-            use {
-                timestampsMillis(media.durationMicros.microseconds.inWholeMilliseconds)
-                    .map { timestampMillis -> timestampMillis.milliseconds.inWholeMicroseconds }
-                    .map { timestampMicros ->
-                        seekTo(micros = timestampMicros).getOrThrow()
+    ) = withContext(coroutineContext) {
+        Decoder.createVideoDecoder(location).mapCatching { decoder ->
+            with(decoder) {
+                use {
+                    timestampsMillis(media.durationMicros.microseconds.inWholeMilliseconds)
+                        .map { timestampMillis -> timestampMillis.milliseconds.inWholeMicroseconds }
+                        .mapNotNull { timestampMicros ->
+                            seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrThrow()
 
-                        checkNotNull((nextFrame().getOrThrow() as? Frame.Video.Content)) { "Unable to get snapshot" }
-                    }
-                    .toList()
+                            nextFrame().getOrThrow() as? Frame.Video.Content
+                        }.toList()
+                }
             }
         }
     }

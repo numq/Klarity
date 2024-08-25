@@ -3,6 +3,9 @@ package decoder
 import format.AudioFormat
 import format.VideoFormat
 import frame.Frame
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import media.Location
 import media.Media
 import java.io.File
@@ -11,22 +14,22 @@ import java.net.URI
 interface Decoder<Frame> : AutoCloseable {
     val media: Media
     suspend fun nextFrame(): Result<Frame>
-    fun seekTo(micros: Long): Result<Unit>
-    fun reset(): Result<Unit>
+    suspend fun seekTo(micros: Long, keyframesOnly: Boolean): Result<Unit>
+    suspend fun reset(): Result<Unit>
 
     companion object {
+        private val coroutineContext = Dispatchers.Default + SupervisorJob()
+
         private fun probe(
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
         ): Result<Media> = runCatching {
-            val decoder = NativeDecoder()
+            val decoder = NativeDecoder(location, findAudioStream, findVideoStream)
 
             val media: Media
 
             try {
-                decoder.init(location, findAudioStream, findVideoStream)
-
                 val format = decoder.format
 
                 val mediaLocation = File(location).takeIf(File::exists)?.run {
@@ -50,9 +53,7 @@ interface Decoder<Frame> : AutoCloseable {
                         check(format.width > 0 && format.height > 0 && format.frameRate >= 0) { "Video decoding is not supported by media" }
 
                         VideoFormat(
-                            width = format.width,
-                            height = format.height,
-                            frameRate = format.frameRate
+                            width = format.width, height = format.height, frameRate = format.frameRate
                         )
                     } else null
                 }.getOrNull()
@@ -60,7 +61,7 @@ interface Decoder<Frame> : AutoCloseable {
                 check(!(audioFormat == null && videoFormat == null)) { "Unsupported media format" }
 
                 media = Media(
-                    id = decoder.id,
+                    id = decoder.hashCode().toLong(),
                     durationMicros = format.durationMicros,
                     location = mediaLocation,
                     audioFormat = audioFormat,
@@ -73,44 +74,46 @@ interface Decoder<Frame> : AutoCloseable {
             }
 
             media
-        }.onFailure { println(it) }
+        }
 
-        internal fun createProbeDecoder(
+        internal suspend fun createProbeDecoder(
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
-        ): Result<Decoder<Unit>> = probe(
-            location = location, findAudioStream = findAudioStream, findVideoStream = findVideoStream
-        ).mapCatching { media ->
-            ProbeDecoder(media = media)
-        }
-
-        internal fun createAudioDecoder(location: String): Result<Decoder<Frame.Audio>> = probe(
-            location = location, findAudioStream = true, findVideoStream = false
-        ).mapCatching { media ->
-            checkNotNull(media.audioFormat) { "Unable to create audio decoder" }
-
-            NativeDecoder().apply {
-                init(location, true, false)
-            }.let { decoder ->
-                AudioDecoder(
-                    decoder = decoder, media = media
-                )
+        ): Result<Decoder<Unit>> = withContext(coroutineContext) {
+            probe(
+                location = location, findAudioStream = findAudioStream, findVideoStream = findVideoStream
+            ).mapCatching { media ->
+                ProbeDecoder(media = media)
             }
         }
 
-        internal fun createVideoDecoder(location: String): Result<Decoder<Frame.Video>> = probe(
-            location = location, findAudioStream = false, findVideoStream = true
-        ).mapCatching { media ->
-            checkNotNull(media.videoFormat) { "Unable to create video decoder" }
+        internal suspend fun createAudioDecoder(location: String): Result<Decoder<Frame.Audio>> =
+            withContext(coroutineContext) {
+                probe(
+                    location = location, findAudioStream = true, findVideoStream = false
+                ).mapCatching { media ->
+                    checkNotNull(media.audioFormat) { "Unable to create audio decoder" }
 
-            NativeDecoder().apply {
-                init(location, false, true)
-            }.let { decoder ->
-                VideoDecoder(
-                    decoder = decoder, media = media
-                )
+                    AudioDecoder(
+                        decoder = NativeDecoder(location, true, false),
+                        media = media
+                    )
+                }
             }
-        }
+
+        internal suspend fun createVideoDecoder(location: String): Result<Decoder<Frame.Video>> =
+            withContext(coroutineContext) {
+                probe(
+                    location = location, findAudioStream = false, findVideoStream = true
+                ).mapCatching { media ->
+                    checkNotNull(media.videoFormat) { "Unable to create video decoder" }
+
+                    VideoDecoder(
+                        decoder = NativeDecoder(location, false, true),
+                        media = media
+                    )
+                }
+            }
     }
 }

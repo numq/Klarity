@@ -7,9 +7,9 @@ class ProbeDecoder(
 ) : Decoder<Unit> {
     override suspend fun nextFrame() = Result.success(Unit)
 
-    override fun seekTo(micros: Long) = Result.success(Unit)
+    override suspend fun seekTo(micros: Long, keyframesOnly: Boolean) = Result.success(Unit)
 
-    override fun reset() = Result.success(Unit)
+    override suspend fun reset() = Result.success(Unit)
 
     override fun close() = Unit
 }

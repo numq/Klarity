@@ -5,6 +5,7 @@ import buffer.BufferFactory
 import decoder.Decoder
 import decoder.DecoderFactory
 import factory.Factory
+import factory.SuspendFactory
 import frame.Frame
 import loop.buffer.BufferLoop
 import loop.buffer.BufferLoopFactory
@@ -19,9 +20,9 @@ import settings.Settings
 object PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
         val initialSettings: Settings?,
-        val probeDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Nothing>>,
-        val audioDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
-        val videoDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
+        val probeDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Unit>>,
+        val audioDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
+        val videoDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
         val audioBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Audio>>,
         val videoBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Video>>,
         val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,

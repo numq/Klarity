@@ -7,6 +7,7 @@ import decoder.Decoder
 import decoder.DecoderFactory
 import event.Event
 import factory.Factory
+import factory.SuspendFactory
 import frame.Frame
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,9 +47,9 @@ interface KlarityPlayer : AutoCloseable {
             PlayerControllerFactory.create(
                 parameters = PlayerControllerFactory.Parameters(
                     initialSettings = null,
-                    probeDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Nothing>>,
-                    audioDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
-                    videoDecoderFactory = DecoderFactory as Factory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
+                    probeDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Unit>>,
+                    audioDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
+                    videoDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
                     audioBufferFactory = BufferFactory as Factory<BufferFactory.Parameters, Buffer<Frame.Audio>>,
                     videoBufferFactory = BufferFactory as Factory<BufferFactory.Parameters, Buffer<Frame.Video>>,
                     bufferLoopFactory = BufferLoopFactory,

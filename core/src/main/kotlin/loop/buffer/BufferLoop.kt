@@ -4,7 +4,7 @@ import pipeline.Pipeline
 import timestamp.Timestamp
 import java.util.concurrent.atomic.AtomicBoolean
 
-interface BufferLoop {
+interface BufferLoop : AutoCloseable {
     val isBuffering: AtomicBoolean
     val isWaiting: AtomicBoolean
     suspend fun start(
@@ -14,7 +14,6 @@ interface BufferLoop {
     ): Result<Unit>
 
     suspend fun stop(): Result<Unit>
-    fun close()
 
     companion object {
         internal fun create(

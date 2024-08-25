@@ -6,4 +6,5 @@ data class Settings(
     val volume: Float,
     val audioBufferSize: Int,
     val videoBufferSize: Int,
+    val seekOnlyKeyframes: Boolean,
 )

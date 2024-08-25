@@ -1,8 +1,8 @@
 package decoder
 
-import factory.Factory
+import factory.SuspendFactory
 
-object DecoderFactory : Factory<DecoderFactory.Parameters, Decoder<*>> {
+object DecoderFactory : SuspendFactory<DecoderFactory.Parameters, Decoder<*>> {
     sealed interface Parameters {
         val location: String
 
@@ -17,7 +17,7 @@ object DecoderFactory : Factory<DecoderFactory.Parameters, Decoder<*>> {
         data class Video(override val location: String) : Parameters
     }
 
-    override fun create(parameters: Parameters) = with(parameters) {
+    override suspend fun create(parameters: Parameters) = with(parameters) {
         when (this) {
             is Parameters.Probe -> Decoder.createProbeDecoder(
                 location = location,

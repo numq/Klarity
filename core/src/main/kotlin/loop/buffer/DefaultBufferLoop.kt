@@ -28,10 +28,10 @@ internal class DefaultBufferLoop(
         buffer: Buffer<Frame.Audio>,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
-    ) {
+    ) = with(currentCoroutineContext()) {
         isWaiting.set(true)
 
-        while (currentCoroutineContext().isActive && isBuffering.get()) {
+        while (isActive) {
             when (val frame = decoder.nextFrame().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
@@ -48,17 +48,17 @@ internal class DefaultBufferLoop(
 
                     when (frame) {
                         is Frame.Audio.Content -> {
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             buffer.push(frame)
 
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
                         is Frame.Audio.EndOfStream -> {
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             buffer.push(frame)
 
@@ -75,10 +75,10 @@ internal class DefaultBufferLoop(
         buffer: Buffer<Frame.Video>,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
-    ) {
+    ) = with(currentCoroutineContext()) {
         isWaiting.set(true)
 
-        while (currentCoroutineContext().isActive && isBuffering.get()) {
+        while (isActive) {
             when (val frame = decoder.nextFrame().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
@@ -95,17 +95,17 @@ internal class DefaultBufferLoop(
 
                     when (frame) {
                         is Frame.Video.Content -> {
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             buffer.push(frame)
 
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
                         is Frame.Video.EndOfStream -> {
-                            currentCoroutineContext().ensureActive()
+                            ensureActive()
 
                             buffer.push(frame)
 
@@ -121,62 +121,47 @@ internal class DefaultBufferLoop(
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
         endOfMedia: suspend () -> Unit,
-    ) = runCatching {
-        check(!isBuffering.get()) { "Unable to start buffer loop, call stop first." }
+    ) = mutex.withLock {
+        runCatching {
+            check(!isBuffering.get()) { "Unable to start buffer loop, call stop first." }
 
-        mutex.withLock {
-            job = coroutineScope.launch(
-                context = CoroutineExceptionHandler { _, throwable ->
-                    if (throwable !is CancellationException) throw throwable
-                }
-            ) {
+            job = coroutineScope.launch(context = CoroutineExceptionHandler { _, throwable ->
+                if (throwable !is CancellationException) throw throwable
+            }) {
                 isBuffering.set(true)
 
                 when (pipeline) {
                     is Pipeline.Media -> with(pipeline) {
-                        joinAll(
-                            launch(
-                                context = CoroutineExceptionHandler { _, throwable ->
-                                    if (throwable !is CancellationException) throw throwable
-                                }
-                            ) {
-                                handleAudioBuffer(
-                                    decoder = audioDecoder,
-                                    buffer = audioBuffer,
-                                    onTimestamp = onTimestamp,
-                                    onWaiting = onWaiting
-                                )
-                            },
-                            launch(
-                                context = CoroutineExceptionHandler { _, throwable ->
-                                    if (throwable !is CancellationException) throw throwable
-                                }
-                            ) {
-                                handleVideoBuffer(
-                                    decoder = videoDecoder,
-                                    buffer = videoBuffer,
-                                    onTimestamp = onTimestamp,
-                                    onWaiting = onWaiting
-                                )
-                            }
-                        )
+                        joinAll(launch(context = CoroutineExceptionHandler { _, throwable ->
+                            if (throwable !is CancellationException) throw throwable
+                        }) {
+                            handleAudioBuffer(
+                                decoder = audioDecoder,
+                                buffer = audioBuffer,
+                                onTimestamp = onTimestamp,
+                                onWaiting = onWaiting
+                            )
+                        }, launch(context = CoroutineExceptionHandler { _, throwable ->
+                            if (throwable !is CancellationException) throw throwable
+                        }) {
+                            handleVideoBuffer(
+                                decoder = videoDecoder,
+                                buffer = videoBuffer,
+                                onTimestamp = onTimestamp,
+                                onWaiting = onWaiting
+                            )
+                        })
                     }
 
                     is Pipeline.Audio -> with(pipeline) {
                         handleAudioBuffer(
-                            decoder = decoder,
-                            buffer = buffer,
-                            onTimestamp = onTimestamp,
-                            onWaiting = onWaiting
+                            decoder = decoder, buffer = buffer, onTimestamp = onTimestamp, onWaiting = onWaiting
                         )
                     }
 
                     is Pipeline.Video -> with(pipeline) {
                         handleVideoBuffer(
-                            decoder = decoder,
-                            buffer = buffer,
-                            onTimestamp = onTimestamp,
-                            onWaiting = onWaiting
+                            decoder = decoder, buffer = buffer, onTimestamp = onTimestamp, onWaiting = onWaiting
                         )
                     }
                 }
@@ -187,13 +172,13 @@ internal class DefaultBufferLoop(
 
                 endOfMedia()
             }
+        }.onFailure {
+            isBuffering.set(false)
         }
-    }.onFailure {
-        isBuffering.set(false)
     }
 
-    override suspend fun stop() = runCatching {
-        mutex.withLock {
+    override suspend fun stop() = mutex.withLock {
+        val result = runCatching {
             job?.cancelAndJoin()
             job = null
 
@@ -208,18 +193,14 @@ internal class DefaultBufferLoop(
 
                 is Pipeline.Video -> pipeline.buffer.flush().getOrThrow()
             }
-
-            isBuffering.set(false)
-
-            isWaiting.set(false)
         }
-    }.onFailure {
+
         isBuffering.set(false)
 
         isWaiting.set(false)
+
+        result
     }
 
-    override fun close() = runCatching {
-        coroutineScope.cancel()
-    }.getOrDefault(Unit)
+    override fun close() = runCatching { coroutineScope.cancel() }.getOrDefault(Unit)
 }

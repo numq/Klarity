@@ -7,6 +7,7 @@ import decoder.Decoder
 import decoder.DecoderFactory
 import event.Event
 import factory.Factory
+import factory.SuspendFactory
 import frame.Frame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,9 +33,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPlayerController(
     private val initialSettings: Settings?,
-    private val probeDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Nothing>>,
-    private val audioDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
-    private val videoDecoderFactory: Factory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
+    private val probeDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Unit>>,
+    private val audioDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
+    private val videoDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
     private val audioBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Audio>>,
     private val videoBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Video>>,
     private val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
@@ -61,6 +62,7 @@ internal class DefaultPlayerController(
         volume = 1.0f,
         audioBufferSize = MIN_AUDIO_BUFFER_SIZE,
         videoBufferSize = MIN_VIDEO_BUFFER_SIZE,
+        seekOnlyKeyframes = false
     )
 
     override val settings = MutableStateFlow(initialSettings ?: defaultSettings)
@@ -142,11 +144,15 @@ internal class DefaultPlayerController(
     override val playbackTimestamp = MutableStateFlow(Timestamp.ZERO)
 
     private suspend fun handleBufferTimestamp(timestamp: Timestamp) {
-        bufferTimestamp.emit(timestamp)
+        if (state.value is State.Loaded.Playing || state.value is State.Loaded.Paused) {
+            bufferTimestamp.emit(timestamp)
+        }
     }
 
     private suspend fun handlePlaybackTimestamp(timestamp: Timestamp) {
-        playbackTimestamp.emit(timestamp)
+        if (state.value is State.Loaded.Playing) {
+            playbackTimestamp.emit(timestamp)
+        }
     }
 
     /**
@@ -182,8 +188,6 @@ internal class DefaultPlayerController(
     }
 
     private suspend fun InternalState.Loaded.handlePlaybackCompletion() {
-        playbackLoop.stop().getOrThrow()
-
         when (val pipeline = pipeline) {
             is Pipeline.Media -> pipeline.sampler.stop().getOrThrow()
 
@@ -217,7 +221,9 @@ internal class DefaultPlayerController(
         command: suspend InternalState.Loaded.() -> Unit,
     ) = mutex.withLock {
         runCatching {
-            command(internalState as InternalState.Loaded)
+            if (internalState is InternalState.Loaded) {
+                command(internalState as InternalState.Loaded)
+            }
         }.onFailure { t -> handlePlaybackError(t) }.getOrDefault(Unit)
     }
 
@@ -321,16 +327,12 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
-        bufferLoop.start(
-            onTimestamp = ::handleBufferTimestamp,
+        bufferLoop.start(onTimestamp = ::handleBufferTimestamp,
             onWaiting = ::handleBufferWaiting,
-            endOfMedia = { handleBufferCompletion() }
-        ).getOrThrow()
+            endOfMedia = { handleBufferCompletion() }).getOrThrow()
 
-        playbackLoop.start(
-            onTimestamp = ::handlePlaybackTimestamp,
-            endOfMedia = { handlePlaybackCompletion() }
-        ).getOrThrow()
+        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = { handlePlaybackCompletion() })
+            .getOrThrow()
 
         updateState(
             InternalState.Loaded.Playing(
@@ -366,10 +368,8 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
-        playbackLoop.start(
-            onTimestamp = ::handlePlaybackTimestamp,
-            endOfMedia = { handlePlaybackCompletion() }
-        ).getOrThrow()
+        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = { handlePlaybackCompletion() })
+            .getOrThrow()
 
         playbackEvents.emit(Event.Playback.Resume)
 
@@ -438,11 +438,11 @@ internal class DefaultPlayerController(
                 sampler.stop().getOrThrow()
 
                 audioDecoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds
+                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
                 ).getOrThrow()
 
                 videoDecoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds
+                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
                 ).getOrThrow()
             }
 
@@ -450,13 +450,13 @@ internal class DefaultPlayerController(
                 sampler.stop().getOrThrow()
 
                 decoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds
+                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
                 ).getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
                 decoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds
+                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
                 ).getOrThrow()
             }
         }
@@ -491,10 +491,8 @@ internal class DefaultPlayerController(
         }
     }
 
-    override val events = merge(mediaEvents,
-        playbackEvents.filter { internalState is InternalState.Loaded.Playing }).shareIn(
-        scope = coroutineScope,
-        started = SharingStarted.Lazily
+    override val events = merge(mediaEvents, playbackEvents).shareIn(
+        scope = coroutineScope, started = SharingStarted.Lazily
     )
 
     override suspend fun changeSettings(newSettings: Settings) = runCatching {
