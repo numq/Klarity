@@ -9,11 +9,11 @@ extern "C" {
 #endif
 /*
  * Class:     decoder_NativeDecoder
- * Method:    initNative
- * Signature: (JLjava/lang/String;ZZ)V
+ * Method:    initializeNative
+ * Signature: (Ljava/lang/String;ZZ)J
  */
-JNIEXPORT void JNICALL Java_decoder_NativeDecoder_initNative
-  (JNIEnv *, jobject, jlong, jstring, jboolean, jboolean);
+JNIEXPORT jlong JNICALL Java_decoder_NativeDecoder_initializeNative
+  (JNIEnv *, jobject, jstring, jboolean, jboolean);
 
 /*
  * Class:     decoder_NativeDecoder

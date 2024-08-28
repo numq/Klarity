@@ -1,59 +1,36 @@
 #ifndef KLARITY_SAMPLER_H
 #define KLARITY_SAMPLER_H
 
+#include <cstring>
 #include <iostream>
 #include <memory>
-#include <mutex>
-#include <vector>
+#include <shared_mutex>
+#include "exception.h"
 #include "stretch/stretch.h"
-#include "media.h"
+#include "portaudio.h"
+#include "deleter.h"
 
-class ISampler {
-public:
-    virtual ~ISampler() = default;
-
-    virtual void setPlaybackSpeed(int64_t id, float factor) = 0;
-
-    virtual void setVolume(int64_t id, float value) = 0;
-
-    virtual void initialize(int64_t id, uint32_t sampleRate, uint32_t channels) = 0;
-
-    virtual void start(int64_t id) = 0;
-
-    virtual void play(int64_t id, uint8_t *samples, uint64_t size) = 0;
-
-    virtual void stop(int64_t id) = 0;
-
-    virtual void close(int64_t id) = 0;
-};
-
-class Sampler : public ISampler {
+struct Sampler {
 private:
-    std::mutex mutex;
-    std::unordered_map<int64_t, Media *> mediaPool{};
-
-    Media *_acquireMedia(int64_t id);
-
-    void _releaseMedia(int64_t id);
+    std::shared_mutex mutex;
+    uint32_t channels;
+    std::unique_ptr<PaStream, PaStreamDeleter> stream;
+    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>, SignalsmithStretchDeleter> stretch;
+    float playbackSpeedFactor = 1.0f;
+    float volume = 1.0f;
 
 public:
-    explicit Sampler();
+    explicit Sampler(uint32_t sampleRate, uint32_t channels);
 
-    ~Sampler() override;
+    void setPlaybackSpeed(float factor);
 
-    void setPlaybackSpeed(int64_t id, float factor) override;
+    void setVolume(float value);
 
-    void setVolume(int64_t id, float value) override;
+    void start();
 
-    void initialize(int64_t id, uint32_t sampleRate, uint32_t channels) override;
+    void play(const uint8_t *samples, uint64_t size);
 
-    void start(int64_t id) override;
-
-    void play(int64_t id, uint8_t *samples, uint64_t size) override;
-
-    void stop(int64_t id) override;
-
-    void close(int64_t id) override;
+    void stop();
 };
 
 #endif //KLARITY_SAMPLER_H

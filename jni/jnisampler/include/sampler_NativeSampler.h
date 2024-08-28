@@ -26,10 +26,10 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative
 /*
  * Class:     sampler_NativeSampler
  * Method:    initializeNative
- * Signature: (JII)V
+ * Signature: (II)J
  */
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_initializeNative
-  (JNIEnv *, jobject, jlong, jint, jint);
+JNIEXPORT jlong JNICALL Java_sampler_NativeSampler_initializeNative
+  (JNIEnv *, jobject, jint, jint);
 
 /*
  * Class:     sampler_NativeSampler

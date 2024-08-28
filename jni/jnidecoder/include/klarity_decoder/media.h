@@ -39,7 +39,7 @@ public:
 
     Frame *nextFrame(int64_t width, int64_t height);
 
-    void seekTo(long timestampMicros, bool keyFramesOnly);
+    void seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
 };
