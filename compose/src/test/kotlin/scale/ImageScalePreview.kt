@@ -9,7 +9,6 @@ import androidx.compose.material.Slider
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,7 +67,7 @@ fun BuildImageScalePreview() {
 @Composable
 fun ImageScaleMultiplePreview(images: Array<ImageBitmap>) {
 
-    val scaleModes = rememberSaveable {
+    val scaleModes = remember {
         mutableStateListOf(
             ImageScale.None,
             ImageScale.Crop,
@@ -79,12 +78,12 @@ fun ImageScaleMultiplePreview(images: Array<ImageBitmap>) {
         )
     }
 
-    val dstRatios = rememberSaveable {
+    val dstRatios = remember {
         val (square, horizontal, vertical) = Triple(1f, 2f, .5f)
         arrayOf(square, horizontal, vertical)
     }
 
-    val (chunkSize, setChunkSize) = rememberSaveable {
+    val (chunkSize, setChunkSize) = remember {
         mutableStateOf(1)
     }
 
@@ -132,7 +131,7 @@ fun ImageScaleMultiplePreview(images: Array<ImageBitmap>) {
             }
         }
         Box(modifier = Modifier.fillMaxWidth().padding(4.dp), contentAlignment = Alignment.Center) {
-            val (sliderValue, setSliderValue) = rememberSaveable {
+            val (sliderValue, setSliderValue) = remember {
                 mutableStateOf(chunkSize.toFloat())
             }
 
