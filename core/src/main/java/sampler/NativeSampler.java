@@ -1,57 +1,47 @@
 package sampler;
 
-import java.util.UUID;
-
 public class NativeSampler {
-    public final long id;
+    private final long nativeHandle;
 
-    public NativeSampler() {
-        this.id = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
+    public NativeSampler(int sampleRate, int channels) {
+        this.nativeHandle = initializeNative(sampleRate, channels);
     }
 
-    public long getId() {
-        return id;
-    }
+    private native void setPlaybackSpeedNative(long nativeHandle, float factor);
 
-    private native void setPlaybackSpeedNative(long id, float factor);
+    private native void setVolumeNative(long nativeHandle, float value);
 
-    private native void setVolumeNative(long id, float value);
+    private native long initializeNative(int sampleRate, int channels);
 
-    private native void initializeNative(long id, int sampleRate, int channels);
+    private native void startNative(long nativeHandle);
 
-    private native void startNative(long id);
+    private native void playNative(long nativeHandle, byte[] bytes, int size);
 
-    private native void playNative(long id, byte[] bytes, int size);
+    private native void stopNative(long nativeHandle);
 
-    private native void stopNative(long id);
-
-    private native void closeNative(long id);
+    private native void closeNative(long nativeHandle);
 
     public void setPlaybackSpeed(float factor) {
-        setPlaybackSpeedNative(id, factor);
+        setPlaybackSpeedNative(nativeHandle, factor);
     }
 
     public void setVolume(float value) {
-        setVolumeNative(id, value);
-    }
-
-    public void initialize(int sampleRate, int channels) {
-        initializeNative(id, sampleRate, channels);
+        setVolumeNative(nativeHandle, value);
     }
 
     public void start() {
-        startNative(id);
+        startNative(nativeHandle);
     }
 
     public void play(byte[] data, int size) {
-        playNative(id, data, size);
+        playNative(nativeHandle, data, size);
     }
 
     public void stop() {
-        stopNative(id);
+        stopNative(nativeHandle);
     }
 
     public void close() {
-        closeNative(id);
+        closeNative(nativeHandle);
     }
 }

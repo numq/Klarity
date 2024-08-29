@@ -1,51 +1,41 @@
 package decoder;
 
-import java.util.UUID;
-
 public class NativeDecoder {
-    private final long id;
+    private final long nativeHandle;
 
-    public NativeDecoder() {
-        this.id = UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE;
+    public NativeDecoder(String location, boolean findAudioStream, boolean findVideoStream) {
+        this.nativeHandle = initializeNative(location, findAudioStream, findVideoStream);
     }
 
-    public long getId() {
-        return id;
-    }
+    private native long initializeNative(String location, boolean findAudioStream, boolean findVideoStream);
 
-    private native void initNative(long id, String location, boolean findAudioStream, boolean findVideoStream);
+    private native NativeFormat getFormatNative(long nativeHandle);
 
-    private native NativeFormat getFormatNative(long id);
+    private native NativeFrame nextFrameNative(long nativeHandle, int width, int height);
 
-    private native NativeFrame nextFrameNative(long id);
+    private native void seekToNative(long nativeHandle, long timestampMicros, boolean keyframesOnly);
 
-    private native void seekToNative(long id, long timestampMicros);
+    private native void resetNative(long nativeHandle);
 
-    private native void resetNative(long id);
-
-    private native void closeNative(long id);
-
-    public void init(String location, boolean findAudioStream, boolean findVideoStream) {
-        initNative(id, location, findAudioStream, findVideoStream);
-    }
+    private native void closeNative(long nativeHandle);
 
     public NativeFormat getFormat() {
-        return getFormatNative(id);
+        return getFormatNative(nativeHandle);
     }
 
-    public NativeFrame nextFrame() {
-        return nextFrameNative(id);
+    public NativeFrame nextFrame(Integer width, Integer height) {
+        return nextFrameNative(nativeHandle, width == null ? getFormat().getWidth() : width, height == null ? getFormat().getHeight() : height);
     }
 
-    public void seekTo(long timestampMicros) {
-        seekToNative(id, timestampMicros);
+    public void seekTo(long timestampMicros, boolean keyframesOnly) {
+        seekToNative(nativeHandle, timestampMicros, keyframesOnly);
     }
 
     public void reset() {
-        resetNative(id);
+        resetNative(nativeHandle);
     }
 
     public void close() {
-        closeNative(id);
+        closeNative(nativeHandle);
     }
 }
