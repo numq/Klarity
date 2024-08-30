@@ -41,14 +41,29 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     }
 }
 
+JNIEXPORT jobject JNICALL Java_sampler_NativeSampler_initializeNative(
+        JNIEnv *env,
+        jobject thisObject,
+        jint sampleRate,
+        jint channels
+) {
+    try {
+        auto sampler = new Sampler(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels));
+        return env->NewDirectByteBuffer(sampler, 0);
+    } catch (const std::exception &e) {
+        handleException(env, std::string("Exception in initNative method: ") + e.what());
+        return nullptr;
+    }
+}
+
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
         JNIEnv *env,
         jobject thisObject,
-        jlong nativeHandle,
+        jobject nativeHandle,
         jfloat factor
 ) {
     try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
@@ -62,11 +77,11 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
         JNIEnv *env,
         jobject thisObject,
-        jlong nativeHandle,
+        jobject nativeHandle,
         jfloat value
 ) {
     try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
@@ -77,27 +92,12 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
     }
 }
 
-JNIEXPORT jlong JNICALL Java_sampler_NativeSampler_initializeNative(
-        JNIEnv *env,
-        jobject thisObject,
-        jint sampleRate,
-        jint channels
-) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
     try {
-        return reinterpret_cast<jlong>(new Sampler(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels)));
-    } catch (const std::exception &e) {
-        handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return -1;
-    }
-}
-
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jlong nativeHandle) {
-    try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
-
         sampler->start();
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in startNative method: ") + e.what());
@@ -107,12 +107,12 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobje
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
         JNIEnv *env,
         jobject thisObject,
-        jlong nativeHandle,
+        jobject nativeHandle,
         jbyteArray bytes,
         jint size
 ) {
     try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
@@ -135,9 +135,9 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong nativeHandle) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
     try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
@@ -148,9 +148,9 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobjec
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_closeNative(JNIEnv *env, jobject thisObject, jlong nativeHandle) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_closeNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
     try {
-        auto sampler = reinterpret_cast<Sampler *>(nativeHandle);
+        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
         if (!sampler) {
             throw std::runtime_error("Invalid nativeHandle");
         }
