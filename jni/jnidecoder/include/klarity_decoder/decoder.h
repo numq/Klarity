@@ -4,11 +4,13 @@
 #define __STDC_CONSTANT_MACROS
 
 #include <string>
-#include <shared_mutex>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include "frame.h"
 #include "format.h"
 #include "exception.h"
+#include "deleter.h"
 
 extern "C" {
 #include "libavutil/imgutils.h"
@@ -19,15 +21,15 @@ extern "C" {
 }
 
 struct Decoder {
-    std::shared_mutex mutex;
-    Format *format;
-    AVFormatContext *formatContext;
-    AVCodecContext *audioCodecContext = nullptr;
-    AVCodecContext *videoCodecContext = nullptr;
-    AVStream *audioStream = nullptr;
-    AVStream *videoStream = nullptr;
-    SwsContext *swsContext = nullptr;
-    SwrContext *swrContext = nullptr;
+    std::mutex mutex;
+    std::unique_ptr<Format> format;
+    std::unique_ptr<AVFormatContext, AvFormatContextDeleter> formatContext;
+    std::unique_ptr<AVCodecContext, AvCodecContextDeleter> audioCodecContext;
+    std::unique_ptr<AVCodecContext, AvCodecContextDeleter> videoCodecContext;
+    AVStream *audioStream;
+    AVStream *videoStream;
+    std::unique_ptr<SwsContext, SwsContextDeleter> swsContext;
+    std::unique_ptr<SwrContext, SwrContextDeleter> swrContext;
 
 private:
     std::vector<uint8_t> _processVideoFrame(const AVFrame &src, int64_t width, int64_t height);
@@ -35,11 +37,9 @@ private:
     std::vector<uint8_t> _processAudioFrame(const AVFrame &src);
 
 public:
-    explicit Decoder(const char *location, bool findAudioStream, bool findVideoStream);
+    explicit Decoder(const std::string &location, bool findAudioStream, bool findVideoStream);
 
-    ~Decoder();
-
-    Frame *nextFrame(int64_t width, int64_t height);
+    std::unique_ptr<Frame> nextFrame(int64_t width, int64_t height);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 
