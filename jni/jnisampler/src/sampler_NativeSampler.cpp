@@ -1,8 +1,12 @@
 #include <iostream>
+#include <shared_mutex>
+#include <mutex>
 #include "sampler_NativeSampler.h"
 #include "klarity_sampler/sampler.h"
 
 static jclass exceptionClass;
+static std::shared_mutex mutex;
+static std::unordered_map<jlong, std::shared_ptr<Sampler>> samplers;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
     env->ThrowNew(exceptionClass, ("JNI ERROR: " + errorMessage).c_str());
@@ -35,40 +39,54 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     if (exceptionClass) env->DeleteGlobalRef(exceptionClass);
 
+    samplers.clear();
+
     PaError err = Pa_Terminate();
     if (err != paNoError) {
         throw SamplerException("Failed to terminate PortAudio: " + std::string(Pa_GetErrorText(err)));
     }
 }
 
-JNIEXPORT jobject JNICALL Java_sampler_NativeSampler_initializeNative(
+JNIEXPORT jlong JNICALL Java_sampler_NativeSampler_createNative(
         JNIEnv *env,
         jobject thisObject,
         jint sampleRate,
         jint channels
 ) {
+    std::unique_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = new Sampler(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels));
-        return env->NewDirectByteBuffer(sampler, 0);
+        auto sampler = std::make_shared<Sampler>(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(channels));
+        if (!sampler) {
+            throw std::runtime_error("Failed to create sampler");
+        }
+
+        auto handle = reinterpret_cast<jlong>(sampler.get());
+
+        samplers[handle] = std::move(sampler);
+
+        return handle;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return nullptr;
+        return 0;
     }
 }
 
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
         JNIEnv *env,
         jobject thisObject,
-        jobject nativeHandle,
+        jlong handle,
         jfloat factor
 ) {
+    std::shared_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
 
-        sampler->setPlaybackSpeed(static_cast<float>(factor));
+        it->second->setPlaybackSpeed(static_cast<float>(factor));
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in setPlaybackSpeedNative method: ") + e.what());
     }
@@ -77,28 +95,33 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
         JNIEnv *env,
         jobject thisObject,
-        jobject nativeHandle,
+        jlong handle,
         jfloat value
 ) {
+    std::shared_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
 
-        sampler->setVolume(static_cast<float>(value));
+        it->second->setVolume(static_cast<float>(value));
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in setVolumeNative method: ") + e.what());
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jlong handle) {
+    std::shared_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
-        sampler->start();
+
+        it->second->start();
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in startNative method: ") + e.what());
     }
@@ -107,14 +130,16 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobje
 JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
         JNIEnv *env,
         jobject thisObject,
-        jobject nativeHandle,
+        jlong handle,
         jbyteArray bytes,
         jint size
 ) {
+    std::shared_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
 
         jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
@@ -129,33 +154,37 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
 
         env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
 
-        sampler->play(samples.data(), samples.size());
+        it->second->play(samples.data(), samples.size());
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in playNative method: ") + e.what());
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong handle) {
+    std::shared_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
 
-        sampler->stop();
+        it->second->stop();
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in stopNative method: ") + e.what());
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_closeNative(JNIEnv *env, jobject thisObject, jobject nativeHandle) {
+JNIEXPORT void JNICALL Java_sampler_NativeSampler_deleteNative(JNIEnv *env, jobject thisObject, jlong handle) {
+    std::unique_lock<std::shared_mutex> lock(mutex);
+
     try {
-        auto sampler = reinterpret_cast<Sampler *>(env->GetDirectBufferAddress(nativeHandle));
-        if (!sampler) {
-            throw std::runtime_error("Invalid nativeHandle");
+        auto it = samplers.find(handle);
+        if (it == samplers.end()) {
+            throw std::runtime_error("Invalid handle");
         }
 
-        delete sampler;
+        samplers.erase(it);
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in closeNative method: ") + e.what());
     }
