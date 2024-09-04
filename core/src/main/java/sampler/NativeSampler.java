@@ -1,25 +1,25 @@
 package sampler;
 
-public class NativeSampler {
+public class NativeSampler implements AutoCloseable {
     private final long nativeHandle;
 
     public NativeSampler(int sampleRate, int channels) {
-        this.nativeHandle = initializeNative(sampleRate, channels);
+        this.nativeHandle = createNative(sampleRate, channels);
     }
 
-    private native void setPlaybackSpeedNative(long nativeHandle, float factor);
+    private native long createNative(int sampleRate, int channels);
 
-    private native void setVolumeNative(long nativeHandle, float value);
+    private native void setPlaybackSpeedNative(long handle, float factor);
 
-    private native long initializeNative(int sampleRate, int channels);
+    private native void setVolumeNative(long handle, float value);
 
-    private native void startNative(long nativeHandle);
+    private native void startNative(long handle);
 
-    private native void playNative(long nativeHandle, byte[] bytes, int size);
+    private native void playNative(long handle, byte[] bytes, int size);
 
-    private native void stopNative(long nativeHandle);
+    private native void stopNative(long handle);
 
-    private native void closeNative(long nativeHandle);
+    private native void deleteNative(long handle);
 
     public void setPlaybackSpeed(float factor) {
         setPlaybackSpeedNative(nativeHandle, factor);
@@ -41,7 +41,8 @@ public class NativeSampler {
         stopNative(nativeHandle);
     }
 
+    @Override
     public void close() {
-        closeNative(nativeHandle);
+        deleteNative(nativeHandle);
     }
 }
