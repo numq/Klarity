@@ -2,67 +2,64 @@ package buffer
 
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
-import kotlin.concurrent.withLock
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-internal class DefaultBuffer<T>(
-    override var capacity: Int,
-) : Buffer<T> {
-    private val lock = ReentrantLock()
+internal class DefaultBuffer<T>(initialCapacity: Int) : Buffer<T> {
+    override var capacity: Int = initialCapacity
+        private set
 
-    private var queue = LinkedBlockingQueue<T>(capacity)
+    private var items = LinkedBlockingQueue<T>(capacity)
 
     override suspend fun resize(newCapacity: Int) = runCatching {
-        require(capacity > 0) { "Invalid buffer capacity" }
-
-        val items = mutableListOf<T>()
+        require(newCapacity > 0) { "Invalid buffer capacity" }
 
         if (newCapacity != capacity) {
-            queue.drainTo(items, newCapacity)
-
-            lock.withLock {
-                queue = LinkedBlockingQueue<T>(items)
-
-                capacity = newCapacity
+            capacity = newCapacity
+            if (items.size > capacity) {
+                items.removeAll { items.indexOf(it) > capacity - 1 }
             }
         }
     }
 
-    override suspend fun peek() = runCatching { queue.peek() }
+    override suspend fun peek() = runCatching { items.peek() }
 
     override suspend fun poll() = runCatching {
         suspendCancellableCoroutine { continuation ->
-            val thread = thread(start = false) {
+            val thread = thread {
                 try {
-                    continuation.resume(queue.take())
+                    continuation.resume(items.take())
                 } catch (_: InterruptedException) {
+
+                } catch (t: Throwable) {
+                    continuation.resumeWithException(t)
                 }
             }
             continuation.invokeOnCancellation {
                 thread.interrupt()
             }
-            thread.start()
         }
     }
 
     override suspend fun push(item: T) = runCatching {
         suspendCancellableCoroutine { continuation ->
-            val thread = thread(start = false) {
+            val thread = thread {
                 try {
-                    continuation.resume(queue.put(item))
+                    continuation.resume(items.put(item))
                 } catch (_: InterruptedException) {
+
+                } catch (t: Throwable) {
+                    continuation.resumeWithException(t)
                 }
             }
             continuation.invokeOnCancellation {
                 thread.interrupt()
             }
-            thread.start()
         }
     }
 
     override suspend fun flush() = runCatching {
-        queue.clear()
+        items.clear()
     }
 }

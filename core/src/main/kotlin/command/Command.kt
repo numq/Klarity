@@ -1,17 +1,37 @@
 package command
 
 sealed interface Command {
-    data class Prepare(val location: String, val audioBufferSize: Int, val videoBufferSize: Int) : Command
+    enum class Descriptor {
+        PREPARE, PLAY, PAUSE, RESUME, STOP, SEEK_TO, RELEASE
+    }
 
-    data object Play : Command
+    val descriptor: Descriptor
 
-    data object Pause : Command
+    data class Prepare(val location: String, val audioBufferSize: Int, val videoBufferSize: Int) : Command {
+        override val descriptor = Descriptor.PREPARE
+    }
 
-    data object Resume : Command
+    data object Play : Command {
+        override val descriptor = Descriptor.PLAY
+    }
 
-    data object Stop : Command
+    data object Pause : Command {
+        override val descriptor = Descriptor.PAUSE
+    }
 
-    data class SeekTo(val millis: Long) : Command
+    data object Resume : Command {
+        override val descriptor = Descriptor.RESUME
+    }
 
-    data object Release : Command
+    data object Stop : Command {
+        override val descriptor = Descriptor.STOP
+    }
+
+    data class SeekTo(val millis: Long) : Command {
+        override val descriptor = Descriptor.SEEK_TO
+    }
+
+    data object Release : Command {
+        override val descriptor = Descriptor.RELEASE
+    }
 }

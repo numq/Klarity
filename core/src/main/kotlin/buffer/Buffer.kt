@@ -14,7 +14,7 @@ interface Buffer<T> {
         ): Result<Buffer<T>> = runCatching {
             require(capacity > 0) { "Unable to create buffer with $capacity capacity" }
 
-            DefaultBuffer(capacity = capacity)
+            DefaultBuffer(initialCapacity = capacity)
         }
     }
 }

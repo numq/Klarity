@@ -1,7 +1,6 @@
 package renderer
 
 import frame.Frame
-import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 
 internal class DefaultRenderer(
@@ -10,34 +9,21 @@ internal class DefaultRenderer(
     override val frameRate: Double,
     override val preview: Frame.Video.Content?,
 ) : Renderer {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    override val frame = MutableStateFlow(preview)
 
-    override val frame = MutableStateFlow<Frame.Video.Content?>(null)
-
-    @Volatile
-    override var playbackSpeedFactor: Float = 1.0f
+    override var playbackSpeedFactor = MutableStateFlow(1f)
 
     override suspend fun setPlaybackSpeed(factor: Float) = runCatching {
         require(factor > 0f) { "Speed factor should be positive" }
 
-        playbackSpeedFactor = factor
+        playbackSpeedFactor.emit(factor)
     }
 
     override suspend fun draw(frame: Frame.Video.Content) = runCatching {
-        this@DefaultRenderer.frame.tryEmit(frame)
-        Unit
+        this@DefaultRenderer.frame.emit(frame)
     }
 
     override suspend fun reset() = runCatching {
-        frame.tryEmit(preview)
-        Unit
-    }
-
-    override fun close() = runCatching { coroutineScope.cancel() }.getOrDefault(Unit)
-
-    init {
-        coroutineScope.launch {
-            reset()
-        }
+        frame.emit(preview)
     }
 }

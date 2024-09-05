@@ -1,6 +1,6 @@
 package settings
 
-data class Settings(
+data class PlayerSettings(
     val playbackSpeedFactor: Float,
     val isMuted: Boolean,
     val volume: Float,

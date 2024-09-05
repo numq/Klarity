@@ -1,13 +1,13 @@
 package probe
 
 import decoder.Decoder
+import frame.Frame
+import media.Media
 
 object ProbeManager {
-    suspend fun probe(location: String) = Decoder.createProbeDecoder(
-        location = location,
-        findAudioStream = true,
-        findVideoStream = true
+    fun probe(location: String) = Decoder.createProbeDecoder(
+        location = location, findAudioStream = true, findVideoStream = true
     ).mapCatching { decoder ->
-        decoder.use(Decoder<*>::media)
+        decoder.use(Decoder<Media, Frame.Probe>::media)
     }
 }

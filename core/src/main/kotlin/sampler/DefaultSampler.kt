@@ -1,60 +1,62 @@
 package sampler
 
 import exception.JNIException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal class DefaultSampler(
-    private val nativeSampler: NativeSampler,
+    private val sampler: NativeSampler,
 ) : Sampler {
-    @Volatile
-    private var currentVolume: Float = 1f
+    private val mutex = Mutex()
 
-    @Volatile
-    override var playbackSpeedFactor: Float = 1.0f
+    private var currentVolume = 1f
 
-    override suspend fun setPlaybackSpeed(factor: Float) = with(Dispatchers.Default) {
+    override var playbackSpeedFactor = MutableStateFlow(1f)
+
+    override suspend fun setPlaybackSpeed(factor: Float) = mutex.withLock {
         runCatching {
             require(factor > 0f) { "Speed factor should be positive" }
 
-            nativeSampler.setPlaybackSpeed(factor)
+            sampler.setPlaybackSpeed(factor)
 
-            playbackSpeedFactor = factor
+            playbackSpeedFactor.emit(factor)
         }.recoverCatching(JNIException::create)
     }
 
-    override suspend fun setVolume(value: Float) = with(Dispatchers.Default) {
+    override suspend fun setVolume(value: Float) = mutex.withLock {
         runCatching {
             require(value in 0.0f..1.0f) { "Volume should be a value between 0.0f and 1.0f" }
 
-            nativeSampler.setVolume(value)
+            sampler.setVolume(value)
 
             currentVolume = value
         }.recoverCatching(JNIException::create)
     }
 
-    override suspend fun setMuted(state: Boolean) = with(Dispatchers.Default) {
+    override suspend fun setMuted(state: Boolean) = mutex.withLock {
         runCatching {
-            nativeSampler.setVolume(if (state) 0f else currentVolume)
+            sampler.setVolume(if (state) 0f else currentVolume)
         }.recoverCatching(JNIException::create)
     }
 
-    override suspend fun start() = with(Dispatchers.Default) {
+    override suspend fun start() = mutex.withLock {
         runCatching {
-            nativeSampler.start()
+            sampler.start()
         }.recoverCatching(JNIException::create)
     }
 
-    override suspend fun play(bytes: ByteArray) = with(Dispatchers.Default) {
+    override suspend fun play(bytes: ByteArray) = mutex.withLock {
         runCatching {
-            nativeSampler.play(bytes, bytes.size)
+            sampler.play(bytes, bytes.size)
         }.recoverCatching(JNIException::create)
     }
 
-    override suspend fun stop() = with(Dispatchers.Default) {
+    override suspend fun stop() = mutex.withLock {
         runCatching {
-            nativeSampler.stop()
+            sampler.stop()
         }.recoverCatching(JNIException::create)
     }
 
-    override fun close() = runCatching { nativeSampler.close() }.getOrDefault(Unit)
+    override fun close() = runCatching { sampler.close() }.recoverCatching(JNIException::create).getOrThrow()
 }

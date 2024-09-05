@@ -5,7 +5,11 @@ import pipeline.Pipeline
 import timestamp.Timestamp
 
 interface PlaybackLoop : AutoCloseable {
-    suspend fun start(onTimestamp: suspend (Timestamp) -> Unit, endOfMedia: suspend () -> Unit): Result<Unit>
+    suspend fun start(
+        onTimestamp: suspend (Timestamp) -> Unit,
+        endOfMedia: suspend () -> Unit,
+    ): Result<Unit>
+
     suspend fun stop(): Result<Unit>
 
     companion object {

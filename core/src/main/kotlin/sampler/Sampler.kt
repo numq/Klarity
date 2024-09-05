@@ -1,7 +1,9 @@
 package sampler
 
+import kotlinx.coroutines.flow.StateFlow
+
 interface Sampler : AutoCloseable {
-    val playbackSpeedFactor: Float
+    val playbackSpeedFactor: StateFlow<Float>
     suspend fun setPlaybackSpeed(factor: Float): Result<Unit>
     suspend fun setVolume(value: Float): Result<Unit>
     suspend fun setMuted(state: Boolean): Result<Unit>
@@ -11,11 +13,7 @@ interface Sampler : AutoCloseable {
 
     companion object {
         internal fun create(sampleRate: Int, channels: Int): Result<Sampler> = runCatching {
-            val nativeSampler = NativeSampler()
-
-            nativeSampler.initialize(sampleRate, channels)
-
-            DefaultSampler(nativeSampler = nativeSampler)
+            DefaultSampler(sampler = NativeSampler(sampleRate, channels))
         }
     }
 }

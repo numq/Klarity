@@ -1,6 +1,8 @@
 package frame
 
 sealed interface Frame {
+    data object Probe : Frame
+
     sealed interface Audio : Frame {
         data class Content(
             val timestampMicros: Long,

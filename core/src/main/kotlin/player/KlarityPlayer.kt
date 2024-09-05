@@ -1,14 +1,12 @@
 package player
 
-import buffer.Buffer
-import buffer.BufferFactory
+import buffer.AudioBufferFactory
+import buffer.VideoBufferFactory
 import controller.PlayerControllerFactory
-import decoder.Decoder
-import decoder.DecoderFactory
-import event.Event
-import factory.Factory
-import factory.SuspendFactory
-import frame.Frame
+import decoder.AudioDecoderFactory
+import decoder.ProbeDecoderFactory
+import decoder.VideoDecoderFactory
+import event.PlayerEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import library.Klarity
@@ -17,45 +15,44 @@ import loop.playback.PlaybackLoopFactory
 import renderer.Renderer
 import renderer.RendererFactory
 import sampler.SamplerFactory
-import settings.Settings
-import state.State
+import settings.PlayerSettings
+import state.PlayerState
 import timestamp.Timestamp
 
 interface KlarityPlayer : AutoCloseable {
-    val settings: StateFlow<Settings>
-    val state: StateFlow<State>
+    val settings: StateFlow<PlayerSettings>
+    val state: StateFlow<PlayerState>
     val bufferTimestamp: StateFlow<Timestamp>
     val playbackTimestamp: StateFlow<Timestamp>
     val renderer: StateFlow<Renderer?>
-    val events: Flow<Event>
-    suspend fun changeSettings(settings: Settings)
+    val events: Flow<PlayerEvent>
+    suspend fun changeSettings(settings: PlayerSettings)
     suspend fun resetSettings()
-    suspend fun load(location: String, enableAudio: Boolean, enableVideo: Boolean)
-    suspend fun unload()
+    suspend fun prepare(location: String, enableAudio: Boolean, enableVideo: Boolean)
     suspend fun play()
     suspend fun pause()
     suspend fun resume()
     suspend fun stop()
     suspend fun seekTo(millis: Long)
+    suspend fun release()
 
-    @Suppress("UNCHECKED_CAST")
     companion object {
         fun create(): Result<KlarityPlayer> = runCatching {
             check(Klarity.isDecoderLoaded) { "Unable to create player - load native decoder first" }
             check(Klarity.isSamplerLoaded) { "Unable to create player - load native sampler first" }
         }.mapCatching {
-            PlayerControllerFactory.create(
+            PlayerControllerFactory().create(
                 parameters = PlayerControllerFactory.Parameters(
                     initialSettings = null,
-                    probeDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Unit>>,
-                    audioDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
-                    videoDecoderFactory = DecoderFactory as SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
-                    audioBufferFactory = BufferFactory as Factory<BufferFactory.Parameters, Buffer<Frame.Audio>>,
-                    videoBufferFactory = BufferFactory as Factory<BufferFactory.Parameters, Buffer<Frame.Video>>,
-                    bufferLoopFactory = BufferLoopFactory,
-                    playbackLoopFactory = PlaybackLoopFactory,
-                    samplerFactory = SamplerFactory,
-                    rendererFactory = RendererFactory
+                    probeDecoderFactory = ProbeDecoderFactory(),
+                    audioDecoderFactory = AudioDecoderFactory(),
+                    videoDecoderFactory = VideoDecoderFactory(),
+                    audioBufferFactory = AudioBufferFactory(),
+                    videoBufferFactory = VideoBufferFactory(),
+                    bufferLoopFactory = BufferLoopFactory(),
+                    playbackLoopFactory = PlaybackLoopFactory(),
+                    samplerFactory = SamplerFactory(),
+                    rendererFactory = RendererFactory()
                 )
             ).mapCatching(::DefaultKlarityPlayer).getOrThrow()
         }

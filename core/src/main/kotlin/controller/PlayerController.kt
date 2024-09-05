@@ -1,11 +1,14 @@
 package controller
 
+import buffer.AudioBufferFactory
 import buffer.Buffer
-import buffer.BufferFactory
+import buffer.VideoBufferFactory
 import command.Command
+import decoder.AudioDecoderFactory
 import decoder.Decoder
-import decoder.DecoderFactory
-import event.Event
+import decoder.ProbeDecoderFactory
+import decoder.VideoDecoderFactory
+import event.PlayerEvent
 import factory.Factory
 import factory.SuspendFactory
 import frame.Frame
@@ -15,36 +18,37 @@ import loop.buffer.BufferLoop
 import loop.buffer.BufferLoopFactory
 import loop.playback.PlaybackLoop
 import loop.playback.PlaybackLoopFactory
+import media.Media
 import renderer.Renderer
 import renderer.RendererFactory
 import sampler.Sampler
 import sampler.SamplerFactory
-import settings.Settings
-import state.State
+import settings.PlayerSettings
+import state.PlayerState
 import timestamp.Timestamp
 
 interface PlayerController : AutoCloseable {
-    val settings: StateFlow<Settings>
-    val state: StateFlow<State>
+    val settings: StateFlow<PlayerSettings>
+    val state: StateFlow<PlayerState>
     val bufferTimestamp: StateFlow<Timestamp>
     val playbackTimestamp: StateFlow<Timestamp>
     val renderer: StateFlow<Renderer?>
-    val events: SharedFlow<Event>
-    suspend fun changeSettings(newSettings: Settings)
+    val events: SharedFlow<PlayerEvent>
+    suspend fun changeSettings(newSettings: PlayerSettings)
     suspend fun resetSettings()
     suspend fun execute(command: Command)
 
     companion object {
         internal fun create(
-            initialSettings: Settings?,
-            probeDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Unit>>,
-            audioDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Audio>>,
-            videoDecoderFactory: SuspendFactory<DecoderFactory.Parameters, Decoder<Frame.Video>>,
-            audioBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Audio>>,
-            videoBufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame.Video>>,
+            initialSettings: PlayerSettings?,
+            probeDecoderFactory: SuspendFactory<ProbeDecoderFactory.Parameters, Decoder<Media, Frame.Probe>>,
+            audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
+            videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
+            audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
+            videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
             bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
             playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-            samplerFactory: Factory<SamplerFactory.Parameters, Sampler>,
+            samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>,
             rendererFactory: Factory<RendererFactory.Parameters, Renderer>,
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
