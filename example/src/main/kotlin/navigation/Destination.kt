@@ -1,5 +1,5 @@
 package navigation
 
 enum class Destination {
-    INSTANT, PLAYLIST
+    SPLASH, HUB, PLAYLIST
 }

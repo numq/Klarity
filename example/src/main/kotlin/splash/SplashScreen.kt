@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -19,17 +19,20 @@ import androidx.compose.ui.unit.Density
 import java.io.File
 
 @Composable
-fun SplashScreen(finish: () -> Unit) {
-
-    val logoAnimBase = rememberSaveable {
-        loadSvgPainter(File("media/logo_anim_base.svg").inputStream(), Density(1f))
+fun SplashScreen(endOfAnimation: () -> Unit) {
+    val logoAnimBase = remember {
+        File("media/logo_anim_base.svg").inputStream().use {
+            loadSvgPainter(it, Density(1f))
+        }
     }
 
-    val logoAnimDetail = rememberSaveable {
-        loadSvgPainter(File("media/logo_anim_detail.svg").inputStream(), Density(1f))
+    val logoAnimDetail = remember {
+        File("media/logo_anim_detail.svg").inputStream().use {
+            loadSvgPainter(it, Density(1f))
+        }
     }
 
-    val animatedRotation = rememberSaveable { Animatable(0f) }
+    val animatedRotation = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
         animatedRotation.animateTo(
@@ -37,12 +40,11 @@ fun SplashScreen(finish: () -> Unit) {
             targetValue = 180f
         )
 
-        finish()
+        endOfAnimation()
     }
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colors.background),
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
         contentAlignment = Alignment.Center
     ) {
         Image(

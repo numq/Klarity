@@ -1,91 +1,92 @@
 package application
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.res.loadSvgPainter
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.window.Window
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.singleWindowApplication
 import decoration.DecorationBox
+import library.Klarity
 import navigation.Navigation
-import splash.SplashScreen
 import theme.KlarityTheme
 import java.awt.Dimension
+import java.awt.FileDialog
 import java.io.File
+import java.nio.file.Paths
+import kotlin.system.exitProcess
 
-fun main() = application {
-
+fun main() {
     val appName = "Klarity"
 
-    val (justLaunched, setJustLaunched) = rememberSaveable { mutableStateOf(true) }
+    val decoderPath = Paths.get("example\\bin\\decoder").toAbsolutePath().toString()
 
-    val iconSvg = rememberSaveable {
-        loadSvgPainter(File("media/logo.svg").inputStream(), Density(1f))
-    }
+    Klarity.loadDecoder(
+        ffmpegPath = "$decoderPath\\ffmpeg", klarityPath = "$decoderPath\\klarity", jniPath = "$decoderPath\\jni"
+    ).getOrThrow()
 
-    val slideAnimationSpec = rememberSaveable<FiniteAnimationSpec<IntOffset>> {
-        tween(delayMillis = 500, easing = LinearEasing)
-    }
+    val samplerPath = Paths.get("example\\bin\\sampler").toAbsolutePath().toString()
 
-    val windowState = rememberWindowState(position = WindowPosition(Alignment.Center))
+    Klarity.loadSampler(
+        portAudioPath = "$samplerPath\\portaudio", klarityPath = "$samplerPath\\klarity", jniPath = "$samplerPath\\jni"
+    ).getOrThrow()
 
-    Window(onCloseRequest = ::exitApplication, state = windowState, undecorated = true) {
+    val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))
+
+    singleWindowApplication(state = windowState, undecorated = true) {
+        val iconSvg = remember {
+            File("media/logo.svg").inputStream().use {
+                loadSvgPainter(it, Density(1f))
+            }
+        }
 
         SideEffect {
             window.iconImage = iconSvg.toAwtImage(Density(1f), LayoutDirection.Ltr)
 
-            window.minimumSize = Dimension(500, 500)
+            window.minimumSize = Dimension(700, 700)
         }
 
-        KlarityTheme(isDarkTheme = isSystemInDarkTheme()) {
-            AnimatedVisibility(
-                visible = justLaunched,
-                enter = slideInHorizontally(animationSpec = slideAnimationSpec) { -it },
-                exit = slideOutHorizontally(animationSpec = slideAnimationSpec) { it }
+        val isSystemInDarkTheme = isSystemInDarkTheme()
+
+        val (isDarkTheme, setIsDarkTheme) = remember(isSystemInDarkTheme) {
+            mutableStateOf(isSystemInDarkTheme)
+        }
+
+        KlarityTheme(isDarkTheme = isDarkTheme) {
+            Column(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                SplashScreen {
-                    setJustLaunched(false)
-                }
-            }
-            AnimatedVisibility(
-                visible = !justLaunched,
-                enter = slideInHorizontally(animationSpec = slideAnimationSpec) { -it },
-                exit = slideOutHorizontally(animationSpec = slideAnimationSpec) { it }
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    window.DecorationBox(exitApplication = ::exitApplication) {
+                DecorationBox(window = window,
+                    isDarkTheme = isDarkTheme,
+                    changeTheme = setIsDarkTheme,
+                    close = { exitProcess(0) }) {
+                    Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
                         Image(iconSvg, "icon")
-                        Text(appName, color = Color.White)
                     }
-                    Navigation()
+                    Text(appName, color = MaterialTheme.colors.primary)
                 }
+                Navigation(openFileChooser = {
+                    FileDialog(window, "Upload media", FileDialog.LOAD).apply {
+                        isMultipleMode = true
+                        isVisible = true
+                    }.files.toList()
+                })
             }
         }
     }
