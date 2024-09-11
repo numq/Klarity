@@ -140,3 +140,8 @@ Contains a demo application
 
 - [Core Module](#core)
 - [Compose Module](#compose)
+
+### Usage
+
+Place the binaries in the `example/bin` folder according to the structure specified
+in `example/application/Application`.
