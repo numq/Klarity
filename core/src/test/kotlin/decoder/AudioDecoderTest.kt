@@ -1,75 +1,101 @@
 package decoder
 
+import format.AudioFormat
 import frame.Frame
-import io.mockk.clearMocks
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockk
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
+import library.Klarity
+import media.Location
 import media.Media
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import kotlin.random.Random
+import java.io.File
+import java.net.URL
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.seconds
 
 class AudioDecoderTest {
-    private lateinit var decoder: Decoder<Frame.Audio>
+    init {
+        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
+            Klarity.loadDecoder(
+                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
+            ).getOrThrow()
+        }
+    }
 
-    private val nativeDecoder = mockk<NativeDecoder>(relaxUnitFun = true)
+    private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
 
-    private val media = mockk<Media>()
+    private val file = files?.find { file -> file.nameWithoutExtension == "audio_only" }!!
+
+    private val location = file.absolutePath
+
+    private lateinit var decoder: Decoder<Media.Audio, Frame.Audio>
 
     @BeforeEach
     fun beforeEach() {
-        coEvery { nativeDecoder.format } coAnswers {
-            NativeFormat(
-                "", 1000L, 44100, 2, 0, 0, 0.0
-            )
-        }
-
-        decoder = AudioDecoder(decoder = nativeDecoder, media = media)
+        decoder = Decoder.createAudioDecoder(location = location).getOrThrow()
     }
 
     @AfterEach
     fun afterEach() {
         decoder.close()
-        clearMocks(nativeDecoder, media)
     }
 
     @Test
-    fun nextFrame() = runTest {
-        val frame = NativeFrame(
-            NativeFrame.Type.AUDIO.ordinal, 0L, Random(System.currentTimeMillis()).nextBytes(10)
-        )
+    fun `create decoder and ensure that media is correct`() = runTest {
+        val media = decoder.media
 
-        coEvery { nativeDecoder.nextFrame() } coAnswers { frame }
+        assertNotNull(media)
 
-        assertEquals(
-            Frame.Audio.Content(0L, frame.bytes, 2, 44100), decoder.nextFrame().getOrThrow()
-        )
+        assertEquals(Location.Local(fileName = file.name, path = location), media.location)
 
-        coVerify { nativeDecoder.format }
+        assertEquals(5.seconds, media.durationMicros.microseconds)
 
-        coVerify { nativeDecoder.nextFrame() }
+        assertEquals(AudioFormat(sampleRate = 44100, channels = 2), (media as Media.Audio).format)
     }
 
     @Test
-    fun seekTo() = runTest {
-        coEvery { nativeDecoder.seekTo(any()) } returns Unit
+    fun `return next frame until the end of media`() = runTest {
+        var frames = 0
 
-        assertTrue(decoder.seekTo(0L).isSuccess)
+        while (isActive) {
+            when (val frame = decoder.nextFrame(width = null, height = null).getOrThrow()) {
+                is Frame.Audio.Content -> {
+                    assertEquals(44100, frame.sampleRate)
+                    assertEquals(2, frame.channels)
+                    assertTrue(frame.timestampMicros < decoder.media.durationMicros)
+                    frames += 1
+                }
 
-        coVerify { nativeDecoder.seekTo(any()) }
+                is Frame.Audio.EndOfStream -> break
+            }
+        }
     }
 
     @Test
-    fun reset() = runTest {
-        coEvery { nativeDecoder.reset() } returns Unit
+    fun `seek to random timestamp`() = runTest {
+        repeat(100) {
+            decoder.seekTo(micros = (0L..decoder.media.durationMicros).random(), keyframesOnly = false).getOrThrow()
+        }
+    }
 
-        assertTrue(decoder.reset().isSuccess)
+    @Test
+    fun `seek to random timestamp and get next frame`() = runTest {
+        repeat(100) {
+            decoder.seekTo(micros = (0L..decoder.media.durationMicros).random(), keyframesOnly = false).getOrThrow()
+            decoder.nextFrame(width = null, height = null).getOrThrow()
+        }
+    }
 
-        coVerify { nativeDecoder.reset() }
+    @Test
+    fun `seek to random timestamp and reset`() = runTest {
+        repeat(100) {
+            decoder.seekTo(micros = (0L..decoder.media.durationMicros).random(), keyframesOnly = false).getOrThrow()
+            decoder.reset().getOrThrow()
+        }
     }
 }
