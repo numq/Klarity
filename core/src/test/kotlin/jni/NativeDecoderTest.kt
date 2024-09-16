@@ -7,48 +7,39 @@ import library.Klarity
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.net.URL
 
 class NativeDecoderTest {
-    companion object {
-        private lateinit var audioDecoder: NativeDecoder
-        private lateinit var videoDecoder: NativeDecoder
-        private lateinit var mediaDecoder: NativeDecoder
-
-        private val binaries = File(ClassLoader.getSystemResources("bin").nextElement().let(URL::getFile)).listFiles()
-
-        private val decoderBinaries = binaries?.find { file -> file.name == "decoder" }?.listFiles()
-
-        private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
-
-        private val audioFile = files?.find { file -> file.nameWithoutExtension == "audio_only" }?.absolutePath
-
-        private val videoFile = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath
-
-        private val mediaFile = files?.find { file -> file.nameWithoutExtension == "audio_video" }?.absolutePath
-
-        @JvmStatic
-        @BeforeAll
-        fun beforeAll() {
-            checkNotNull(decoderBinaries)
+    init {
+        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
             Klarity.loadDecoder(
-                ffmpegPath = decoderBinaries.first { file -> file.name == "ffmpeg" }.absolutePath,
-                klarityPath = decoderBinaries.first { file -> file.name == "klarity" }.absolutePath,
-                jniPath = decoderBinaries.first { file -> file.name == "jni" }.absolutePath
+                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
             ).getOrThrow()
-            checkNotNull(files)
         }
     }
 
+    private lateinit var audioDecoder: NativeDecoder
+    private lateinit var videoDecoder: NativeDecoder
+    private lateinit var mediaDecoder: NativeDecoder
+
+    private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
+
+    private val audioFile = files?.find { file -> file.nameWithoutExtension == "audio_only" }?.absolutePath
+
+    private val videoFile = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath
+
+    private val mediaFile = files?.find { file -> file.nameWithoutExtension == "audio_video" }?.absolutePath
+
     @BeforeEach
     fun beforeEach() {
-        audioDecoder = NativeDecoder().apply { init(audioFile, true, true) }
-        videoDecoder = NativeDecoder().apply { init(videoFile, true, true) }
-        mediaDecoder = NativeDecoder().apply { init(mediaFile, true, true) }
+        audioDecoder = NativeDecoder(audioFile!!, true, true)
+        videoDecoder = NativeDecoder(videoFile!!, true, true)
+        mediaDecoder = NativeDecoder(mediaFile!!, true, true)
     }
 
     @AfterEach
@@ -61,45 +52,45 @@ class NativeDecoderTest {
     @Test
     fun `get format`() = runTest {
         with(audioDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(44100, sampleRate)
-            assertEquals(2, channels)
-            assertEquals(0, width)
-            assertEquals(0, height)
-            assertEquals(0.0, frameRate)
+            assertEquals(5_000_000L, durationMicros())
+            assertEquals(44100, sampleRate())
+            assertEquals(2, channels())
+            assertEquals(0, width())
+            assertEquals(0, height())
+            assertEquals(0.0, frameRate())
         }
         with(videoDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(0, sampleRate)
-            assertEquals(0, channels)
-            assertEquals(500, width)
-            assertEquals(500, height)
-            assertEquals(25.0, frameRate)
+            assertEquals(5_000_000L, durationMicros())
+            assertEquals(0, sampleRate())
+            assertEquals(0, channels())
+            assertEquals(500, width())
+            assertEquals(500, height())
+            assertEquals(25.0, frameRate())
         }
 
         with(mediaDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(44100, sampleRate)
-            assertEquals(2, channels)
-            assertEquals(500, width)
-            assertEquals(500, height)
-            assertEquals(25.0, frameRate)
+            assertEquals(5_000_000L, durationMicros())
+            assertEquals(44100, sampleRate())
+            assertEquals(2, channels())
+            assertEquals(500, width())
+            assertEquals(500, height())
+            assertEquals(25.0, frameRate())
         }
     }
 
     @Test
     fun `get next frame`() = runTest {
-        with(audioDecoder.nextFrame()) {
+        with(audioDecoder.nextFrame(0, 0)) {
             assertEquals(NativeFrame.Type.AUDIO.ordinal, type)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
         }
-        with(videoDecoder.nextFrame()) {
+        with(videoDecoder.nextFrame(100, 100)) {
             assertEquals(NativeFrame.Type.VIDEO.ordinal, type)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
         }
-        with(mediaDecoder.nextFrame()) {
+        with(mediaDecoder.nextFrame(100, 100)) {
             assertTrue(type == NativeFrame.Type.AUDIO.ordinal || type == NativeFrame.Type.VIDEO.ordinal)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
@@ -108,9 +99,9 @@ class NativeDecoderTest {
 
     @Test
     fun `seek media`() = runTest {
-        audioDecoder.seekTo((0L..audioDecoder.format.durationMicros).random())
-        videoDecoder.seekTo((0L..videoDecoder.format.durationMicros).random())
-        mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros).random())
+        audioDecoder.seekTo((0L..audioDecoder.format.durationMicros()).random(), false)
+        videoDecoder.seekTo((0L..videoDecoder.format.durationMicros()).random(), false)
+        mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros()).random(), false)
     }
 
     @Test
