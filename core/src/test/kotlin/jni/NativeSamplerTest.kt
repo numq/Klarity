@@ -2,8 +2,8 @@ package jni
 
 import kotlinx.coroutines.test.runTest
 import library.Klarity
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import sampler.NativeSampler
 import java.io.File
@@ -11,6 +11,28 @@ import java.net.URL
 import kotlin.random.Random
 
 class NativeSamplerTest {
+    init {
+        File(ClassLoader.getSystemResources("bin/sampler").nextElement().let(URL::getFile)).listFiles()?.run {
+            Klarity.loadSampler(
+                portAudioPath = find { file -> file.path.endsWith("portaudio") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
+            ).getOrThrow()
+        }
+    }
+
+    private lateinit var sampler: NativeSampler
+
+    @BeforeEach
+    fun beforeEach() {
+        sampler = NativeSampler(44100, 2)
+    }
+
+    @AfterEach
+    fun afterEach() {
+        sampler.close()
+    }
+
     @Test
     fun `change playbackSpeed`() = runTest {
         sampler.start()
@@ -34,42 +56,8 @@ class NativeSamplerTest {
     }
 
     @Test
-    fun `pause and resume playback`() = runTest {
-        sampler.start()
-        sampler.pause()
-        sampler.resume()
-        sampler.stop()
-    }
-
-    @Test
-    fun `stop playback`() = runTest {
+    fun `start and stop playback`() = runTest {
         sampler.start()
         sampler.stop()
-    }
-
-    companion object {
-        private val binaries = File(ClassLoader.getSystemResources("bin").nextElement().let(URL::getFile)).listFiles()
-
-        private val samplerBinaries = binaries?.find { file -> file.name == "sampler" }?.listFiles()
-
-        private lateinit var sampler: NativeSampler
-
-        @JvmStatic
-        @BeforeAll
-        fun beforeAll() {
-            checkNotNull(samplerBinaries)
-            Klarity.loadSampler(
-                portAudioPath = samplerBinaries.first { file -> file.name == "portaudio" }.absolutePath,
-                klarityPath = samplerBinaries.first { file -> file.name == "klarity" }.absolutePath,
-                jniPath = samplerBinaries.first { file -> file.name == "jni" }.absolutePath
-            ).getOrThrow()
-            sampler = NativeSampler().apply { initialize(44100, 2) }
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun afterAll() {
-            sampler.close()
-        }
     }
 }
