@@ -1,6 +1,7 @@
 package renderer
 
 import frame.Frame
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -18,20 +19,22 @@ class RendererTest {
 
     @AfterEach
     fun afterEach() {
-        renderer.close()
+        runBlocking {
+            renderer.reset()
+        }
     }
 
     @Test
     fun `change playback speed`() = runTest {
-        assertEquals(1f, renderer.playbackSpeedFactor)
+        assertEquals(1f, renderer.playbackSpeedFactor.value)
 
         assertTrue(renderer.setPlaybackSpeed(2f).isSuccess)
 
-        assertEquals(2f, renderer.playbackSpeedFactor)
+        assertEquals(2f, renderer.playbackSpeedFactor.value)
 
         assertTrue(renderer.setPlaybackSpeed(1f).isSuccess)
 
-        assertEquals(1f, renderer.playbackSpeedFactor)
+        assertEquals(1f, renderer.playbackSpeedFactor.value)
     }
 
     @Test
