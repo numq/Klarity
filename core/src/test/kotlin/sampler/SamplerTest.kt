@@ -60,7 +60,7 @@ class SamplerTest {
     }
 
     @Test
-    fun `playback interaction`() = runTest {
+    fun `play bytes and stop`() = runTest {
         assertTrue(sampler.start().isSuccess)
 
         assertTrue(sampler.play(Random(System.currentTimeMillis()).nextBytes(10)).isSuccess)
