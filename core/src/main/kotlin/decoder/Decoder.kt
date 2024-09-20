@@ -20,18 +20,18 @@ interface Decoder<Media, Frame> : AutoCloseable {
             findAudioStream: Boolean,
             findVideoStream: Boolean,
         ): Result<Media> = runCatching {
+            val mediaLocation = File(location).takeIf(File::exists)?.run {
+                Location.Local(fileName = name, path = path)
+            } ?: URI.create(location).takeIf(URI::isAbsolute)?.run {
+                Location.Remote(url = location)
+            }
+
+            checkNotNull(mediaLocation) { "Unable to find media" }
+
             val media: Media
 
             NativeDecoder(location, findAudioStream, findVideoStream).use { decoder ->
                 val format = decoder.format
-
-                val mediaLocation = File(location).takeIf(File::exists)?.run {
-                    Location.Local(fileName = name, path = path)
-                } ?: URI.create(location).takeIf(URI::isAbsolute)?.run {
-                    Location.Remote(url = location)
-                }
-
-                checkNotNull(mediaLocation) { "Unable to find media" }
 
                 val audioFormat = runCatching {
                     if (findAudioStream) {
