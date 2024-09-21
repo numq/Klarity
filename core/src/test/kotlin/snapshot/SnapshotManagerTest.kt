@@ -1,70 +1,62 @@
 package snapshot
 
-import decoder.Decoder
 import frame.Frame
-import io.mockk.*
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterAll
+import library.Klarity
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Test
-import kotlin.random.Random
+import java.io.File
+import java.net.URL
 
 class SnapshotManagerTest {
-    private val decoder = mockk<Decoder<Frame.Video>>(relaxUnitFun = true)
+    init {
+        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
+            Klarity.loadDecoder(
+                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
+            ).getOrThrow()
+        }
+    }
+
+    private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
+
+    private val location = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath!!
 
     @Test
     fun `single snapshot`() = runTest {
-        val frame = Frame.Video.Content(0L, Random(System.currentTimeMillis()).nextBytes(10), 100, 100, 30.0)
-
-        every { decoder.media.durationMicros } returns 0L
-
-        every { decoder.seekTo(any()) } returns Result.success(Unit)
-
-        coEvery { decoder.nextFrame() } returns Result.success(frame)
-
-        every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
-
-        val result = SnapshotManager.snapshot("", timestampMillis = { 0L })
-
-        assertEquals(Result.success(frame), result)
+        val snapshot = SnapshotManager.snapshot(
+            location = location,
+            timestampMillis = { durationMillis ->
+                (0L..durationMillis).random()
+            }).getOrThrow()
+        assertInstanceOf(Frame.Video.Content::class.java, snapshot)
+        with(snapshot!!) {
+            assertEquals(500, width)
+            assertEquals(500, height)
+            assertEquals(25.0, frameRate)
+        }
     }
 
     @Test
     fun `multiple snapshots`() = runTest {
-        val frames = buildList {
-            repeat(10) {
-                add(Frame.Video.Content(0L, Random(System.currentTimeMillis()).nextBytes(10), 100, 100, 30.0))
+        SnapshotManager.snapshots(
+            location = location,
+            timestampsMillis = { durationMillis ->
+                buildList {
+                    repeat(10) {
+                        add((0L..durationMillis).random())
+                    }
+                }
             }
-        }
-
-        every { decoder.media.durationMicros } returns 0L
-
-        every { decoder.seekTo(any()) } returns Result.success(Unit)
-
-        coEvery { decoder.nextFrame() } returnsMany frames.map { Result.success(it) }
-
-        every { Decoder.createVideoDecoder(any()) } returns Result.success(decoder)
-
-        val result = SnapshotManager.snapshots(
-            "",
-            timestampsMillis = { frames.map(Frame.Video.Content::timestampMicros) }
-        )
-
-        assertEquals(Result.success(frames), result)
-    }
-
-    companion object {
-        @JvmStatic
-        @BeforeAll
-        fun beforeAll() {
-            mockkObject(Decoder.Companion)
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun afterAll() {
-            unmockkObject(Decoder.Companion)
+        ).getOrThrow().forEach { snapshot ->
+            assertInstanceOf(Frame.Video.Content::class.java, snapshot)
+            with(snapshot) {
+                assertEquals(500, width)
+                assertEquals(500, height)
+                assertEquals(25.0, frameRate)
+            }
         }
     }
 }
