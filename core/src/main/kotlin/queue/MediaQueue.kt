@@ -3,12 +3,12 @@ package queue
 import kotlinx.coroutines.flow.StateFlow
 
 interface MediaQueue<Item> {
+    val items: StateFlow<List<Item>>
     val isShuffled: StateFlow<Boolean>
     val repeatMode: StateFlow<RepeatMode>
+    val selectedItem: StateFlow<SelectedItem<Item>>
     val hasPrevious: StateFlow<Boolean>
     val hasNext: StateFlow<Boolean>
-    val items: StateFlow<List<Item>>
-    val selectedItem: StateFlow<SelectedItem<Item>>
     suspend fun shuffle()
     suspend fun setRepeatMode(repeatMode: RepeatMode)
     suspend fun previous()
