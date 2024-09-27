@@ -34,6 +34,16 @@ private fun createImageFromBytes(
     Image.makeRaster(imageInfo, bytes, imageInfo.width * imageInfo.bytesPerPixel)
 }
 
+/**
+ * A composable that renders a [Foreground] onto the screen with an optional [Background].
+ * It supports different scaling and rendering configurations.
+ *
+ * @param modifier The [Modifier] to apply to the composable.
+ * @param foreground The [Foreground] content to render.
+ * @param background The [Background] content to render behind the [Foreground]. Defaults to [Background.Transparent].
+ * @param logRenderingTime If true, logs the time taken to render each frame.
+ * @param placeholder A composable to display when the [Foreground] is not yet rendered. Can be null.
+ */
 @Composable
 fun Renderer(
     modifier: Modifier,
