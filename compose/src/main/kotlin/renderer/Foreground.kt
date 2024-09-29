@@ -44,7 +44,7 @@ sealed interface Foreground {
      * @property bytes The byte array representing the image data.
      * @property width The width of the image.
      * @property height The height of the image.
-     * @property colorType The color type of the image (default is BGRA 8888).
+     * @property colorType The color type of the image (default is BGRA_8888).
      * @property alphaType The alpha type used in the image (default is pre-multiplied).
      */
     data class Cover(
