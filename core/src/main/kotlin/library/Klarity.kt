@@ -23,8 +23,12 @@ object Klarity {
         const val JNI_SAMPLER = "libjni_sampler"
     }
 
-    private val extension = System.getProperty("os.name")?.let { property ->
-        if (property.contains("win", true)) "dll" else "so"
+    private val extension = when {
+        System.getProperty("os.name", "").contains("win", true) -> "dll"
+
+        System.getProperty("os.name", "").contains("mac", true) -> "dylib"
+
+        else -> "so"
     }
 
     var isDecoderLoaded = false
