@@ -9,6 +9,19 @@ Klarity is a library providing media player functionality written in Kotlin for 
 
 ---
 
+- [Features](#features)
+- [Architecture](#architecture)
+    - [Dependency graph](#dependency-graph)
+    - [State diagram](#state-diagram)
+    - [Transition table](#transition-table)
+- [Supported formats](#supported-formats)
+- [Modules](#modules)
+    - [Core](#core)
+    - [Compose](#compose)
+    - [Example](#example)
+- [Components](#components)
+- [Usage](#usage)
+
 # Features
 
 - Media playback (audio, video)
@@ -113,7 +126,7 @@ stateDiagram-v2
 
 ## Core
 
-Contains basic components such as: controller, player, preview manager, snapshot manager
+> Contains basic components such as: controller, player, preview manager, snapshot manager
 
 ### Dependencies
 
@@ -126,7 +139,7 @@ Contains basic components such as: controller, player, preview manager, snapshot
 
 ## Compose
 
-Contains a Compose component for rendering video
+> Contains a Compose component for rendering video
 
 ### Dependencies
 
@@ -134,14 +147,30 @@ Contains a Compose component for rendering video
 
 ## Example
 
-Contains a demo application
+> Contains a demo application
 
 ### Dependencies
 
 - [Core Module](#core)
 - [Compose Module](#compose)
 
-### Usage
+To run demo application place the binaries appropriate to your platform into the `example/bin` folder and run
+the [Application](example/src/main/kotlin/application/Application.kt).
 
-Place the binaries in the `example/bin` folder according to the structure specified
-in `example/application/Application`.
+## Components
+
+- [KlarityPlayer](core/src/main/kotlin/player/KlarityPlayer.kt) - contains the media player logic.
+- [SnapshotManager](core/src/main/kotlin/snapshot/SnapshotManager.kt) - allows to get frames (snapshots) with a
+  specified timestamp once per session. Use case - previewing keyframes.
+- [PreviewManager](core/src/main/kotlin/preview/PreviewManager.kt) - allows to get frames (snapshots) with a
+  specific timestamp during a continuous session. Use case - previewing the timeline.
+- [Renderer](compose/src/main/kotlin/renderer/Renderer.kt) - Provides functionality for rendering background and
+  foreground.
+
+## Usage
+
+- Load binaries using the [Klarity](core/src/main/kotlin/library/Klarity.kt) loader object
+  > Binaries must be located in the filesystem, however, they can be part of a jar - for this the binaries must be
+  opened
+  > as temporary files whose path can be used by the loader.
+- Use the necessary components
