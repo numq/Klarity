@@ -2,7 +2,7 @@
 
 <div style="display: flex; justify-content: center; align-items: center">
     <img src="./media/logo.png" alt="logo" style="max-width: 100%; height: 256px; display: inline-block; vertical-align: middle">
-    <p style="color: #24242f; display: inline-block; vertical-align: middle; font-size: 128px">Klarity</p>
+    <p style="display: inline-block; vertical-align: middle; font-size: 128px">Klarity</p>
 </div>
 
 Klarity is a library providing media player functionality written in Kotlin for developing Compose Desktop applications
