@@ -1,11 +1,14 @@
 <a href="https://www.buymeacoffee.com/numq"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a one way ticket&emoji=✈️&slug=numq&button_colour=5F7FFF&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" /></a>
 
-<div style="display: flex; justify-content: center; align-items: center">
-    <img src="./media/logo.png" alt="logo" style="max-width: 100%; height: 256px; display: inline-block; vertical-align: middle">
-    <p style="display: inline-block; vertical-align: middle; font-size: 128px">Klarity</p>
+<div style="display: flex; align-items: center; margin: 20px; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
+  <div style="flex: 1; text-align: center;">
+    <img src="./media/logo.png" alt="Your Image" style="max-width: 100%; border-radius: 8px;">
+  </div>
+  <div style="flex: 2; margin-left: 20px; color: #333;">
+    <h1>Klarity</h1>
+    <p style="font-size: 14px; line-height: 1.5;">Media player library for Jetpack Compose Desktop</p>
+  </div>
 </div>
-
-Klarity is a library providing media player functionality written in Kotlin for developing Compose Desktop applications
 
 ---
 
