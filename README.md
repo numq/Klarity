@@ -3,7 +3,7 @@
 <div align="center">
 <h1>Klarity</h1>
 <img src="./media/logo.png" alt="logo" height="128px"/>
-<h2>Media player library for Jetpack Compose Desktop</h2>
+<p>Media player library for Jetpack Compose Desktop</p>
 </div>
 
 ---
