@@ -8,18 +8,20 @@
 
 ---
 
-- [Features](#features)
-- [Architecture](#architecture)
-    - [Dependency graph](#dependency-graph)
-    - [State diagram](#state-diagram)
-    - [Transition table](#transition-table)
-- [Supported formats](#supported-formats)
-- [Modules](#modules)
-    - [Core](#core)
-    - [Compose](#compose)
-    - [Example](#example)
-- [Components](#components)
-- [Usage](#usage)
+# Table of Content
+
+* [Features](#features)
+* [Architecture](#architecture)
+    * [Dependency graph](#dependency-graph)
+    * [State diagram](#state-diagram)
+    * [Transition table](#transition-table)
+* [Supported formats](#supported-formats)
+* [Modules](#modules)
+    * [Core](#core)
+    * [Compose](#compose)
+    * [Example](#example)
+* [Components](#components)
+* [Usage](#usage)
 
 # Features
 
