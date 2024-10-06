@@ -2,8 +2,9 @@
 
 <div align="center">
 <h1>Klarity</h1>
-<img src="./media/logo.png" alt="logo" height="128px"/>
-<p>Media player library for Jetpack Compose Desktop</p>
+<img src="media/logo.png" alt="logo" height="128px"/>
+<h2>Media player library for Jetpack Compose Desktop</h2>
+<img src="media/screenshot.png" alt="screenshot"/>
 </div>
 
 ---
