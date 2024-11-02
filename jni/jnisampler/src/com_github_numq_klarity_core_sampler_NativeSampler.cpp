@@ -1,7 +1,7 @@
 #include <iostream>
 #include <shared_mutex>
 #include <mutex>
-#include "sampler_NativeSampler.h"
+#include "com_github_numq_klarity_core_sampler_NativeSampler.h"
 #include "klarity_sampler/sampler.h"
 
 static jclass exceptionClass;
@@ -9,7 +9,7 @@ static std::shared_mutex mutex;
 static std::unordered_map<jlong, std::shared_ptr<Sampler>> samplers;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(exceptionClass, ("JNI ERROR: " + errorMessage).c_str());
+    env->ThrowNew(exceptionClass, errorMessage.c_str());
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -47,9 +47,9 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     }
 }
 
-JNIEXPORT jlong JNICALL Java_sampler_NativeSampler_createNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_createNative(
         JNIEnv *env,
-        jobject thisObject,
+        jclass thisClass,
         jint sampleRate,
         jint channels
 ) {
@@ -72,9 +72,9 @@ JNIEXPORT jlong JNICALL Java_sampler_NativeSampler_createNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setPlaybackSpeedNative(
         JNIEnv *env,
-        jobject thisObject,
+        jclass thisClass,
         jlong handle,
         jfloat factor
 ) {
@@ -92,9 +92,9 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setPlaybackSpeedNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setVolumeNative(
         JNIEnv *env,
-        jobject thisObject,
+        jclass thisClass,
         jlong handle,
         jfloat value
 ) {
@@ -112,7 +112,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_setVolumeNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobject thisObject, jlong handle) {
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -127,9 +127,9 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_startNative(JNIEnv *env, jobje
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_playNative(
         JNIEnv *env,
-        jobject thisObject,
+        jclass thisClass,
         jlong handle,
         jbyteArray bytes,
         jint size
@@ -160,7 +160,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_playNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobject thisObject, jlong handle) {
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -175,7 +175,7 @@ JNIEXPORT void JNICALL Java_sampler_NativeSampler_stopNative(JNIEnv *env, jobjec
     }
 }
 
-JNIEXPORT void JNICALL Java_sampler_NativeSampler_deleteNative(JNIEnv *env, jobject thisObject, jlong handle) {
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_deleteNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     try {

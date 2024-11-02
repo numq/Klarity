@@ -3,7 +3,7 @@ project(jni_sampler VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_library(jni_sampler SHARED src/sampler_NativeSampler.cpp)
+add_library(jni_sampler SHARED src/com_github_numq_klarity_core_sampler_NativeSampler.cpp)
 
 target_include_directories(jni_sampler PRIVATE include)
 

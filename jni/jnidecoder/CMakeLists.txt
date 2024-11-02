@@ -3,7 +3,7 @@ project(jnidecoder VERSION 1.0.0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_library(jni_decoder SHARED src/decoder_NativeDecoder.cpp)
+add_library(jni_decoder SHARED src/com_github_numq_klarity_core_decoder_NativeDecoder.cpp)
 
 target_include_directories(jni_decoder PRIVATE include)
 

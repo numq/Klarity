@@ -1,7 +1,7 @@
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
-#include "decoder_NativeDecoder.h"
+#include "com_github_numq_klarity_core_decoder_NativeDecoder.h"
 #include "decoder.h"
 
 static jclass exceptionClass;
@@ -14,7 +14,7 @@ static std::unordered_map<jlong, std::shared_ptr<Decoder>> decoders;
 
 void handleException(JNIEnv *env, const std::string &errorMessage) {
     if (exceptionClass) {
-        env->ThrowNew(exceptionClass, ("JNI ERROR: " + errorMessage).c_str());
+        env->ThrowNew(exceptionClass, errorMessage.c_str());
     }
 }
 
@@ -30,12 +30,12 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    formatClass = (jclass) env->NewGlobalRef(env->FindClass("decoder/NativeFormat"));
+    formatClass = (jclass) env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/format/NativeFormat"));
     if (formatClass == nullptr) {
         return JNI_ERR;
     }
 
-    frameClass = (jclass) env->NewGlobalRef(env->FindClass("decoder/NativeFrame"));
+    frameClass = (jclass) env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeFrame"));
     if (frameClass == nullptr) {
         return JNI_ERR;
     }
@@ -65,9 +65,9 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     decoders.clear();
 }
 
-JNIEXPORT jlong JNICALL Java_decoder_NativeDecoder_createNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
         JNIEnv *env,
-        jobject obj,
+        jclass thisClass,
         jstring location,
         jboolean findAudioStream,
         jboolean findVideoStream
@@ -99,7 +99,8 @@ JNIEXPORT jlong JNICALL Java_decoder_NativeDecoder_createNative(
     }
 }
 
-JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(JNIEnv *env, jobject obj, jlong handle) {
+JNIEXPORT jobject JNICALL
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -138,7 +139,8 @@ JNIEXPORT jobject JNICALL Java_decoder_NativeDecoder_getFormatNative(JNIEnv *env
 }
 
 JNIEXPORT jobject JNICALL
-Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong handle, jint width, jint height) {
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jclass thisClass, jlong handle,
+                                                                        jint width, jint height) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -175,9 +177,9 @@ Java_decoder_NativeDecoder_nextFrameNative(JNIEnv *env, jobject obj, jlong handl
     }
 }
 
-JNIEXPORT void JNICALL Java_decoder_NativeDecoder_seekToNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
         JNIEnv *env,
-        jobject obj,
+        jclass thisClass,
         jlong handle,
         jlong timestampMicros,
         jboolean keyframesOnly
@@ -196,7 +198,8 @@ JNIEXPORT void JNICALL Java_decoder_NativeDecoder_seekToNative(
     }
 }
 
-JNIEXPORT void JNICALL Java_decoder_NativeDecoder_resetNative(JNIEnv *env, jobject obj, jlong handle) {
+JNIEXPORT void JNICALL
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_resetNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -211,7 +214,8 @@ JNIEXPORT void JNICALL Java_decoder_NativeDecoder_resetNative(JNIEnv *env, jobje
     }
 }
 
-JNIEXPORT void JNICALL Java_decoder_NativeDecoder_deleteNative(JNIEnv *env, jobject obj, jlong handle) {
+JNIEXPORT void JNICALL
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_deleteNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     try {
