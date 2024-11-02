@@ -3,7 +3,7 @@
 <div align="center">
 <h1>Klarity</h1>
 <img src="media/logo.png" alt="logo" height="128px"/>
-<h2>Media player library for Jetpack Compose Desktop</h2>
+<h2>Media player loader for Jetpack Compose Desktop</h2>
 <img src="media/screenshot.png" alt="screenshot"/>
 </div>
 
@@ -161,17 +161,21 @@ the [Application](example/src/main/kotlin/application/Application.kt).
 
 ## Components
 
-- [KlarityPlayer](core/src/main/kotlin/player/KlarityPlayer.kt) - contains the media player logic.
-- [SnapshotManager](core/src/main/kotlin/snapshot/SnapshotManager.kt) - allows to get frames (snapshots) with a
+- [KlarityPlayer](core/src/main/kotlin/com/github/numq/klarity/core/player/KlarityPlayer.kt) - contains the media player
+  logic.
+- [SnapshotManager](core/src/main/kotlin/com/github/numq/klarity/core/snapshot/SnapshotManager.kt) - allows to get
+  frames (snapshots) with a
   specified timestamp once per session. Use case - previewing keyframes.
-- [PreviewManager](core/src/main/kotlin/preview/PreviewManager.kt) - allows to get frames (snapshots) with a
+- [PreviewManager](core/src/main/kotlin/com/github/numq/klarity/core/preview/PreviewManager.kt) - allows to get frames (
+  snapshots) with a
   specific timestamp during a continuous session. Use case - previewing the timeline.
-- [Renderer](compose/src/main/kotlin/renderer/Renderer.kt) - Provides functionality for rendering background and
+- [Renderer](compose/src/main/kotlin/com/github/numq/klarity/compose/renderer/Renderer.kt) - Provides functionality for
+  rendering background and
   foreground.
 
 ## Usage
 
-- Load binaries using the [Klarity](core/src/main/kotlin/library/Klarity.kt) loader object
+- Load binaries using the [Klarity](core/src/main/kotlin/com/github/numq/klarity/core/loader/Klarity.kt) loader object
   > Binaries must be located in the filesystem, however, they can be part of a jar - for this the binaries must be
   opened
   > as temporary files whose path can be used by the loader.
