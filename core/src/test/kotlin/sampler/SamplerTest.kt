@@ -1,7 +1,8 @@
 package sampler
 
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.sampler.Sampler
 import kotlinx.coroutines.test.runTest
-import library.Klarity
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

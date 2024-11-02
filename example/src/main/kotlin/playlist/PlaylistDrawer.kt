@@ -23,7 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import queue.SelectedItem
+import com.github.numq.klarity.core.queue.SelectedItem
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

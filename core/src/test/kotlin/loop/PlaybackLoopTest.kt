@@ -1,20 +1,20 @@
 package loop
 
-import buffer.Buffer
-import frame.Frame
+import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.loop.buffer.BufferLoop
+import com.github.numq.klarity.core.loop.playback.DefaultPlaybackLoop
+import com.github.numq.klarity.core.pipeline.Pipeline
+import com.github.numq.klarity.core.timestamp.Timestamp
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
 import kotlinx.coroutines.test.runTest
-import loop.buffer.BufferLoop
-import loop.playback.DefaultPlaybackLoop
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import pipeline.Pipeline
-import timestamp.Timestamp
 
 class PlaybackLoopTest {
     private lateinit var bufferLoop: BufferLoop

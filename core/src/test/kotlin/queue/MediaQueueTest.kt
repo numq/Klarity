@@ -1,5 +1,8 @@
 package queue
 
+import com.github.numq.klarity.core.queue.MediaQueue
+import com.github.numq.klarity.core.queue.RepeatMode
+import com.github.numq.klarity.core.queue.SelectedItem
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*

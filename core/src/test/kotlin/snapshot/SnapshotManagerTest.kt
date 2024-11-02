@@ -1,8 +1,9 @@
 package snapshot
 
-import frame.Frame
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.snapshot.SnapshotManager
 import kotlinx.coroutines.test.runTest
-import library.Klarity
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Test

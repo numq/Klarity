@@ -1,9 +1,9 @@
 package jni
 
-import decoder.NativeDecoder
-import decoder.NativeFrame
+import com.github.numq.klarity.core.decoder.NativeDecoder
+import com.github.numq.klarity.core.frame.NativeFrame
+import com.github.numq.klarity.core.loader.Klarity
 import kotlinx.coroutines.test.runTest
-import library.Klarity
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -52,45 +52,45 @@ class NativeDecoderTest {
     @Test
     fun `get format`() = runTest {
         with(audioDecoder.format) {
-            assertEquals(5_000_000L, durationMicros())
-            assertEquals(44100, sampleRate())
-            assertEquals(2, channels())
-            assertEquals(0, width())
-            assertEquals(0, height())
-            assertEquals(0.0, frameRate())
+            assertEquals(5_000_000L, durationMicros)
+            assertEquals(44100, sampleRate)
+            assertEquals(2, channels)
+            assertEquals(0, width)
+            assertEquals(0, height)
+            assertEquals(0.0, frameRate)
         }
         with(videoDecoder.format) {
-            assertEquals(5_000_000L, durationMicros())
-            assertEquals(0, sampleRate())
-            assertEquals(0, channels())
-            assertEquals(500, width())
-            assertEquals(500, height())
-            assertEquals(25.0, frameRate())
+            assertEquals(5_000_000L, durationMicros)
+            assertEquals(0, sampleRate)
+            assertEquals(0, channels)
+            assertEquals(500, width)
+            assertEquals(500, height)
+            assertEquals(25.0, frameRate)
         }
 
         with(mediaDecoder.format) {
-            assertEquals(5_000_000L, durationMicros())
-            assertEquals(44100, sampleRate())
-            assertEquals(2, channels())
-            assertEquals(500, width())
-            assertEquals(500, height())
-            assertEquals(25.0, frameRate())
+            assertEquals(5_000_000L, durationMicros)
+            assertEquals(44100, sampleRate)
+            assertEquals(2, channels)
+            assertEquals(500, width)
+            assertEquals(500, height)
+            assertEquals(25.0, frameRate)
         }
     }
 
     @Test
     fun `get next frame`() = runTest {
-        with(audioDecoder.nextFrame(0, 0)) {
+        with(audioDecoder.nextFrame(0, 0)!!) {
             assertEquals(NativeFrame.Type.AUDIO.ordinal, type)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
         }
-        with(videoDecoder.nextFrame(100, 100)) {
+        with(videoDecoder.nextFrame(100, 100)!!) {
             assertEquals(NativeFrame.Type.VIDEO.ordinal, type)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
         }
-        with(mediaDecoder.nextFrame(100, 100)) {
+        with(mediaDecoder.nextFrame(100, 100)!!) {
             assertTrue(type == NativeFrame.Type.AUDIO.ordinal || type == NativeFrame.Type.VIDEO.ordinal)
             assertEquals(0L, timestampMicros)
             assertTrue(bytes.isNotEmpty())
@@ -99,9 +99,9 @@ class NativeDecoderTest {
 
     @Test
     fun `seek media`() = runTest {
-        audioDecoder.seekTo((0L..audioDecoder.format.durationMicros()).random(), false)
-        videoDecoder.seekTo((0L..videoDecoder.format.durationMicros()).random(), false)
-        mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros()).random(), false)
+        audioDecoder.seekTo((0L..audioDecoder.format.durationMicros).random(), false)
+        videoDecoder.seekTo((0L..videoDecoder.format.durationMicros).random(), false)
+        mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros).random(), false)
     }
 
     @Test

@@ -1,23 +1,23 @@
 package loop
 
-import buffer.Buffer
-import decoder.Decoder
-import frame.Frame
+import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.loop.buffer.DefaultBufferLoop
+import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.pipeline.Pipeline
+import com.github.numq.klarity.core.timestamp.Timestamp
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
-import loop.buffer.DefaultBufferLoop
-import media.Media
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import pipeline.Pipeline
-import timestamp.Timestamp
 
 class BufferLoopTest {
     private lateinit var pipeline: Pipeline

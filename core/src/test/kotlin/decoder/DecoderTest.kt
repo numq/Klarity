@@ -1,6 +1,7 @@
 package decoder
 
-import library.Klarity
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.loader.Klarity
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.File

@@ -12,19 +12,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.core.format.VideoFormat
+import com.github.numq.klarity.core.frame.Frame
 import controls.HoveredTimestamp
 import extension.formatTimestamp
-import format.VideoFormat
-import frame.Frame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import renderer.Foreground
-import renderer.Renderer
-import scale.ImageScale
+import com.github.numq.klarity.compose.renderer.Foreground
+import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.scale.ImageScale
 
 private fun scaleDimensions(
     width: Float,

@@ -1,11 +1,11 @@
 package jni
 
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.sampler.NativeSampler
 import kotlinx.coroutines.test.runTest
-import library.Klarity
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import sampler.NativeSampler
 import java.io.File
 import java.net.URL
 import kotlin.random.Random

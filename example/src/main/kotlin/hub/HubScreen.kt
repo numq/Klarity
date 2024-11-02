@@ -17,6 +17,8 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.core.probe.ProbeManager
+import com.github.numq.klarity.core.snapshot.SnapshotManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -25,10 +27,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notification.Notification
-import probe.ProbeManager
 import remote.RemoteUploadingDialog
 import slider.StepSlider
-import snapshot.SnapshotManager
 import java.io.File
 import kotlin.random.Random
 

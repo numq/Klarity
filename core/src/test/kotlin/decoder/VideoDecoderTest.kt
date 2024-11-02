@@ -1,12 +1,13 @@
 package decoder
 
-import format.VideoFormat
-import frame.Frame
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.format.VideoFormat
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.media.Location
+import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
-import library.Klarity
-import media.Location
-import media.Media
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -55,7 +56,7 @@ class VideoDecoderTest {
 
         assertEquals(5.seconds, media.durationMicros.microseconds)
 
-        assertEquals(VideoFormat(width = 500, height = 500, frameRate = 25.0), (media as Media.Video).format)
+        assertEquals(VideoFormat(width = 500, height = 500, frameRate = 25.0), media.format)
     }
 
     @Test

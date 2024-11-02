@@ -16,11 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.core.queue.RepeatMode
+import com.github.numq.klarity.core.state.PlayerState
+import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import queue.RepeatMode
-import state.PlayerState
-import timestamp.Timestamp
 
 @Composable
 fun PlaylistControls(
@@ -91,9 +91,7 @@ fun PlaylistControls(
                 val infiniteTransition = rememberInfiniteTransition()
 
                 val angle by infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(
+                    initialValue = 0f, targetValue = 360f, animationSpec = infiniteRepeatable(
                         animation = tween(durationMillis = 2000, easing = LinearEasing)
                     )
                 )

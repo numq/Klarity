@@ -1,12 +1,13 @@
 package decoder
 
-import format.AudioFormat
-import format.VideoFormat
-import frame.Frame
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.format.AudioFormat
+import com.github.numq.klarity.core.format.VideoFormat
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.media.Location
+import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.test.runTest
-import library.Klarity
-import media.Location
-import media.Media
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach

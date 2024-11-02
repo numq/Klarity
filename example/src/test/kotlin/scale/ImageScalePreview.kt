@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.singleWindowApplication
+import com.github.numq.klarity.compose.scale.ImageScale
 import org.jetbrains.skia.Bitmap
 import java.io.File
 import java.net.URI

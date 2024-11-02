@@ -7,9 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.github.numq.klarity.core.player.KlarityPlayer
+import com.github.numq.klarity.core.preview.PreviewManager
 import notification.Notification
-import player.KlarityPlayer
-import preview.PreviewManager
 import java.io.File
 
 @Composable

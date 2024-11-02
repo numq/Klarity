@@ -1,5 +1,6 @@
 package buffer
 
+import com.github.numq.klarity.core.buffer.Buffer
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test

@@ -14,9 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import renderer.Foreground
-import renderer.Renderer
-import scale.ImageScale
+import com.github.numq.klarity.compose.renderer.Foreground
+import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.scale.ImageScale
 
 @Composable
 fun UploadedPlaylistItem(

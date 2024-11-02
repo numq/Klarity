@@ -1,5 +1,7 @@
 package factory
 
+import com.github.numq.klarity.core.factory.Factory
+
 internal class StringFactory : Factory<Int, String> {
     override fun create(parameters: Int): Result<String> {
         return if (parameters > 0) {

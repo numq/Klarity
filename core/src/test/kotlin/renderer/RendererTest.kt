@@ -1,6 +1,7 @@
 package renderer
 
-import frame.Frame
+import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach

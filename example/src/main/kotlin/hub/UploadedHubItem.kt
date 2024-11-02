@@ -22,7 +22,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import event.PlayerEvent
+import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.media.Location
+import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.player.KlarityPlayer
+import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterIsInstance
@@ -30,14 +34,10 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import media.Location
-import media.Media
 import notification.Notification
-import player.KlarityPlayer
-import renderer.Foreground
-import renderer.Renderer
-import scale.ImageScale
-import state.PlayerState
+import com.github.numq.klarity.compose.renderer.Foreground
+import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.scale.ImageScale
 import kotlin.time.Duration.Companion.microseconds
 
 @Composable

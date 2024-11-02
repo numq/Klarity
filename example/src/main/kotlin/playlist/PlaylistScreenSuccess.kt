@@ -21,31 +21,31 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.compose.renderer.Background
+import com.github.numq.klarity.compose.renderer.Foreground
+import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.media.Location
+import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.player.KlarityPlayer
+import com.github.numq.klarity.core.preview.PreviewManager
+import com.github.numq.klarity.core.preview.PreviewState
+import com.github.numq.klarity.core.probe.ProbeManager
+import com.github.numq.klarity.core.queue.MediaQueue
+import com.github.numq.klarity.core.queue.SelectedItem
+import com.github.numq.klarity.core.snapshot.SnapshotManager
+import com.github.numq.klarity.core.state.PlayerState
 import controls.HoveredTimestamp
 import controls.Timeline
 import controls.VolumeControls
-import event.PlayerEvent
 import extension.formatTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import media.Location
-import media.Media
 import notification.Notification
-import player.KlarityPlayer
-import preview.PreviewManager
-import preview.PreviewState
-import probe.ProbeManager
-import queue.MediaQueue
-import queue.SelectedItem
 import remote.RemoteUploadingDialog
-import renderer.Background
-import renderer.Foreground
-import renderer.Renderer
-import snapshot.SnapshotManager
-import state.PlayerState
 import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.microseconds
@@ -181,7 +181,7 @@ fun PlaylistScreenSuccess(
                                 is PlayerState.Ready.Paused,
                                 is PlayerState.Ready.Completed,
                                 is PlayerState.Ready.Seeking,
-                                -> {
+                                    -> {
                                     player.stop()
                                     player.play()
                                 }

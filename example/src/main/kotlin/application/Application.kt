@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
+import com.github.numq.klarity.core.loader.Klarity
 import decoration.DecorationBox
-import library.Klarity
 import navigation.Navigation
 import theme.KlarityTheme
 import java.awt.Dimension
