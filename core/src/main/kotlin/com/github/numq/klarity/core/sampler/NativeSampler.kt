@@ -22,7 +22,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
         private external fun setVolumeNative(handle: Long, value: Float)
 
         @JvmStatic
-        private external fun startNative(handle: Long)
+        private external fun startNative(handle: Long): Long
 
         @JvmStatic
         private external fun playNative(handle: Long, bytes: ByteArray, size: Int)

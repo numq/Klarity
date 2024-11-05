@@ -10,9 +10,13 @@ internal class DefaultSampler(
 ) : Sampler {
     private val mutex = Mutex()
 
+    private var latency = 0L
+
     private var currentVolume = 1f
 
     override var playbackSpeedFactor = MutableStateFlow(1f)
+
+    override suspend fun getLatency() = mutex.withLock { Result.success(latency) }
 
     override suspend fun setPlaybackSpeed(factor: Float) = mutex.withLock {
         runCatching {
@@ -42,7 +46,7 @@ internal class DefaultSampler(
 
     override suspend fun start() = mutex.withLock {
         runCatching {
-            sampler.start()
+            latency = sampler.start()
         }.recoverCatching(NativeException::create)
     }
 

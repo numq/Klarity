@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface Sampler : AutoCloseable {
     val playbackSpeedFactor: StateFlow<Float>
+    suspend fun getLatency(): Result<Long>
     suspend fun setPlaybackSpeed(factor: Float): Result<Unit>
     suspend fun setVolume(value: Float): Result<Unit>
     suspend fun setMuted(state: Boolean): Result<Unit>

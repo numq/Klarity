@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultPlaybackLoop(
@@ -43,7 +42,10 @@ internal class DefaultPlaybackLoop(
         onAudioTimestamp: suspend (Timestamp) -> Unit,
         onVideoTimestamp: suspend (Timestamp) -> Unit,
     ) = coroutineScope {
+        val latency = sampler.getLatency().getOrThrow()
+
         val lastAudioTimestamp = AtomicReference(Duration.INFINITE)
+
         val audioJob = launch {
             while (isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
@@ -54,11 +56,9 @@ internal class DefaultPlaybackLoop(
 
                 when (val frame = audioBuffer.poll().getOrThrow()) {
                     is Frame.Audio.Content -> {
-                        lastAudioTimestamp.set(frame.timestampMicros.microseconds)
+                        onAudioTimestamp(Timestamp(micros = frame.timestampMicros - latency))
 
-                        ensureActive()
-
-                        onAudioTimestamp(Timestamp(micros = frame.timestampMicros))
+                        lastAudioTimestamp.set((frame.timestampMicros - latency).microseconds)
 
                         ensureActive()
 
@@ -69,6 +69,7 @@ internal class DefaultPlaybackLoop(
                 }
             }
         }
+
         val videoJob = launch {
             var lastFrameTimestamp = Duration.INFINITE
 
@@ -91,24 +92,25 @@ internal class DefaultPlaybackLoop(
                         break
                     }
 
-                    else -> when (val frame = videoBuffer.peek().getOrThrow()) {
-                        null -> {
-                            yield()
+                    else -> when (val frame = videoBuffer.poll().getOrThrow()) {
+                        is Frame.Video.Content -> if (lastAudioTimestamp.get().isFinite()) {
+                            val startPlaybackTime = System.nanoTime().nanoseconds
 
-                            continue
-                        }
+                            while (isActive && isPlaying.get()) {
+                                if ((System.nanoTime().nanoseconds - startPlaybackTime) * renderer.playbackSpeedFactor.value.toDouble() > frame.timestampMicros.microseconds - lastAudioTimestamp.get()) {
+                                    break
+                                }
 
-                        is Frame.Video.Content -> if (
-                            lastAudioTimestamp.get().isFinite() &&
-                            lastAudioTimestamp.get() - frame.timestampMicros.microseconds > 15.milliseconds
-                        ) {
-                            renderer.draw(videoBuffer.poll().getOrThrow() as Frame.Video.Content).getOrThrow()
+                                ensureActive()
+
+                                yield()
+                            }
+
+                            renderer.draw(frame).getOrThrow()
 
                             ensureActive()
 
                             onVideoTimestamp(Timestamp(micros = frame.timestampMicros))
-
-                            ensureActive()
 
                             lastFrameTimestamp = frame.timestampMicros.microseconds
                         }
@@ -124,6 +126,7 @@ internal class DefaultPlaybackLoop(
                 }
             }
         }
+
         joinAll(audioJob, videoJob)
     }
 
@@ -135,13 +138,11 @@ internal class DefaultPlaybackLoop(
         while (isActive && isPlaying.get()) {
             when (val frame = buffer.poll().getOrThrow()) {
                 is Frame.Audio.Content -> {
+                    sampler.play(bytes = frame.bytes).getOrThrow()
+
                     ensureActive()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
-
-                    ensureActive()
-
-                    sampler.play(bytes = frame.bytes).getOrThrow()
                 }
 
                 is Frame.Audio.EndOfStream -> break
@@ -176,13 +177,11 @@ internal class DefaultPlaybackLoop(
                         yield()
                     }
 
+                    renderer.draw(frame).getOrThrow()
+
                     ensureActive()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
-
-                    ensureActive()
-
-                    renderer.draw(frame).getOrThrow()
 
                     lastFrameTimestamp = frame.timestampMicros.microseconds
                 }

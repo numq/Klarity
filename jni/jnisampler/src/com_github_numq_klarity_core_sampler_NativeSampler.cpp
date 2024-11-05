@@ -112,7 +112,8 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
     }
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(JNIEnv *env, jclass thisClass, jlong handle) {
+JNIEXPORT jlong JNICALL
+Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -121,9 +122,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
             throw std::runtime_error("Invalid handle");
         }
 
-        it->second->start();
+        return static_cast<jlong>(it->second->start());
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in startNative method: ") + e.what());
+        return 0;
     }
 }
 
@@ -160,7 +162,8 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
     }
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative(JNIEnv *env, jclass thisClass, jlong handle) {
+JNIEXPORT void JNICALL
+Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::shared_lock<std::shared_mutex> lock(mutex);
 
     try {
@@ -175,7 +178,8 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
     }
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_deleteNative(JNIEnv *env, jclass thisClass, jlong handle) {
+JNIEXPORT void JNICALL
+Java_com_github_numq_klarity_core_sampler_NativeSampler_deleteNative(JNIEnv *env, jclass thisClass, jlong handle) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     try {

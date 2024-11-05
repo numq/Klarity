@@ -26,7 +26,7 @@ public:
 
     void setVolume(float value);
 
-    void start();
+    int start();
 
     void play(const uint8_t *samples, uint64_t size);
 
