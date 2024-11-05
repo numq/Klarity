@@ -1,41 +1,99 @@
 package loop
 
-import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loop.buffer.DefaultBufferLoop
-import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.buffer.AudioBufferFactory
+import com.github.numq.klarity.core.buffer.VideoBufferFactory
+import com.github.numq.klarity.core.decoder.AudioDecoderFactory
+import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
+import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.loop.buffer.BufferLoop
+import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.pipeline.Pipeline
+import com.github.numq.klarity.core.renderer.Renderer
+import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.timestamp.Timestamp
-import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.unmockkAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.File
+import java.net.URL
 
 class BufferLoopTest {
-    private lateinit var pipeline: Pipeline
-
-    @BeforeEach
-    fun beforeEach() {
-        pipeline = mockk<Pipeline>(relaxed = true)
+    init {
+        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
+            Klarity.loadDecoder(
+                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
+            ).getOrThrow()
+        }
+        File(ClassLoader.getSystemResources("bin/sampler").nextElement().let(URL::getFile)).listFiles()?.run {
+            Klarity.loadSampler(
+                portAudioPath = find { file -> file.path.endsWith("portaudio") }!!.path,
+                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
+                jniPath = find { file -> file.path.endsWith("jni") }!!.path
+            ).getOrThrow()
+        }
     }
 
-    @AfterEach
-    fun afterEach() {
-        unmockkAll()
+    private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
+
+    private val file = files?.find { file -> file.nameWithoutExtension == "audio_video" }!!
+
+    private val location = file.absolutePath
+
+    private lateinit var pipeline: Pipeline
+
+    private lateinit var bufferLoop: BufferLoop
+
+    @BeforeEach
+    fun beforeEach() = runBlocking {
+        val media = ProbeDecoderFactory().create(
+            parameters = ProbeDecoderFactory.Parameters(
+                location = location,
+                findAudioStream = true,
+                findVideoStream = true
+            )
+        ).getOrThrow().media
+
+        val audioDecoder = AudioDecoderFactory().create(
+            parameters = AudioDecoderFactory.Parameters(location = location)
+        ).getOrThrow()
+
+        val videoDecoder = VideoDecoderFactory().create(
+            parameters = VideoDecoderFactory.Parameters(location = location)
+        ).getOrThrow()
+
+        val audioBuffer = AudioBufferFactory().create(AudioBufferFactory.Parameters(capacity = 100)).getOrThrow()
+
+        val videoBuffer = VideoBufferFactory().create(VideoBufferFactory.Parameters(capacity = 100)).getOrThrow()
+
+        val sampler = mockk<Sampler>(relaxed = true)
+
+        val renderer = mockk<Renderer>(relaxed = true)
+
+        pipeline = Pipeline.AudioVideo(
+            media = media,
+            audioDecoder = audioDecoder,
+            videoDecoder = videoDecoder,
+            audioBuffer = audioBuffer,
+            videoBuffer = videoBuffer,
+            sampler = sampler,
+            renderer = renderer,
+        )
+
+        bufferLoop = BufferLoopFactory().create(
+            parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
+        ).getOrThrow()
     }
 
     @Test
     fun `test start and stop lifecycle`() = runTest {
-        val bufferLoop = DefaultBufferLoop(pipeline)
-
         val onTimestamp: suspend (Timestamp) -> Unit = {}
         val onWaiting: suspend () -> Unit = {}
         val endOfMedia: suspend () -> Unit = {}
@@ -53,23 +111,6 @@ class BufferLoopTest {
 
     @Test
     fun `test isWaiting state changes`() = runTest {
-        val pipeline = mockk<Pipeline.Audio>(relaxed = true)
-        val decoder = mockk<Decoder<Media.Audio, Frame.Audio>>(relaxed = true)
-        val buffer = mockk<Buffer<Frame.Audio>>(relaxed = true)
-
-        every { pipeline.decoder } returns decoder
-        every { pipeline.buffer } returns buffer
-        coEvery { decoder.nextFrame(any(), any()) } returns Result.success(
-            Frame.Audio.Content(
-                0,
-                byteArrayOf(),
-                2,
-                44100
-            )
-        )
-
-        val bufferLoop = DefaultBufferLoop(pipeline)
-
         val onTimestamp: suspend (Timestamp) -> Unit = {}
         val onWaiting: suspend () -> Unit = {}
         val endOfMedia: suspend () -> Unit = {}
@@ -81,23 +122,6 @@ class BufferLoopTest {
 
     @Test
     fun `test timestamp flow`() = runTest {
-        val pipeline = mockk<Pipeline.Audio>(relaxed = true)
-        val decoder = mockk<Decoder<Media.Audio, Frame.Audio>>(relaxed = true)
-        val buffer = mockk<Buffer<Frame.Audio>>(relaxed = true)
-
-        every { pipeline.decoder } returns decoder
-        every { pipeline.buffer } returns buffer
-        coEvery { decoder.nextFrame(any(), any()) } returns Result.success(
-            Frame.Audio.Content(
-                0,
-                byteArrayOf(),
-                2,
-                44100
-            )
-        )
-
-        val bufferLoop = DefaultBufferLoop(pipeline)
-
         val onTimestamp: suspend (Timestamp) -> Unit = {}
         val onWaiting: suspend () -> Unit = {}
         val endOfMedia: suspend () -> Unit = {}
