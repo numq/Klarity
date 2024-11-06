@@ -16,6 +16,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -111,17 +112,6 @@ class BufferLoopTest {
 
     @Test
     fun `test isWaiting state changes`() = runTest {
-        val onTimestamp: suspend (Timestamp) -> Unit = {}
-        val onWaiting: suspend () -> Unit = {}
-        val endOfMedia: suspend () -> Unit = {}
-
-        assertTrue(bufferLoop.start(onTimestamp, onWaiting, endOfMedia).isSuccess)
-
-        assertTrue(bufferLoop.stop().isSuccess)
-    }
-
-    @Test
-    fun `test timestamp flow`() = runTest {
         val onTimestamp: suspend (Timestamp) -> Unit = {}
         val onWaiting: suspend () -> Unit = {}
         val endOfMedia: suspend () -> Unit = {}
