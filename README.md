@@ -3,13 +3,17 @@
 <div align="center">
 <h1>Klarity</h1>
 <img src="media/logo.png" alt="logo" height="128px"/>
-<h2>Media player loader for Jetpack Compose Desktop</h2>
+</div>
+
+### Klarity is an FFMpeg-based media player library written in C++ and Kotlin, and supports use in Jetpack Compose Desktop projects.
+
+<div align="center">
 <img src="media/screenshot.png" alt="screenshot"/>
 </div>
 
 ---
 
-# Table of Content
+## Table of Content
 
 * [Features](#features)
 * [Architecture](#architecture)
@@ -22,7 +26,7 @@
     * [Compose](#compose)
     * [Example](#example)
 * [Components](#components)
-* [Usage](#usage)
+* [Installation](#installation-and-usage)
 
 # Features
 
@@ -33,9 +37,9 @@
 - Coroutines/Flow based API
 - Compose video rendering
 
-# Architecture
+## Architecture
 
-## Dependency graph
+### Dependency graph
 
 ```mermaid
 graph TD
@@ -76,7 +80,7 @@ graph TD
     JNI\nNativeDecoder --> C++\nDecoder
 ```
 
-## State diagram
+### State diagram
 
 ```mermaid
 stateDiagram-v2
@@ -108,7 +112,7 @@ stateDiagram-v2
     }
 ```
 
-## Transition table
+### Transition table
 
 | Current State \ Target State | Empty | Preparing | Ready (Stopped) | Ready (Playing) | Ready (Paused) | Ready (Completed) | Ready (Seeking) | Released |
 |------------------------------|-------|-----------|-----------------|-----------------|----------------|-------------------|-----------------|----------|
@@ -120,17 +124,17 @@ stateDiagram-v2
 | **Ready (Completed)**        | N/A   | N/A       | Stop            | N/A             | N/A            | N/A               | SeekTo          | N/A      |
 | **Ready (Seeking)**          | N/A   | N/A       | Stop            | N/A             | Seek Completed | N/A               | SeekTo          | N/A      |
 
-# Supported formats
+## Supported formats
 
 [Full list of formats supported by FFmpeg](https://ffmpeg.org/ffmpeg-formats.html)
 
-# Modules
+## Modules
 
-## Core
+### Core
 
 > Contains basic components such as: controller, player, preview manager, snapshot manager
 
-### Dependencies
+#### Dependencies
 
 - [klarity-decoder](https://github.com/numq/klarity-decoder)
     - [FFmpeg](https://www.ffmpeg.org/)
@@ -139,19 +143,19 @@ stateDiagram-v2
     - [PortAudio](https://github.com/PortAudio/portaudio/)
     - [Signalsmith Audio](https://github.com/Signalsmith-Audio/signalsmith-stretch)
 
-## Compose
+### Compose
 
 > Contains a Compose component for rendering video
 
-### Dependencies
+#### Dependencies
 
 - [Core Module](#core)
 
-## Example
+### Example
 
 > Contains a demo application
 
-### Dependencies
+#### Dependencies
 
 - [Core Module](#core)
 - [Compose Module](#compose)
@@ -159,7 +163,7 @@ stateDiagram-v2
 To run demo application place the binaries appropriate to your platform into the `example/bin` folder and run
 the [Application](example/src/main/kotlin/application/Application.kt).
 
-## Components
+### Components
 
 - [KlarityPlayer](core/src/main/kotlin/com/github/numq/klarity/core/player/KlarityPlayer.kt) - contains the media player
   logic.
@@ -173,10 +177,15 @@ the [Application](example/src/main/kotlin/application/Application.kt).
   rendering background and
   foreground.
 
-## Usage
+### Installation and usage
 
-- Load binaries using the [Klarity](core/src/main/kotlin/com/github/numq/klarity/core/loader/Klarity.kt) loader object
-  > Binaries must be located in the filesystem, however, they can be part of a jar - for this the binaries must be
-  opened
-  > as temporary files whose path can be used by the loader.
-- Use the necessary components
+> [!IMPORTANT]
+> Binaries must be located in the filesystem, however, they can be part of a jar - for this the binaries must be
+> opened as temporary files whose path can be used by the loader.
+
+- Include the library jars in project
+- Place binaries in folder
+- Load binaries by specifying path in calls to `loadDecoder` and `loadSampler` functions
+  of [Klarity](core/src/main/kotlin/com/github/numq/klarity/core/loader/Klarity.kt) loader object
+- Instantiate and use **core** media player components located in `com.github.numq.klarity.core`
+- Instantiate and use specific **Jetpack Compose** components located in `com.github.numq.klarity.compose`
