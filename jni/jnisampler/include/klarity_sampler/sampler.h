@@ -13,6 +13,7 @@
 struct Sampler {
 private:
     std::mutex mutex;
+    uint32_t sampleRate;
     uint32_t channels;
     std::unique_ptr<PaStream, PaStreamDeleter> stream;
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>, SignalsmithStretchDeleter> stretch;
