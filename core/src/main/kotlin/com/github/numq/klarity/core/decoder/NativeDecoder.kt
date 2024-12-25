@@ -5,8 +5,8 @@ import com.github.numq.klarity.core.frame.NativeFrame
 import java.lang.ref.Cleaner
 
 internal class NativeDecoder(location: String, findAudioStream: Boolean, findVideoStream: Boolean) : AutoCloseable {
-    private val nativeHandle: Long = createNative(location, findAudioStream, findVideoStream).also { handle ->
-        require(handle != 0L) { "Unable to instantiate NativeDecoder" }
+    private val nativeHandle = createNative(location, findAudioStream, findVideoStream).also { handle ->
+        require(handle != -1L) { "Unable to instantiate native decoder" }
     }
 
     private val cleanable = cleaner.register(this) { deleteNative(nativeHandle) }

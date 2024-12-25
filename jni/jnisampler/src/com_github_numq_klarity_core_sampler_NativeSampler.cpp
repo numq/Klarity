@@ -68,7 +68,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         return handle;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in initNative method: ") + e.what());
-        return 0;
+        return -1;
     }
 }
 
@@ -125,7 +125,7 @@ Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(JNIEnv *env,
         return static_cast<jlong>(it->second->start());
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in startNative method: ") + e.what());
-        return 0;
+        return -1;
     }
 }
 

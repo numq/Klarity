@@ -95,7 +95,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         return handle;
     } catch (const std::exception &e) {
         handleException(env, std::string("Exception in createNative method: ") + e.what());
-        return 0;
+        return -1;
     }
 }
 
