@@ -1,5 +1,7 @@
 package playlist
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -18,6 +20,7 @@ import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.Renderer
 import com.github.numq.klarity.compose.scale.ImageScale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UploadedPlaylistItem(
     playlistItem: PlaylistItem.Uploaded,
@@ -25,18 +28,13 @@ fun UploadedPlaylistItem(
     select: () -> Unit,
     delete: () -> Unit,
 ) {
-    Card(modifier = Modifier.alpha(if (isSelected) .5f else 1f)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(64.dp).clickable(onClick = select).padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    TooltipArea(tooltip = {
+        Text(text = playlistItem.media.location.path)
+    }, content = {
+        Card(modifier = Modifier.alpha(if (isSelected) .5f else 1f)) {
             Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(
-                    space = 8.dp,
-                    alignment = Alignment.Start
-                ),
+                modifier = Modifier.fillMaxWidth().height(64.dp).clickable(onClick = select).padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(space = 8.dp, alignment = Alignment.Start),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Card(shape = CircleShape) {
@@ -48,14 +46,14 @@ fun UploadedPlaylistItem(
                     )
                 }
                 Text(
-                    text = playlistItem.media.location.value,
-                    modifier = Modifier.padding(8.dp),
-                    maxLines = 1
+                    text = playlistItem.media.location.path,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
                 )
-            }
-            IconButton(onClick = delete) {
-                Icon(Icons.Default.Remove, null)
+                IconButton(onClick = delete) {
+                    Icon(Icons.Default.Remove, null)
+                }
             }
         }
-    }
+    })
 }

@@ -137,7 +137,7 @@ fun UploadedHubItem(
                                     when (state) {
                                         is PlayerState.Empty -> {
                                             player.prepare(
-                                                location = hubItem.media.location.value,
+                                                location = hubItem.media.location.path,
                                                 enableAudio = true,
                                                 enableVideo = true
                                             )

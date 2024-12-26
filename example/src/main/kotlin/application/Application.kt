@@ -27,19 +27,22 @@ import theme.KlarityTheme
 import java.awt.Dimension
 import java.awt.FileDialog
 import java.io.File
-import java.nio.file.Paths
 import kotlin.system.exitProcess
 
 fun main() {
     val appName = "Klarity"
 
-    val decoderPath = Paths.get("example\\bin\\decoder").toAbsolutePath().toString()
+    val pathToBinaries = Thread.currentThread().contextClassLoader.getResource("bin")?.file
+
+    checkNotNull(pathToBinaries) { "Binaries not found" }
+
+    val decoderPath = "$pathToBinaries\\decoder"
 
     Klarity.loadDecoder(
         ffmpegPath = "$decoderPath\\ffmpeg", klarityPath = "$decoderPath\\klarity", jniPath = "$decoderPath\\jni"
     ).getOrThrow()
 
-    val samplerPath = Paths.get("example\\bin\\sampler").toAbsolutePath().toString()
+    val samplerPath = "$pathToBinaries\\sampler"
 
     Klarity.loadSampler(
         portAudioPath = "$samplerPath\\portaudio", klarityPath = "$samplerPath\\klarity", jniPath = "$samplerPath\\jni"

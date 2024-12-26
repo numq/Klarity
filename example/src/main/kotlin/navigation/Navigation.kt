@@ -36,10 +36,6 @@ import playlist.PlaylistScreen
 import splash.SplashScreen
 import java.io.File
 import java.net.URI
-import java.nio.file.LinkOption
-import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.toPath
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -91,11 +87,7 @@ fun Navigation(openFileChooser: () -> List<File>) {
                                 openFileChooser().filter(File::exists)
                             },
                             upload = { locations ->
-                                locations.map {
-                                    URI(it).toPath()
-                                }.filter { path ->
-                                    path.exists(LinkOption.NOFOLLOW_LINKS)
-                                }.map(Path::toFile)
+                                locations.map(::URI).map(URI::getPath).map(::File).filter(File::exists)
                             },
                             notify = notifications::trySend
                         )
@@ -114,11 +106,7 @@ fun Navigation(openFileChooser: () -> List<File>) {
                                 openFileChooser().filter(File::exists)
                             },
                             upload = { locations ->
-                                locations.map {
-                                    URI(it).toPath()
-                                }.filter { path ->
-                                    path.exists(LinkOption.NOFOLLOW_LINKS)
-                                }.map(Path::toFile)
+                                locations.map(::URI).map(URI::getPath).map(::File).filter(File::exists)
                             },
                             notify = notifications::trySend
                         )

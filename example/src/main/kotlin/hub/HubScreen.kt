@@ -55,7 +55,10 @@ fun HubScreen(
                 hubItems += pendingItem
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = HubItem.Uploaded(
-                        media = media, snapshots = SnapshotManager.snapshots(media.location.value) { durationMillis ->
+                        media = media,
+                        snapshots = SnapshotManager.snapshots(
+                            location = media.location.path
+                        ) { durationMillis ->
                             val n = 10
                             (1..<n).map { i -> durationMillis.div(n - i) }
                         }.getOrNull() ?: emptyList()
@@ -82,7 +85,7 @@ fun HubScreen(
     }
 
     fun addFiles(files: List<File>) {
-        files.map { it.absolutePath }.forEach(::addLocation)
+        files.map(File::getAbsolutePath).forEach(::addLocation)
     }
 
     fun deleteHubItem(hubItem: HubItem) {
