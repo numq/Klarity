@@ -21,9 +21,9 @@ interface Decoder<Media, Frame> : AutoCloseable {
             findVideoStream: Boolean,
         ): Result<Media> = runCatching {
             val mediaLocation = File(location).takeIf(File::exists)?.run {
-                Location.Local(fileName = name, path = path)
+                Location.Local(path = path, name = name)
             } ?: URI.create(location).takeIf(URI::isAbsolute)?.run {
-                Location.Remote(url = location)
+                Location.Remote(path = location)
             }
 
             checkNotNull(mediaLocation) { "Unable to find media" }

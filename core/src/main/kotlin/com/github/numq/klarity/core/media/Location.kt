@@ -4,21 +4,17 @@ import java.io.File
 import java.net.URI
 
 sealed interface Location {
-    val value: String
+    val path: String
 
-    data class Local(val fileName: String, val path: String) : Location {
-        override val value = path
-    }
+    data class Local(override val path: String, val name: String) : Location
 
-    data class Remote(val url: String) : Location {
-        override val value = url
-    }
+    data class Remote(override val path: String) : Location
 
     companion object {
         fun create(location: String): Result<Location> = runCatching {
             checkNotNull(
-                File(location).takeIf(File::exists)?.run { Local(fileName = name, path = path) }
-                    ?: URI(location).takeIf(URI::isAbsolute)?.run { Remote(url = location) }
+                File(location).takeIf(File::exists)?.run { Local(path = path, name = name) }
+                    ?: URI(location).takeIf(URI::isAbsolute)?.run { Remote(path = location) }
             ) { "Unable to create location" }
         }
     }
