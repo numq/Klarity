@@ -9,8 +9,9 @@
 *.out
 *.app
 
-# CMake build directory
-cmake-build-*/
+# CMake build directories
+cmake-build-debug/
+cmake-build-release/
 
 # CLion project files
 .idea/

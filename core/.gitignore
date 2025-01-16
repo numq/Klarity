@@ -1,3 +1,5 @@
+src/main/resources/bin
+src/test/resources/bin
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
