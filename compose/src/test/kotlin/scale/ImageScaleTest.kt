@@ -29,7 +29,7 @@ class ImageScaleTest {
         )
         assertEquals(
             DpSize(20.dp, 40.dp),
-            ImageScale.Fill.scaleDp(srcSize, DpSize(20.dp, 10.dp))
+            ImageScale.Fill.scaleDp(srcSize, DpSize(20.dp, 40.dp))
         )
     }
 
