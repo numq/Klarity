@@ -1,2 +1,2 @@
-jni/jnidecoder/include/** linguist-vendored
-jni/jnisampler/include/** linguist-vendored
+*.kt linguist-language=Kotlin
+*.kts linguist-language=Kotlin
