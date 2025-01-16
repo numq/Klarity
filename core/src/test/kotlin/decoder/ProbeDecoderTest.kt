@@ -58,7 +58,7 @@ class ProbeDecoderTest {
 
         assertTrue(media is Media.AudioVideo)
 
-        assertEquals(Location.Local(fileName = file.name, path = location), media.location)
+        assertEquals(Location.Local(path = location, name = file.name), media.location)
 
         assertEquals(5.seconds, media.durationMicros.microseconds)
 
