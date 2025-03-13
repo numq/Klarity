@@ -22,6 +22,14 @@ dependencies {
     implementation(project(":compose"))
 }
 
+tasks.withType<JavaCompile> {
+    options.release.set(JavaVersion.VERSION_15.ordinal)
+}
+
+tasks.withType<KotlinCompile> {
+    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
@@ -29,13 +37,9 @@ tasks.test {
     }
 }
 
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
-}
-
 compose.desktop {
     application {
-        mainClass = "ApplicationKt"
+        mainClass = "application/ApplicationKt"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Klarity"

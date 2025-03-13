@@ -1,5 +1,6 @@
 package controller
 
+import JNITest
 import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.command.Command
@@ -8,7 +9,6 @@ import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
-import com.github.numq.klarity.core.loader.Klarity
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.RendererFactory
@@ -28,24 +28,7 @@ import java.io.File
 import java.net.URL
 import kotlin.time.Duration.Companion.microseconds
 
-class PlayerControllerTest {
-    init {
-        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
-            Klarity.loadDecoder(
-                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
-                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
-                jniPath = find { file -> file.path.endsWith("jni") }!!.path
-            ).getOrThrow()
-        }
-        File(ClassLoader.getSystemResources("bin/sampler").nextElement().let(URL::getFile)).listFiles()?.run {
-            Klarity.loadSampler(
-                portAudioPath = find { file -> file.path.endsWith("portaudio") }!!.path,
-                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
-                jniPath = find { file -> file.path.endsWith("jni") }!!.path
-            ).getOrThrow()
-        }
-    }
-
+class PlayerControllerTest : JNITest() {
     private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
 
     private val file = files?.find { file -> file.nameWithoutExtension == "audio_video" }!!

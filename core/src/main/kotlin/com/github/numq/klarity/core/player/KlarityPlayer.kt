@@ -7,7 +7,6 @@ import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.loader.Klarity
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.Renderer
@@ -25,7 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
  * and monitoring player state and events.
  */
 interface KlarityPlayer : AutoCloseable {
-
     /**
      * A flow that emits the current settings of the player.
      */
@@ -111,15 +109,50 @@ interface KlarityPlayer : AutoCloseable {
     suspend fun release()
 
     companion object {
+        private var isLoaded = false
+
+        /**
+         * Loads the native libraries.
+         *
+         * This method must be called before creating an instance.
+         *
+         * @param avutil The path to the `avutil-59` binary.
+         * @param swscale The path to the `swscale-8` binary.
+         * @param swresample The path to the `swresample-5` binary.
+         * @param avcodec The path to the `avcodec-61` binary.
+         * @param avformat The path to the `avformat-61` binary.
+         * @param portaudio The path to the `portaudio` binary.
+         * @param klarity The path to the `klarity` binary.
+         * @return A [Result] indicating the success or failure of the operation.
+         */
+        fun load(
+            avutil: String,
+            swscale: String,
+            swresample: String,
+            avcodec: String,
+            avformat: String,
+            portaudio: String,
+            klarity: String,
+        ) = runCatching {
+            System.load(avutil)
+            System.load(swscale)
+            System.load(swresample)
+            System.load(avcodec)
+            System.load(avformat)
+            System.load(portaudio)
+            System.load(klarity)
+        }.onSuccess {
+            isLoaded = true
+        }
+
         /**
          * Creates a new instance of the KlarityPlayer.
          *
          * @return A Result containing either a new KlarityPlayer instance or an error if creation fails.
          */
         fun create(): Result<KlarityPlayer> = runCatching {
-            check(Klarity.isDecoderLoaded) { "Unable to create player - load native decoder first" }
-            check(Klarity.isSamplerLoaded) { "Unable to create player - load native sampler first" }
-        }.mapCatching {
+            check(isLoaded) { "Native binaries were not loaded" }
+
             PlayerControllerFactory().create(
                 parameters = PlayerControllerFactory.Parameters(
                     initialSettings = null,

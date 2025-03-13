@@ -23,13 +23,17 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
 }
 
+tasks.withType<JavaCompile> {
+    options.release.set(JavaVersion.VERSION_15.ordinal)
+}
+
+tasks.withType<KotlinCompile> {
+    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging {
         events("passed", "skipped", "failed")
     }
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
 }

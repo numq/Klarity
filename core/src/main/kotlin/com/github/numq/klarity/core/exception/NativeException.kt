@@ -1,9 +1,7 @@
 package com.github.numq.klarity.core.exception
 
-data class NativeException(override val message: String) : Exception(message) {
+data class NativeException(override val cause: Throwable) : Exception(cause) {
     internal companion object {
-        inline fun <reified R> create(throwable: Throwable): R {
-            throw NativeException(throwable.message ?: "Unknown native exception occurred")
-        }
+        fun <T> create(throwable: Throwable): T = throw NativeException(throwable)
     }
 }

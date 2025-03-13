@@ -1,6 +1,6 @@
 package sampler
 
-import com.github.numq.klarity.core.loader.Klarity
+import JNITest
 import com.github.numq.klarity.core.sampler.Sampler
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -8,21 +8,9 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.File
-import java.net.URL
 import kotlin.random.Random
 
-class SamplerTest {
-    init {
-        File(ClassLoader.getSystemResources("bin/sampler").nextElement().let(URL::getFile)).listFiles()?.run {
-            Klarity.loadSampler(
-                portAudioPath = find { file -> file.path.endsWith("portaudio") }!!.path,
-                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
-                jniPath = find { file -> file.path.endsWith("jni") }!!.path
-            ).getOrThrow()
-        }
-    }
-
+class SamplerTest : JNITest() {
     private lateinit var sampler: Sampler
 
     @BeforeEach

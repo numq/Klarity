@@ -1,7 +1,7 @@
 package snapshot
 
+import JNITest
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loader.Klarity
 import com.github.numq.klarity.core.snapshot.SnapshotManager
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -10,17 +10,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import java.net.URL
 
-class SnapshotManagerTest {
-    init {
-        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
-            Klarity.loadDecoder(
-                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
-                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
-                jniPath = find { file -> file.path.endsWith("jni") }!!.path
-            ).getOrThrow()
-        }
-    }
-
+class SnapshotManagerTest : JNITest() {
     private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
 
     private val location = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath!!

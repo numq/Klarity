@@ -37,7 +37,10 @@ interface Decoder<Media, Frame> : AutoCloseable {
                     if (findAudioStream) {
                         check(format.sampleRate > 0 && format.channels > 0) { "Audio decoding is not supported by media" }
 
-                        AudioFormat(sampleRate = format.sampleRate, channels = format.channels)
+                        AudioFormat(
+                            sampleRate = format.sampleRate,
+                            channels = format.channels
+                        )
                     } else null
                 }.getOrNull()
 
@@ -46,7 +49,9 @@ interface Decoder<Media, Frame> : AutoCloseable {
                         check(format.width > 0 && format.height > 0 && format.frameRate >= 0) { "Video decoding is not supported by media" }
 
                         VideoFormat(
-                            width = format.width, height = format.height, frameRate = format.frameRate
+                            width = format.width,
+                            height = format.height,
+                            frameRate = format.frameRate
                         )
                     } else null
                 }.getOrNull()
@@ -89,7 +94,12 @@ interface Decoder<Media, Frame> : AutoCloseable {
             location = location, findAudioStream = findAudioStream, findVideoStream = findVideoStream
         ).mapCatching { media ->
             ProbeDecoder(
-                decoder = NativeDecoder(location, findAudioStream, findVideoStream), media = media
+                decoder = NativeDecoder(
+                    location = location,
+                    findAudioStream = findAudioStream,
+                    findVideoStream = findVideoStream
+                ),
+                media = media
             )
         }
 
@@ -98,11 +108,21 @@ interface Decoder<Media, Frame> : AutoCloseable {
         ).mapCatching<Decoder<Media.Audio, Frame.Audio>, Media> { media ->
             when (media) {
                 is Media.AudioVideo -> AudioDecoder(
-                    decoder = NativeDecoder(location, true, false), media = media.toAudio()
+                    decoder = NativeDecoder(
+                        location = location,
+                        findAudioStream = true,
+                        findVideoStream = false
+                    ),
+                    media = media.toAudio()
                 )
 
                 is Media.Audio -> AudioDecoder(
-                    decoder = NativeDecoder(location, true, false), media = media
+                    decoder = NativeDecoder(
+                        location = location,
+                        findAudioStream = true,
+                        findVideoStream = false
+                    ),
+                    media = media
                 )
 
                 is Media.Video -> throw Exception("Unable to create audio decoder")
@@ -114,13 +134,23 @@ interface Decoder<Media, Frame> : AutoCloseable {
         ).mapCatching { media ->
             when (media) {
                 is Media.AudioVideo -> VideoDecoder(
-                    decoder = NativeDecoder(location, false, true), media = media.toVideo()
+                    decoder = NativeDecoder(
+                        location = location,
+                        findAudioStream = false,
+                        findVideoStream = true
+                    ),
+                    media = media.toVideo()
                 )
 
                 is Media.Audio -> throw Exception("Unable to create video decoder")
 
                 is Media.Video -> VideoDecoder(
-                    decoder = NativeDecoder(location, false, true), media = media
+                    decoder = NativeDecoder(
+                        location = location,
+                        findAudioStream = false,
+                        findVideoStream = true
+                    ),
+                    media = media
                 )
             }
         }

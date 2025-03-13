@@ -20,10 +20,17 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
 }
 
-tasks.test {
-    useJUnitPlatform()
+tasks.withType<JavaCompile> {
+    options.release.set(JavaVersion.VERSION_11.ordinal)
 }
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "${JavaVersion.VERSION_11}"
+}
+
+tasks.test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
 }

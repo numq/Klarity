@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
-import com.github.numq.klarity.core.loader.Klarity
+import com.github.numq.klarity.core.player.KlarityPlayer
 import decoration.DecorationBox
 import navigation.Navigation
 import theme.KlarityTheme
@@ -29,23 +29,21 @@ import java.awt.FileDialog
 import java.io.File
 import kotlin.system.exitProcess
 
-fun main() {
-    val appName = "Klarity"
+const val APP_NAME = "Klarity"
 
+fun main() {
     val pathToBinaries = Thread.currentThread().contextClassLoader.getResource("bin")?.file
 
     checkNotNull(pathToBinaries) { "Binaries not found" }
 
-    val decoderPath = "$pathToBinaries\\decoder"
-
-    Klarity.loadDecoder(
-        ffmpegPath = "$decoderPath\\ffmpeg", klarityPath = "$decoderPath\\klarity", jniPath = "$decoderPath\\jni"
-    ).getOrThrow()
-
-    val samplerPath = "$pathToBinaries\\sampler"
-
-    Klarity.loadSampler(
-        portAudioPath = "$samplerPath\\portaudio", klarityPath = "$samplerPath\\klarity", jniPath = "$samplerPath\\jni"
+    KlarityPlayer.load(
+        avutil = "$pathToBinaries\\avutil-59.dll",
+        swscale = "$pathToBinaries\\swscale-8.dll",
+        swresample = "$pathToBinaries\\swresample-5.dll",
+        avcodec = "$pathToBinaries\\avcodec-61.dll",
+        avformat = "$pathToBinaries\\avformat-61.dll",
+        portaudio = "$pathToBinaries\\libportaudio.dll",
+        klarity = "$pathToBinaries\\klarity.dll",
     ).getOrThrow()
 
     val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))
@@ -82,7 +80,7 @@ fun main() {
                     Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
                         Image(iconSvg, "icon")
                     }
-                    Text(appName, color = MaterialTheme.colors.primary)
+                    Text(APP_NAME, color = MaterialTheme.colors.primary)
                 }
                 Navigation(openFileChooser = {
                     FileDialog(window, "Upload media", FileDialog.LOAD).apply {

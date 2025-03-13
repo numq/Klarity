@@ -1,9 +1,9 @@
 package decoder
 
+import JNITest
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loader.Klarity
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.isActive
@@ -17,17 +17,7 @@ import java.net.URL
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.seconds
 
-class AudioDecoderTest {
-    init {
-        File(ClassLoader.getSystemResources("bin/decoder").nextElement().let(URL::getFile)).listFiles()?.run {
-            Klarity.loadDecoder(
-                ffmpegPath = find { file -> file.path.endsWith("ffmpeg") }!!.path,
-                klarityPath = find { file -> file.path.endsWith("klarity") }!!.path,
-                jniPath = find { file -> file.path.endsWith("jni") }!!.path
-            ).getOrThrow()
-        }
-    }
-
+class AudioDecoderTest : JNITest() {
     private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
 
     private val file = files?.find { file -> file.nameWithoutExtension == "audio_only" }!!
