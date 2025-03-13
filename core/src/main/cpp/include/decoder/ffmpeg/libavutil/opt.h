@@ -886,7 +886,6 @@ int av_opt_set_chlayout(void *obj, const char *name, const AVChannelLayout *layo
  */
 int av_opt_set_dict_val(void *obj, const char *name, const AVDictionary *val, int search_flags);
 
-#if FF_API_OPT_INT_LIST
 /**
  * Set a binary option to an integer list.
  *
@@ -902,7 +901,6 @@ int av_opt_set_dict_val(void *obj, const char *name, const AVDictionary *val, in
      AVERROR(EINVAL) : \
      av_opt_set_bin(obj, name, (const uint8_t *)(val), \
                     av_int_list_length(val, term) * sizeof(*(val)), flags))
-#endif
 
 /**
  * Add, replace, or remove elements for an array option. Which of these
@@ -1071,7 +1069,6 @@ int av_opt_eval_q     (void *obj, const AVOption *o, const char *val, AVRational
  * @}
  */
 
-#if FF_API_OPT_PTR
 /**
  * Gets a pointer to the requested field in a struct.
  * This function allows accessing a struct even when its fields are moved or
@@ -1079,12 +1076,8 @@ int av_opt_eval_q     (void *obj, const AVOption *o, const char *val, AVRational
  *
  * @returns a pointer to the field, it can be cast to the correct type and read
  *          or written to.
- *
- * @deprecated direct access to AVOption-exported fields is not supported
  */
-attribute_deprecated
 void *av_opt_ptr(const AVClass *avclass, void *obj, const char *name);
-#endif
 
 /**
  * Check if given option is set to its default value.
