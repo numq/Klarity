@@ -66,6 +66,10 @@ private:
 
     std::vector<uint8_t> videoBuffer;
 
+    int audioStreamIndex = -1;
+
+    int videoStreamIndex = -1;
+
     AVFormatContext *formatContext = nullptr;
 
     AVCodecContext *audioCodecContext = nullptr;
@@ -76,15 +80,17 @@ private:
 
     SwsContext *swsContext = nullptr;
 
-    int audioStreamIndex = -1;
+    int swsPixelFormat = AV_PIX_FMT_NONE;
 
-    int videoStreamIndex = -1;
+    int swsWidth = -1;
+
+    int swsHeight = -1;
 
     AVCodecContext *_initCodecContext(unsigned int streamIndex);
 
     std::vector<uint8_t> &_processAudioFrame(const AVFrame &src);
 
-    std::vector<uint8_t> &_processVideoFrame(const AVFrame &src, int64_t width, int64_t height);
+    std::vector<uint8_t> &_processVideoFrame(const AVFrame &src, int dstWidth, int dstHeight);
 
     void _cleanUp();
 
@@ -95,7 +101,7 @@ public:
 
     ~Decoder();
 
-    std::optional<Frame> nextFrame(int64_t width, int64_t height);
+    std::optional<Frame> nextFrame(int width, int height);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 

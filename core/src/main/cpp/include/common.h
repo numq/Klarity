@@ -32,8 +32,4 @@ extern Decoder *getDecoderPointer(jlong handle);
 
 extern Sampler *getSamplerPointer(jlong handle);
 
-extern void deleteDecoderPointer(jlong handle);
-
-extern void deleteSamplerPointer(jlong handle);
-
 #endif // KLARITY_COMMON_H
