@@ -5,10 +5,10 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include "frame.h"
 #include "format.h"
 #include "exception.h"
-#include "decoder-deleter.h"
 
 extern "C" {
 #include "libavutil/imgutils.h"
@@ -20,36 +20,86 @@ extern "C" {
 
 struct Decoder {
 private:
+    class AVPacketGuard {
+    public:
+        AVPacketGuard() {
+            packet = av_packet_alloc();
+        }
+
+        ~AVPacketGuard() {
+            if (packet) {
+                av_packet_free(&packet);
+            }
+        }
+
+        AVPacket *get() { return packet; }
+
+    private:
+        AVPacket *packet = nullptr;
+    };
+
+    class AVFrameGuard {
+    public:
+        AVFrameGuard() {
+            frame = av_frame_alloc();
+        }
+
+        ~AVFrameGuard() {
+            if (frame) {
+                av_frame_free(&frame);
+            }
+        }
+
+        AVFrame *get() { return frame; }
+
+    private:
+        AVFrame *frame = nullptr;
+    };
+
+    const AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLT;
+
+    const AVPixelFormat pixelFormat = AV_PIX_FMT_RGBA;
+
     std::mutex mutex;
 
-    std::unique_ptr<AVFormatContext, av_format_context_deleter> formatContext;
+    std::vector<uint8_t> audioBuffer;
 
-    std::unique_ptr<AVCodecContext, av_codec_context_deleter> audioCodecContext;
+    std::vector<uint8_t> videoBuffer;
 
-    std::unique_ptr<AVCodecContext, av_codec_context_deleter> videoCodecContext;
+    AVFormatContext *formatContext = nullptr;
 
-    std::unique_ptr<AVStream> audioStream;
+    AVCodecContext *audioCodecContext = nullptr;
 
-    std::unique_ptr<AVStream> videoStream;
+    AVCodecContext *videoCodecContext = nullptr;
 
-    std::unique_ptr<SwsContext, sws_context_deleter> swsContext;
+    SwrContext *swrContext = nullptr;
 
-    std::unique_ptr<SwrContext, swr_context_deleter> swrContext;
+    SwsContext *swsContext = nullptr;
 
-    std::vector<uint8_t> _processAudioFrame(const AVFrame &src);
+    int audioStreamIndex = -1;
 
-    std::vector<uint8_t> _processVideoFrame(const AVFrame &src, int64_t width, int64_t height);
+    int videoStreamIndex = -1;
+
+    AVCodecContext *_initCodecContext(unsigned int streamIndex);
+
+    std::vector<uint8_t> &_processAudioFrame(const AVFrame &src);
+
+    std::vector<uint8_t> &_processVideoFrame(const AVFrame &src, int64_t width, int64_t height);
+
+    void _cleanUp();
 
 public:
-    std::unique_ptr<Format> format{nullptr};
+    Format format;
 
     explicit Decoder(const std::string &location, bool findAudioStream, bool findVideoStream);
 
-    std::unique_ptr<Frame> nextFrame(int64_t width, int64_t height);
+    ~Decoder();
+
+    std::optional<Frame> nextFrame(int64_t width, int64_t height);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
 };
 
-#endif //KLARITY_DECODER_DECODER_H
+#endif // KLARITY_DECODER_DECODER_H

@@ -1,10 +1,7 @@
 #include <jni.h>
-#include <memory>
 #include <shared_mutex>
-#include <unordered_map>
 #include "common.h"
 #include "decoder.h"
-#include "decoder-deleter.h"
 
 #ifndef _Included_com_github_numq_klarity_core_decoder_NativeDecoder
 #define _Included_com_github_numq_klarity_core_decoder_NativeDecoder

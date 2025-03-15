@@ -12,7 +12,7 @@ abstract class JNITest {
                 avcodec = "$pathToBinaries\\avcodec-61.dll",
                 avformat = "$pathToBinaries\\avformat-61.dll",
                 portaudio = "$pathToBinaries\\libportaudio.dll",
-                klarity = "$pathToBinaries\\klarity.dll",
+                klarity = "$pathToBinaries\\klarity.dll"
             ).getOrThrow()
         }
     }

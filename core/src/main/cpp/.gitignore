@@ -1,4 +1,4 @@
-# Compiled Object files, Static and Dynamic libs (Shared Objects)
+# Compiled Object media, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
 *.so
@@ -13,14 +13,14 @@
 cmake-build-debug/
 cmake-build-release/
 
-# CLion project files
+# CLion project media
 .idea/
 
 # Compiled output
 bin/
 lib/
 
-# Ignore any local user-specific files
+# Ignore any local user-specific media
 .vscode/
 *.suo
 *.user

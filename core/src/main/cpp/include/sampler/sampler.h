@@ -8,7 +8,6 @@
 #include "exception.h"
 #include "portaudio.h"
 #include "stretch/stretch.h"
-#include "sampler-deleter.h"
 
 struct Sampler {
 private:
@@ -18,16 +17,20 @@ private:
 
     uint32_t channels;
 
-    std::unique_ptr<PaStream, pa_stream_deleter> stream;
+    PaStream *stream = nullptr;
 
-    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>, signalsmith_stretch_deleter> stretch;
+    signalsmith::stretch::SignalsmithStretch<float> *stretch = nullptr;
 
     float playbackSpeedFactor = 1.0f;
 
     float volume = 1.0f;
 
+    void _cleanUp();
+
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
+
+    ~Sampler();
 
     void setPlaybackSpeed(float factor);
 

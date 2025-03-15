@@ -1,26 +1,17 @@
 package com.github.numq.klarity.core.sampler
 
-import com.github.numq.klarity.core.exception.NativeException
 import java.lang.ref.Cleaner
 
 internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
-    private val nativeHandle = try {
-        requireNotNull(
-            createNative(
-                sampleRate,
-                channels
-            ).takeIf { it != -1L }
-        ) { "Unable to instantiate native sampler" }
-    } catch (e: Exception) {
-        throw NativeException(e)
-    }
+    private val nativeHandle = requireNotNull(
+        createNative(
+            sampleRate,
+            channels
+        ).takeIf { it != -1L }
+    ) { "Unable to instantiate native sampler" }
 
     private val cleanable = cleaner.register(this) {
-        try {
-            deleteNative(handle = nativeHandle)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
+        deleteNative(handle = nativeHandle)
     }
 
     companion object {
@@ -48,45 +39,15 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
         private external fun deleteNative(handle: Long)
     }
 
-    fun setPlaybackSpeed(factor: Float) {
-        try {
-            setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
-    }
+    fun setPlaybackSpeed(factor: Float) = setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
 
-    fun setVolume(value: Float) {
-        try {
-            setVolumeNative(handle = nativeHandle, value = value)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
-    }
+    fun setVolume(value: Float) = setVolumeNative(handle = nativeHandle, value = value)
 
-    fun start(): Long {
-        try {
-            return startNative(handle = nativeHandle)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
-    }
+    fun start() = startNative(handle = nativeHandle)
 
-    fun play(data: ByteArray, size: Int) {
-        try {
-            playNative(handle = nativeHandle, bytes = data, size = size)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
-    }
+    fun play(data: ByteArray, size: Int) = playNative(handle = nativeHandle, bytes = data, size = size)
 
-    fun stop() {
-        try {
-            stopNative(handle = nativeHandle)
-        } catch (e: Exception) {
-            throw NativeException(e)
-        }
-    }
+    fun stop() = stopNative(handle = nativeHandle)
 
     override fun close() = cleanable.clean()
 }

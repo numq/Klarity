@@ -179,7 +179,12 @@ internal class DefaultPlayerController(
     private suspend fun handleBufferTimestamp(timestamp: Timestamp) {
         (internalState.value as? InternalPlayerState.Ready)?.status?.let { status ->
             if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED) {
-                bufferTimestamp.emit(timestamp)
+                bufferTimestamp.emit(
+                    timestamp.copy(
+                        micros = timestamp.micros.coerceAtLeast(0L),
+                        millis = timestamp.millis.coerceAtLeast(0L)
+                    )
+                )
             }
         }
     }
@@ -187,7 +192,12 @@ internal class DefaultPlayerController(
     private suspend fun handlePlaybackTimestamp(timestamp: Timestamp) {
         (internalState.value as? InternalPlayerState.Ready)?.status?.let { status ->
             if (status == InternalPlayerState.Ready.Status.PLAYING) {
-                playbackTimestamp.emit(timestamp)
+                playbackTimestamp.emit(
+                    timestamp.copy(
+                        micros = timestamp.micros.coerceAtLeast(0L),
+                        millis = timestamp.millis.coerceAtLeast(0L)
+                    )
+                )
             }
         }
     }

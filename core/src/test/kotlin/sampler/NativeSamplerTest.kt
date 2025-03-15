@@ -2,7 +2,6 @@ package sampler
 
 import JNITest
 import com.github.numq.klarity.core.sampler.NativeSampler
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.BeforeEach
@@ -23,28 +22,28 @@ class NativeSamplerTest : JNITest() {
     }
 
     @Test
-    fun `should create and close`() = runTest {
+    fun `should create and close`() {
         assertDoesNotThrow {
             NativeSampler(sampleRate = 48_000, channels = 2).close()
         }
     }
 
     @Test
-    fun `change playbackSpeed`() = runTest {
+    fun `change playbackSpeed`() {
         sampler.start()
         sampler.setPlaybackSpeed(2f)
         sampler.stop()
     }
 
     @Test
-    fun `change volume`() = runTest {
+    fun `change volume`() {
         sampler.start()
         sampler.setVolume(.5f)
         sampler.stop()
     }
 
     @Test
-    fun `play bytes`() = runTest {
+    fun `play bytes`() {
         sampler.start()
         val bytes = Random(System.currentTimeMillis()).nextBytes(10)
         sampler.play(bytes, bytes.size)
@@ -52,7 +51,7 @@ class NativeSamplerTest : JNITest() {
     }
 
     @Test
-    fun `start and stop playback`() = runTest {
+    fun `start and stop playback`() {
         sampler.start()
         sampler.stop()
     }

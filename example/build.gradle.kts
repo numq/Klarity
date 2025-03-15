@@ -22,10 +22,6 @@ dependencies {
     implementation(project(":compose"))
 }
 
-tasks.withType<JavaCompile> {
-    options.release.set(JavaVersion.VERSION_15.ordinal)
-}
-
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
 }

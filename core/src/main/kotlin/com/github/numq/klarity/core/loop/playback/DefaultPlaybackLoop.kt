@@ -9,10 +9,7 @@ import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
@@ -216,11 +213,15 @@ internal class DefaultPlaybackLoop(
                                 val audioTimestamps = MutableSharedFlow<Timestamp>()
                                 val videoTimestamps = MutableSharedFlow<Timestamp>()
 
-                                val timestampJob = audioTimestamps.combine(videoTimestamps) { a, v ->
-                                    if (a.micros >= v.micros) a else v
-                                }.onEach { timestamp ->
-                                    onTimestamp(timestamp)
-                                }.launchIn(this@launch)
+                                val timestampJob = when {
+                                    ((pipeline.media as? Media.AudioVideo)?.videoFormat?.frameRate ?: 0.0) > 0.0 -> {
+                                        audioTimestamps.combine(videoTimestamps) { a, v ->
+                                            if (a.micros >= v.micros) a else v
+                                        }
+                                    }
+
+                                    else -> merge(audioTimestamps, videoTimestamps)
+                                }.onEach(onTimestamp).launchIn(this@launch)
 
                                 handleMediaPlayback(
                                     media = media,

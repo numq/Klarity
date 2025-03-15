@@ -2,9 +2,7 @@ package decoder
 
 import JNITest
 import com.github.numq.klarity.core.decoder.NativeDecoder
-import com.github.numq.klarity.core.exception.NativeException
 import com.github.numq.klarity.core.frame.NativeFrame
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -42,8 +40,8 @@ class NativeDecoderTest : JNITest() {
     }
 
     @Test
-    fun `should handle invalid location`() = runTest {
-        assertThrows(NativeException::class.java) {
+    fun `should handle invalid location`() {
+        assertThrows(RuntimeException::class.java) {
             NativeDecoder(
                 location = "some invalid media location",
                 findAudioStream = true,
@@ -53,7 +51,7 @@ class NativeDecoderTest : JNITest() {
     }
 
     @Test
-    fun `should create and close`() = runTest {
+    fun `should create and close`() {
         files!!.forEach { file ->
             assertDoesNotThrow {
                 when (file.nameWithoutExtension) {
@@ -80,7 +78,7 @@ class NativeDecoderTest : JNITest() {
     }
 
     @Test
-    fun `get format`() = runTest {
+    fun `get format`() {
         with(audioDecoder.format) {
             assertEquals(5_000_000L, durationMicros)
             assertEquals(44100, sampleRate)
@@ -108,7 +106,7 @@ class NativeDecoderTest : JNITest() {
     }
 
     @Test
-    fun `get next frame`() = runTest {
+    fun `get next frame`() {
         with(audioDecoder.nextFrame(0, 0)!!) {
             assertEquals(NativeFrame.Type.AUDIO.ordinal, type)
             assertEquals(0L, timestampMicros)
@@ -127,14 +125,14 @@ class NativeDecoderTest : JNITest() {
     }
 
     @Test
-    fun `seek media`() = runTest {
+    fun `seek media`() {
         audioDecoder.seekTo((0L..audioDecoder.format.durationMicros).random(), false)
         videoDecoder.seekTo((0L..videoDecoder.format.durationMicros).random(), false)
         mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros).random(), false)
     }
 
     @Test
-    fun `reset media`() = runTest {
+    fun `reset media`() {
         audioDecoder.reset()
         videoDecoder.reset()
         mediaDecoder.reset()

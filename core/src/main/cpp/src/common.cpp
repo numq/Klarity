@@ -38,18 +38,6 @@ Sampler *getSamplerPointer(jlong handle) {
     return it->second.get();
 }
 
-void deleteDecoderPointer(jlong handle) {
-    if (decoderPointers.erase(handle) == 0) {
-        throw std::runtime_error("Unable to free native decoder pointer");
-    }
-}
-
-void deleteSamplerPointer(jlong handle) {
-    if (samplerPointers.erase(handle) == 0) {
-        throw std::runtime_error("Unable to free native sampler pointer");
-    }
-}
-
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
@@ -94,6 +82,19 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8) != JNI_OK) return;
 
+    {
+        std::unique_lock<std::shared_mutex> decoderLock(decoderMutex);
+
+        decoderPointers.clear();
+    }
+    {
+        std::unique_lock<std::shared_mutex> samplerLock(samplerMutex);
+
+        samplerPointers.clear();
+    }
+
+    Pa_Terminate();
+
     if (exceptionClass) {
         env->DeleteGlobalRef(exceptionClass);
         exceptionClass = nullptr;
@@ -108,10 +109,4 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
         env->DeleteGlobalRef(frameClass);
         frameClass = nullptr;
     }
-
-    Pa_Terminate();
-
-    decoderPointers.clear();
-
-    samplerPointers.clear();
 }

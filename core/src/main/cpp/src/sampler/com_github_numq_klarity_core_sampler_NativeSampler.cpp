@@ -133,7 +133,16 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_d
     std::unique_lock<std::shared_mutex> lock(samplerMutex);
 
     try {
-        deleteSamplerPointer(handle);
+        if (!getSamplerPointer(handle)) {
+            throw std::runtime_error("Invalid handle");
+        }
+
+        erase_if(
+                samplerPointers,
+                [&handle](const auto &p) {
+                    return p.first == handle;
+                }
+        );
     } catch (const std::exception &e) {
         handleException(env, e.what());
     }

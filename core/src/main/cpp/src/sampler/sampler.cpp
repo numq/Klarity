@@ -1,5 +1,16 @@
 #include "sampler.h"
 
+void Sampler::_cleanUp() {
+    if (stream) {
+        Pa_CloseStream(stream);
+        stream = nullptr;
+    }
+    if (stretch) {
+        delete stretch;
+        stretch = nullptr;
+    }
+}
+
 Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     this->sampleRate = sampleRate;
     this->channels = channels;
@@ -16,26 +27,28 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultHighOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 
-    PaStream *rawStream = nullptr;
     PaError err = Pa_OpenStream(
-            &rawStream,
+            &stream,
             nullptr,
             &outputParameters,
             sampleRate,
             paFramesPerBufferUnspecified,
-            paClipOff,
+            paNoFlag,
             nullptr,
             nullptr
     );
     if (err != paNoError) {
-        throw SamplerException("PortAudio error: " + std::string(Pa_GetErrorText(err)));
+        _cleanUp();
+        throw SamplerException(std::string(Pa_GetErrorText(err)));
     }
 
-    stream.reset(rawStream);
-
-    stretch.reset(new signalsmith::stretch::SignalsmithStretch<float>());
+    stretch = new signalsmith::stretch::SignalsmithStretch<float>();
 
     stretch->presetDefault(static_cast<int>(channels), static_cast<float>(sampleRate));
+}
+
+Sampler::~Sampler() {
+    _cleanUp();
 }
 
 void Sampler::setPlaybackSpeed(float factor) {
@@ -65,20 +78,21 @@ int Sampler::start() {
         throw SamplerException("Unable to start uninitialized sampler");
     }
 
-    if (Pa_IsStreamActive(stream.get()) == 1) {
+    if (Pa_IsStreamActive(stream) == 1) {
         throw SamplerException("Unable to start active sampler");
     }
 
     stretch->reset();
 
-    PaError err = Pa_StartStream(stream.get());
+    PaError err = Pa_StartStream(stream);
     if (err != paNoError) {
         throw SamplerException("Failed to start PortAudio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
-    double outputLatency = Pa_GetStreamInfo(stream.get())->outputLatency;
+    double outputLatency = Pa_GetStreamInfo(stream)->outputLatency;
 
-    double stretchLatency = (stretch->inputLatency() + stretch->outputLatency()) / static_cast<double>(this->sampleRate);
+    double stretchLatency =
+            (stretch->inputLatency() + stretch->outputLatency()) / static_cast<double>(this->sampleRate);
 
     return static_cast<int>((outputLatency + stretchLatency) * 1'000'000);
 }
@@ -86,7 +100,7 @@ int Sampler::start() {
 void Sampler::play(const uint8_t *samples, uint64_t size) {
     std::unique_lock<std::mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr || Pa_IsStreamActive(stream.get()) <= 0) {
+    if (!stretch || stream == nullptr || Pa_IsStreamActive(stream) <= 0) {
         throw SamplerException("Unable to play uninitialized sampler");
     }
 
@@ -116,7 +130,7 @@ void Sampler::play(const uint8_t *samples, uint64_t size) {
         }
     }
 
-    Pa_WriteStream(stream.get(), output.data(), outputSamples);
+    Pa_WriteStream(stream, output.data(), outputSamples);
 }
 
 void Sampler::stop() {
@@ -126,10 +140,14 @@ void Sampler::stop() {
         throw SamplerException("Unable to stop uninitialized sampler");
     }
 
-    if (Pa_IsStreamActive(stream.get()) == 1) {
-        PaError err = Pa_StopStream(stream.get());
+    auto isStreamActive = Pa_IsStreamActive(stream);
+
+    if (isStreamActive == 1) {
+        PaError err = Pa_StopStream(stream);
         if (err != paNoError) {
             throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
         }
+    } else if (isStreamActive < 0) {
+        throw SamplerException("Failed to check stream status: " + std::string(Pa_GetErrorText(isStreamActive)));
     }
 }
