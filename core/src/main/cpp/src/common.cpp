@@ -70,6 +70,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
+    av_log_set_level(AV_LOG_QUIET);
+
     if (Pa_Initialize() != paNoError) {
         return JNI_ERR;
     }

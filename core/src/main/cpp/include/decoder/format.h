@@ -1,9 +1,6 @@
 #ifndef KLARITY_DECODER_FORMAT_H
 #define KLARITY_DECODER_FORMAT_H
 
-#include <cstdint>
-#include <string>
-
 struct Format {
     std::string location;
     uint64_t durationMicros;
