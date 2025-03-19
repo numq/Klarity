@@ -15,8 +15,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Precompiled Dependencies
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v9
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: "Build Dependencies"
+          workflow_conclusion: success
           name: ffmpeg-portaudio-${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || matrix.os == 'macos-latest' && 'macos' || 'windows' }}.zip
           path: deps
 
