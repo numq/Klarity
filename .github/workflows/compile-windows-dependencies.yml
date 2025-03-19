@@ -1,20 +1,20 @@
 name: Compile Windows Dependencies
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Allows manual execution
 
 jobs:
   build_windows_dependencies:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies (Windows)
+      - name: Install Chocolatey Dependencies
         run: |
-          choco install nasm yasm cmake
+          choco install nasm yasm cmake pkgconfiglite
           choco install --ignore-checksums autoconf automake libtool
-          choco install pkgconfiglite msys2
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
@@ -22,25 +22,30 @@ jobs:
           msystem: MINGW64
           install: >-
             base-devel
+            git
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-nasm
             mingw-w64-x86_64-yasm
             mingw-w64-x86_64-pkg-config
 
+      - name: Clone FFmpeg (Outside MSYS2)
+        run: git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
+
       - name: Build FFmpeg 7.1
         shell: msys2 {0}
         run: |
-          git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
           ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
           make -j$(nproc)
           make install
 
+      - name: Clone PortAudio (Outside MSYS2)
+        run: git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
+
       - name: Build PortAudio v19.7.0
         shell: msys2 {0}
         run: |
-          git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
           cd portaudio
           cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
           cmake --build build --config Release --target install
