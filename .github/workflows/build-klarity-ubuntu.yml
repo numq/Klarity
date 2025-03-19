@@ -10,15 +10,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make wget
+
+      - name: Install OpenJDK 15 from Adoptium
+        run: |
+          wget https://github.com/AdoptOpenJDK/openjdk15-binaries/releases/download/jdk-15.0.2+7/openjdk-15.0.2+7-20210113-linux-x64.tar.gz
+          sudo mkdir -p /usr/lib/jvm
+          sudo tar xzvf openjdk-15.0.2+7-20210113-linux-x64.tar.gz -C /usr/lib/jvm
+          sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-15.0.2+7/bin/java 1
+          sudo update-alternatives --set java /usr/lib/jvm/jdk-15.0.2+7/bin/java
+          java -version  # Verify the installation
+
       - name: Download Dependencies
         uses: actions/download-artifact@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Required Dependencies (Ubuntu)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake g++ make openjdk-15-jdk
 
       - name: Build Klarity Library (Ubuntu)
         run: |
