@@ -22,7 +22,7 @@ jobs:
 
       # Install dependencies for macOS
       - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macos'
         run: |
           brew install nasm yasm cmake autoconf automake libtool pkg-config
 
@@ -56,8 +56,8 @@ jobs:
 
       # Upload compiled binaries and headers
       - name: Upload FFmpeg & PortAudio
-        if: success()  # Only upload if the build is successful
-        uses: actions/upload-artifact@v2
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-portaudio-${{ matrix.os }}
           path: |

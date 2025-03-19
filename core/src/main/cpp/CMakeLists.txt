@@ -46,5 +46,5 @@ target_link_libraries(klarity PRIVATE
         avutil-59
         swresample-5
         swscale-8
-        libportaudio
+        portaudio
 )
