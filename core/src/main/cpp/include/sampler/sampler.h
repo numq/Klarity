@@ -1,6 +1,7 @@
 #ifndef KLARITY_SAMPLER_H
 #define KLARITY_SAMPLER_H
 
+#include <memory>
 #include <mutex>
 #include "exception.h"
 #include "portaudio.h"
