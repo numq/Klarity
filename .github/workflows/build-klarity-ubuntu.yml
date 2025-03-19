@@ -13,16 +13,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ make wget
-
-      - name: Add AdoptOpenJDK Repository and Install OpenJDK 15
-        run: |
-          wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | sudo tee /etc/apt/trusted.gpg.d/adoptopenjdk.asc
-
-          sudo add-apt-repository --yes https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/
-
-          sudo apt-get update
-          sudo apt-get install -y adoptopenjdk-15-hotspot
+          sudo apt-get install -y cmake g++ make wget openjdk-15-jdk
 
       - name: Verify OpenJDK Installation
         run: |
