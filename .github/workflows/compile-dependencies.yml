@@ -1,0 +1,61 @@
+name: Compile Dependencies
+
+on:
+  workflow_dispatch:  # Allows manual execution
+
+jobs:
+  build_dependencies:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]  # Target platforms
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install dependencies for Linux
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config
+
+      # Install dependencies for macOS
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install nasm yasm cmake autoconf automake libtool pkg-config
+
+      # Install dependencies for Windows
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install nasm yasm cmake autoconf automake libtool pkgconfiglite
+
+      # Clone and Build FFmpeg
+      - name: Build FFmpeg
+        run: |
+          git clone https://github.com/FFmpeg/FFmpeg.git
+          cd FFmpeg
+          ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
+          make -j$(nproc)
+          make install
+
+      # Clone and Build PortAudio
+      - name: Build PortAudio
+        run: |
+          git clone https://github.com/PortAudio/portaudio.git
+          cd portaudio
+          cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
+          cmake --build build --config Release --target install
+
+      # Upload compiled binaries and headers
+      - name: Upload FFmpeg & PortAudio
+        uses: actions/upload-artifact@v2
+        with:
+          name: ffmpeg-portaudio-${{ matrix.os }}
+          path: |
+            deps/lib/*.so
+            deps/lib/*.dylib
+            deps/lib/*.dll
+            deps/include
