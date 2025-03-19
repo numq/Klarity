@@ -56,9 +56,14 @@ jobs:
           cmake --build build --config Release --target install
 
       - name: Organize Required Files
+        shell: pwsh
         run: |
-          if not exist "$GITHUB_WORKSPACE\\deps\\bin" mkdir "$GITHUB_WORKSPACE\\deps\\bin"
-          if not exist "$GITHUB_WORKSPACE\\deps\\include" mkdir "$GITHUB_WORKSPACE\\deps\\include"
+          if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\bin")) {
+            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\bin"
+          }
+          if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\include")) {
+            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\include"
+          }
 
           xcopy /E /I /H /Y /F $GITHUB_WORKSPACE\\deps\\include\\* $GITHUB_WORKSPACE\\deps\\include\\
           xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\av*.dll $GITHUB_WORKSPACE\\deps\\bin\\
