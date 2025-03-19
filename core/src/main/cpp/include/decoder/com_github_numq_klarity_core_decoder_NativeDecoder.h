@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative
-        (JNIEnv *, jclass, jstring, jboolean, jboolean);
+        (JNIEnv *, jclass, jstring, jboolean, jboolean, jint);
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative
         (JNIEnv *, jclass, jlong);

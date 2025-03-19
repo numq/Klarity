@@ -12,6 +12,7 @@ import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoop
@@ -284,6 +285,7 @@ internal class DefaultPlayerController(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
+        hardwareAcceleration: HardwareAcceleration,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
@@ -291,7 +293,8 @@ internal class DefaultPlayerController(
             ProbeDecoderFactory.Parameters(
                 location = location,
                 findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
-                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
+                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE,
+                hardwareAcceleration = hardwareAcceleration
             )
         ).getOrThrow().use(Decoder<Media, Frame.Probe>::media)
 
@@ -325,7 +328,10 @@ internal class DefaultPlayerController(
             is Media.Video -> media.format
         }?.run {
             val decoder = videoDecoderFactory.create(
-                parameters = VideoDecoderFactory.Parameters(location = location)
+                parameters = VideoDecoderFactory.Parameters(
+                    location = location,
+                    hardwareAcceleration = hardwareAcceleration
+                )
             ).getOrThrow()
 
             val buffer = videoBufferFactory.create(
@@ -591,7 +597,8 @@ internal class DefaultPlayerController(
                         handlePrepare(
                             location = location,
                             audioBufferSize = audioBufferSize,
-                            videoBufferSize = videoBufferSize
+                            videoBufferSize = videoBufferSize,
+                            hardwareAcceleration = hardwareAcceleration
                         )
                     }.also(executionJob::set).join()
                 }

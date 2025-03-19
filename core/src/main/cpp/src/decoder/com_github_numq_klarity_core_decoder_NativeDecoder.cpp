@@ -5,7 +5,8 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jclass thisClass,
         jstring location,
         jboolean findAudioStream,
-        jboolean findVideoStream
+        jboolean findVideoStream,
+        jint hardwareAcceleration
 ) {
     std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
@@ -23,7 +24,8 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         auto decoder = std::make_unique<Decoder>(
                 locationStr,
                 findAudioStream,
-                findVideoStream
+                findVideoStream,
+                static_cast<HardwareAcceleration>(hardwareAcceleration)
         );
 
         auto handle = reinterpret_cast<jlong>(decoder.get());

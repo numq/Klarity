@@ -7,6 +7,7 @@ import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.Renderer
@@ -73,8 +74,20 @@ interface KlarityPlayer : AutoCloseable {
      * @param location The location of the media file to prepare.
      * @param enableAudio Whether to enable audio playback.
      * @param enableVideo Whether to enable video playback.
+     * @param hardwareAcceleration Specifies the type of hardware acceleration to use for video playback - NONE (default), CUDA, VAAPI, DXVA2, QSV.
+     *                             Possible values are:
+     *                             - {@link HardwareAcceleration#NONE}: No hardware acceleration.
+     *                             - {@link HardwareAcceleration#CUDA}: Use NVIDIA CUDA for hardware acceleration.
+     *                             - {@link HardwareAcceleration#VAAPI}: Use VAAPI for hardware acceleration.
+     *                             - {@link HardwareAcceleration#DXVA2}: Use DXVA2 for hardware acceleration.
+     *                             - {@link HardwareAcceleration#QSV}: Use Intel Quick Sync Video for hardware acceleration.
      */
-    suspend fun prepare(location: String, enableAudio: Boolean, enableVideo: Boolean)
+    suspend fun prepare(
+        location: String,
+        enableAudio: Boolean,
+        enableVideo: Boolean,
+        hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE,
+    )
 
     /**
      * Starts playback of the prepared media.

@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.preview
 
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlinx.coroutines.flow.StateFlow
 
 interface PreviewManager : AutoCloseable {
@@ -16,8 +17,12 @@ interface PreviewManager : AutoCloseable {
     ): Result<Frame.Video.Content?>
 
     companion object {
-        fun create(): Result<PreviewManager> = runCatching {
-            DefaultPreviewManager(videoDecoderFactory = VideoDecoderFactory())
-        }
+        fun create(hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE): Result<PreviewManager> =
+            runCatching {
+                DefaultPreviewManager(
+                    hardwareAcceleration = hardwareAcceleration,
+                    videoDecoderFactory = VideoDecoderFactory()
+                )
+            }
     }
 }

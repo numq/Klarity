@@ -1,7 +1,64 @@
 #include "decoder.h"
 
-AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParameters) {
-    auto codec = avcodec_find_decoder(avCodecParameters->codec_id);
+AVBufferRef *Decoder::_initializeHWDevice(HardwareAcceleration hwAccel) {
+    AVBufferRef *hw_device_ctx = nullptr;
+
+    AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
+
+    switch (hwAccel) {
+        case HardwareAcceleration::CUDA:
+            type = AV_HWDEVICE_TYPE_CUDA;
+            break;
+
+        case HardwareAcceleration::VAAPI:
+            type = AV_HWDEVICE_TYPE_VAAPI;
+            break;
+
+        case HardwareAcceleration::DXVA2:
+            type = AV_HWDEVICE_TYPE_DXVA2;
+            break;
+
+        case HardwareAcceleration::QSV:
+            type = AV_HWDEVICE_TYPE_QSV;
+            break;
+
+        default:
+            return nullptr;
+    }
+
+    if (av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0) < 0) {
+        throw DecoderException("Failed to create hardware device context");
+    }
+
+    return hw_device_ctx;
+}
+
+
+AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParameters, HardwareAcceleration hwAccel) {
+    const AVCodec *codec = nullptr;
+
+    switch (hwAccel) {
+        case HardwareAcceleration::CUDA:
+            codec = avcodec_find_decoder_by_name("h264_cuvid");
+            break;
+
+        case HardwareAcceleration::VAAPI:
+            codec = avcodec_find_decoder_by_name("h264_vaapi");
+            break;
+
+        case HardwareAcceleration::DXVA2:
+            codec = avcodec_find_decoder_by_name("h264_dxva2");
+            break;
+
+        case HardwareAcceleration::QSV:
+            codec = avcodec_find_decoder_by_name("h264_qsv");
+            break;
+
+        default:
+            codec = avcodec_find_decoder(avCodecParameters->codec_id);
+            break;
+    }
+
     if (!codec) {
         throw DecoderException("Codec not found");
     }
@@ -16,7 +73,18 @@ AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParam
         throw DecoderException("Could not copy codec parameters to context");
     }
 
+    if (hwAccel != HardwareAcceleration::NONE) {
+        codecContext->hw_device_ctx = _initializeHWDevice(hwAccel);
+        if (!codecContext->hw_device_ctx) {
+            avcodec_free_context(&codecContext);
+            throw DecoderException("Failed to initialize hardware device context");
+        }
+    }
+
     if (avcodec_open2(codecContext, codec, nullptr) < 0) {
+        if (codecContext->hw_device_ctx) {
+            av_buffer_unref(&codecContext->hw_device_ctx);
+        }
         avcodec_free_context(&codecContext);
         throw DecoderException("Could not open codec");
     }
@@ -238,12 +306,21 @@ void Decoder::_cleanUp() {
         formatContext = nullptr;
     }
 
+    if (hwDeviceContext) {
+        av_buffer_unref(&hwDeviceContext);
+    }
+
     std::vector<uint8_t>().swap(audioBuffer);
 
     std::vector<uint8_t>().swap(videoBuffer);
 }
 
-Decoder::Decoder(const std::string &location, bool findAudioStream, bool findVideoStream) {
+Decoder::Decoder(
+        const std::string &location,
+        bool findAudioStream,
+        bool findVideoStream,
+        HardwareAcceleration hwAccel
+) {
     formatContext = avformat_alloc_context();
     if (!formatContext) {
         throw DecoderException("Could not allocate format context");
@@ -271,7 +348,7 @@ Decoder::Decoder(const std::string &location, bool findAudioStream, bool findVid
 
             if (avCodecParameters) {
                 if (findAudioStream && avCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-                    audioCodecContext = _initializeCodecContext(avCodecParameters);
+                    audioCodecContext = _initializeCodecContext(avCodecParameters, HardwareAcceleration::NONE);
 
                     audioStreamIndex = streamIndex;
 
@@ -300,7 +377,7 @@ Decoder::Decoder(const std::string &location, bool findAudioStream, bool findVid
                 }
 
                 if (findVideoStream && avCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-                    videoCodecContext = _initializeCodecContext(avCodecParameters);
+                    videoCodecContext = _initializeCodecContext(avCodecParameters, hwAccel);
 
                     videoStreamIndex = streamIndex;
 

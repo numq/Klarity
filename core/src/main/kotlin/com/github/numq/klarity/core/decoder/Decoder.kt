@@ -3,6 +3,7 @@ package com.github.numq.klarity.core.decoder
 import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import java.io.File
@@ -19,6 +20,7 @@ interface Decoder<Media, Frame> : AutoCloseable {
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
+            hardwareAcceleration: HardwareAcceleration,
         ): Result<Media> = runCatching {
             val mediaLocation = File(location).takeIf(File::exists)?.run {
                 Location.Local(path = absolutePath, name = name)
@@ -30,7 +32,7 @@ interface Decoder<Media, Frame> : AutoCloseable {
 
             val media: Media
 
-            NativeDecoder(location, findAudioStream, findVideoStream).use { decoder ->
+            NativeDecoder(location, findAudioStream, findVideoStream, hardwareAcceleration).use { decoder ->
                 val format = decoder.format
 
                 val audioFormat = runCatching {
@@ -90,28 +92,37 @@ interface Decoder<Media, Frame> : AutoCloseable {
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
+            hardwareAcceleration: HardwareAcceleration,
         ): Result<Decoder<Media, Frame.Probe>> = probe(
-            location = location, findAudioStream = findAudioStream, findVideoStream = findVideoStream
+            location = location,
+            findAudioStream = findAudioStream,
+            findVideoStream = findVideoStream,
+            hardwareAcceleration = hardwareAcceleration
         ).mapCatching { media ->
             ProbeDecoder(
                 decoder = NativeDecoder(
                     location = location,
                     findAudioStream = findAudioStream,
-                    findVideoStream = findVideoStream
+                    findVideoStream = findVideoStream,
+                    hardwareAcceleration = hardwareAcceleration
                 ),
                 media = media
             )
         }
 
         internal fun createAudioDecoder(location: String): Result<Decoder<Media.Audio, Frame.Audio>> = probe(
-            location = location, findAudioStream = true, findVideoStream = false
+            location = location,
+            findAudioStream = true,
+            findVideoStream = false,
+            hardwareAcceleration = HardwareAcceleration.NONE
         ).mapCatching<Decoder<Media.Audio, Frame.Audio>, Media> { media ->
             when (media) {
                 is Media.AudioVideo -> AudioDecoder(
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = true,
-                        findVideoStream = false
+                        findVideoStream = false,
+                        hardwareAcceleration = HardwareAcceleration.NONE
                     ),
                     media = media.toAudio()
                 )
@@ -120,7 +131,8 @@ interface Decoder<Media, Frame> : AutoCloseable {
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = true,
-                        findVideoStream = false
+                        findVideoStream = false,
+                        hardwareAcceleration = HardwareAcceleration.NONE
                     ),
                     media = media
                 )
@@ -129,15 +141,22 @@ interface Decoder<Media, Frame> : AutoCloseable {
             }
         }
 
-        internal fun createVideoDecoder(location: String): Result<Decoder<Media.Video, Frame.Video>> = probe(
-            location = location, findAudioStream = false, findVideoStream = true
+        internal fun createVideoDecoder(
+            location: String,
+            hardwareAcceleration: HardwareAcceleration,
+        ): Result<Decoder<Media.Video, Frame.Video>> = probe(
+            location = location,
+            findAudioStream = false,
+            findVideoStream = true,
+            hardwareAcceleration = hardwareAcceleration
         ).mapCatching { media ->
             when (media) {
                 is Media.AudioVideo -> VideoDecoder(
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = false,
-                        findVideoStream = true
+                        findVideoStream = true,
+                        hardwareAcceleration = hardwareAcceleration
                     ),
                     media = media.toVideo()
                 )
@@ -148,7 +167,8 @@ interface Decoder<Media, Frame> : AutoCloseable {
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = false,
-                        findVideoStream = true
+                        findVideoStream = true,
+                        hardwareAcceleration = hardwareAcceleration
                     ),
                     media = media
                 )

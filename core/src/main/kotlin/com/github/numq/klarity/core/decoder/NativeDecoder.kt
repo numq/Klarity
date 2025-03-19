@@ -2,14 +2,21 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.format.NativeFormat
 import com.github.numq.klarity.core.frame.NativeFrame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import java.lang.ref.Cleaner
 
-internal class NativeDecoder(location: String, findAudioStream: Boolean, findVideoStream: Boolean) : AutoCloseable {
+internal class NativeDecoder(
+    location: String,
+    findAudioStream: Boolean,
+    findVideoStream: Boolean,
+    hardwareAcceleration: HardwareAcceleration,
+) : AutoCloseable {
     private val nativeHandle = requireNotNull(
         createNative(
             location,
             findAudioStream,
-            findVideoStream
+            findVideoStream,
+            hardwareAcceleration
         ).takeIf { it != -1L }
     ) { "Unable to instantiate native decoder" }
 
@@ -21,7 +28,12 @@ internal class NativeDecoder(location: String, findAudioStream: Boolean, findVid
         private val cleaner = Cleaner.create()
 
         @JvmStatic
-        private external fun createNative(location: String, findAudioStream: Boolean, findVideoStream: Boolean): Long
+        private external fun createNative(
+            location: String,
+            findAudioStream: Boolean,
+            findVideoStream: Boolean,
+            hardwareAcceleration: HardwareAcceleration,
+        ): Long
 
         @JvmStatic
         private external fun getFormatNative(handle: Long): NativeFormat

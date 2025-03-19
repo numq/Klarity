@@ -1,5 +1,7 @@
 package com.github.numq.klarity.core.command
 
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+
 sealed interface Command {
     enum class Descriptor {
         PREPARE, PLAY, PAUSE, RESUME, STOP, SEEK_TO, RELEASE
@@ -7,7 +9,12 @@ sealed interface Command {
 
     val descriptor: Descriptor
 
-    data class Prepare(val location: String, val audioBufferSize: Int, val videoBufferSize: Int) : Command {
+    data class Prepare(
+        val location: String,
+        val audioBufferSize: Int,
+        val videoBufferSize: Int,
+        val hardwareAcceleration: HardwareAcceleration,
+    ) : Command {
         override val descriptor = Descriptor.PREPARE
     }
 

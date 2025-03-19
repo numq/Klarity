@@ -3,6 +3,7 @@ package decoder
 import JNITest
 import com.github.numq.klarity.core.decoder.NativeDecoder
 import com.github.numq.klarity.core.frame.NativeFrame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -27,9 +28,26 @@ class NativeDecoderTest : JNITest() {
 
     @BeforeEach
     fun beforeEach() {
-        audioDecoder = NativeDecoder(audioFile!!, findAudioStream = true, findVideoStream = false)
-        videoDecoder = NativeDecoder(videoFile!!, findAudioStream = false, findVideoStream = true)
-        mediaDecoder = NativeDecoder(mediaFile!!, findAudioStream = true, findVideoStream = true)
+        audioDecoder = NativeDecoder(
+            audioFile!!,
+            findAudioStream = true,
+            findVideoStream = false,
+            hardwareAcceleration = HardwareAcceleration.NONE
+        )
+
+        videoDecoder = NativeDecoder(
+            videoFile!!,
+            findAudioStream = false,
+            findVideoStream = true,
+            hardwareAcceleration = HardwareAcceleration.NONE
+        )
+
+        mediaDecoder = NativeDecoder(
+            mediaFile!!,
+            findAudioStream = true,
+            findVideoStream = true,
+            hardwareAcceleration = HardwareAcceleration.NONE
+        )
     }
 
     @AfterEach
@@ -45,7 +63,8 @@ class NativeDecoderTest : JNITest() {
             NativeDecoder(
                 location = "some invalid media location",
                 findAudioStream = true,
-                findVideoStream = true
+                findVideoStream = true,
+                hardwareAcceleration = HardwareAcceleration.NONE
             ).close()
         }
     }
@@ -58,19 +77,22 @@ class NativeDecoderTest : JNITest() {
                     "audio_only" -> NativeDecoder(
                         location = file.absolutePath,
                         findAudioStream = true,
-                        findVideoStream = false
+                        findVideoStream = false,
+                        hardwareAcceleration = HardwareAcceleration.NONE
                     ).close()
 
                     "video_only" -> NativeDecoder(
                         location = file.absolutePath,
                         findAudioStream = false,
-                        findVideoStream = true
+                        findVideoStream = true,
+                        hardwareAcceleration = HardwareAcceleration.NONE
                     ).close()
 
                     else -> NativeDecoder(
                         location = file.absolutePath,
                         findAudioStream = true,
-                        findVideoStream = true
+                        findVideoStream = true,
+                        hardwareAcceleration = HardwareAcceleration.NONE
                     ).close()
                 }
             }

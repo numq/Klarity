@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.snapshot
 
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -11,9 +12,10 @@ object SnapshotManager {
         width: Int? = null,
         height: Int? = null,
         keyframesOnly: Boolean = true,
+        hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE,
         timestampMillis: (durationMillis: Long) -> (Long),
     ) = VideoDecoderFactory().create(
-        parameters = VideoDecoderFactory.Parameters(location = location)
+        parameters = VideoDecoderFactory.Parameters(location = location, hardwareAcceleration = hardwareAcceleration)
     ).mapCatching { decoder ->
         with(decoder) {
             use {
@@ -35,9 +37,10 @@ object SnapshotManager {
         width: Int? = null,
         height: Int? = null,
         keyframesOnly: Boolean = true,
+        hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE,
         timestampsMillis: (durationMillis: Long) -> (List<Long>),
     ) = VideoDecoderFactory().create(
-        parameters = VideoDecoderFactory.Parameters(location = location)
+        parameters = VideoDecoderFactory.Parameters(location = location, hardwareAcceleration = hardwareAcceleration)
     ).mapCatching { decoder ->
         with(decoder) {
             use {

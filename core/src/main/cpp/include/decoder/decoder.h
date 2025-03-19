@@ -6,6 +6,7 @@
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
+#include "hwaccel.h"
 
 extern "C" {
 #include "libavutil/imgutils.h"
@@ -28,6 +29,8 @@ private:
     std::vector<uint8_t> audioBuffer;
 
     std::vector<uint8_t> videoBuffer;
+
+    AVBufferRef *hwDeviceContext = nullptr;
 
     AVFormatContext *formatContext = nullptr;
 
@@ -55,7 +58,9 @@ private:
 
     AVFrame *frame = nullptr;
 
-    static AVCodecContext *_initializeCodecContext(AVCodecParameters *avCodecParameters);
+    static AVBufferRef *_initializeHWDevice(HardwareAcceleration hwAccel);
+
+    static AVCodecContext *_initializeCodecContext(AVCodecParameters *avCodecParameters, HardwareAcceleration hwAccel);
 
     void _prepareSwsContext(AVPixelFormat srcFormat, int width, int height, int dstWidth, int dstHeight);
 
@@ -68,7 +73,12 @@ private:
 public:
     Format format;
 
-    Decoder(const std::string &location, bool findAudioStream, bool findVideoStream);
+    Decoder(
+            const std::string &location,
+            bool findAudioStream,
+            bool findVideoStream,
+            HardwareAcceleration hwAccel
+    );
 
     ~Decoder();
 

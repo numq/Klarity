@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.preview
 
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,7 +13,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration.Companion.milliseconds
 
-internal class DefaultPreviewManager(private val videoDecoderFactory: VideoDecoderFactory) : PreviewManager {
+internal class DefaultPreviewManager(
+    private val hardwareAcceleration: HardwareAcceleration,
+    private val videoDecoderFactory: VideoDecoderFactory,
+) : PreviewManager {
     private val coroutineContext = Dispatchers.Default + SupervisorJob()
 
     private val coroutineScope = CoroutineScope(coroutineContext)
@@ -33,7 +37,10 @@ internal class DefaultPreviewManager(private val videoDecoderFactory: VideoDecod
         check(currentState is InternalPreviewState.Empty) { "Unable to load non-empty preview manager" }
 
         videoDecoderFactory.create(
-            parameters = VideoDecoderFactory.Parameters(location = location)
+            parameters = VideoDecoderFactory.Parameters(
+                location = location,
+                hardwareAcceleration = hardwareAcceleration
+            )
         ).mapCatching { decoder ->
             internalState.emit(InternalPreviewState.Ready(decoder = decoder))
         }.getOrThrow()
