@@ -15,6 +15,7 @@ jobs:
         with:
           name: ffmpeg-portaudio-ubuntu
           path: deps/
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Required Dependencies (Ubuntu)
         run: |

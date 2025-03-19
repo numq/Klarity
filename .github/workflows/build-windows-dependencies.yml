@@ -56,20 +56,19 @@ jobs:
           cmake --build build --config Release --target install
 
       - name: Organize Required Files
-        shell: msys2 {0}
         run: |
-          if not exist "$GITHUB_WORKSPACE/deps/bin" mkdir $GITHUB_WORKSPACE/deps/bin
-          if not exist "$GITHUB_WORKSPACE/deps/include" mkdir $GITHUB_WORKSPACE/deps/include
+          if not exist "$GITHUB_WORKSPACE\\deps\\bin" mkdir "$GITHUB_WORKSPACE\\deps\\bin"
+          if not exist "$GITHUB_WORKSPACE\\deps\\include" mkdir "$GITHUB_WORKSPACE\\deps\\include"
 
-          xcopy /E /I /H /Y /F $GITHUB_WORKSPACE/deps/include\* $GITHUB_WORKSPACE/deps/include\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\av*.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\sw*.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libiconv-2.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\liblzma-5.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\zlib1.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libwinpthread-1.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libgcc_s_seh-1.dll $GITHUB_WORKSPACE/deps/bin\
-          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libstdc++-6.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F $GITHUB_WORKSPACE\\deps\\include\\* $GITHUB_WORKSPACE\\deps\\include\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\av*.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\sw*.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libiconv-2.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\liblzma-5.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\zlib1.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libwinpthread-1.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libgcc_s_seh-1.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libstdc++-6.dll $GITHUB_WORKSPACE\\deps\\bin\\
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
