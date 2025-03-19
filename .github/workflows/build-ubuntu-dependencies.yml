@@ -1,25 +1,26 @@
-name: Compile macOS Dependencies
+name: Build Ubuntu Dependencies
 
 on:
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:
 
 jobs:
-  build_macos_dependencies:
-    runs-on: macos-latest
+  build_ubuntu_dependencies:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (macOS)
+      - name: Install dependencies (Ubuntu)
         run: |
-          brew install nasm yasm cmake autoconf automake libtool pkg-config
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config
 
       - name: Build FFmpeg 7.1
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
           ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
-          make -j$(sysctl -n hw.logicalcpu)
+          make -j$(nproc)
           make install
 
       - name: Build PortAudio v19.7.0
@@ -29,8 +30,17 @@ jobs:
           cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
           cmake --build build --config Release --target install
 
+      - name: Organize Required Files
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/deps/bin
+          mkdir -p $GITHUB_WORKSPACE/deps/include
+          
+          cp -r $GITHUB_WORKSPACE/deps/include/* $GITHUB_WORKSPACE/deps/include/
+
+          cp /usr/local/lib/*.so* $GITHUB_WORKSPACE/deps/bin/
+
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-portaudio-macos
+          name: ffmpeg-portaudio-ubuntu
           path: deps/
