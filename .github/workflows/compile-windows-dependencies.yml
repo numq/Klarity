@@ -30,6 +30,9 @@ jobs:
             mingw-w64-x86_64-nasm
             mingw-w64-x86_64-yasm
             mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-libiconv
+            mingw-w64-x86_64-xz
+            mingw-w64-x86_64-zlib
 
       - name: Clone FFmpeg
         run: git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
@@ -51,6 +54,13 @@ jobs:
           cd portaudio
           cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
           cmake --build build --config Release --target install
+
+      - name: Copy Required DLLs
+        shell: msys2 {0}
+        run: |
+          cp /mingw64/bin/libiconv-2.dll $GITHUB_WORKSPACE/deps/
+          cp /mingw64/bin/liblzma-5.dll $GITHUB_WORKSPACE/deps/
+          cp /mingw64/bin/zlib1.dll $GITHUB_WORKSPACE/deps/
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
