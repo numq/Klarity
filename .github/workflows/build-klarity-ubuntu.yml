@@ -30,7 +30,7 @@ jobs:
         with:
           name: ffmpeg-portaudio-ubuntu
           path: deps
-          token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Klarity Library (Ubuntu)
         run: |
