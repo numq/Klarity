@@ -46,7 +46,7 @@ jobs:
       - name: Build Klarity Library (macOS)
         run: |
           cd core/src/main/cpp
-          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -B build -S .
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -DCMAKE_INSTALL_RPATH=$GITHUB_WORKSPACE/deps/bin -B build -S .
           cmake --build build --config Release
 
       - name: Upload Klarity Library
