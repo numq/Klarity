@@ -10,14 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake g++ make wget openjdk-15-jdk
+      - name: Set up Java 15 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '15'
 
       - name: Verify OpenJDK Installation
         run: |
           java -version
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make wget
 
       - name: Download Dependencies
         uses: actions/download-artifact@v4
