@@ -22,14 +22,6 @@ else ()
     message(FATAL_ERROR "JNI not found.")
 endif ()
 
-set(DEPENDENCIES_DIR "${CMAKE_SOURCE_DIR}/deps")
-
-set(FFMPEG_INCLUDE_DIR "${DEPENDENCIES_DIR}/include")
-set(PORTAUDIO_INCLUDE_DIR "${DEPENDENCIES_DIR}/include")
-
-set(FFMPEG_LIB_DIR "${DEPENDENCIES_DIR}/lib")
-set(PORTAUDIO_LIB_DIR "${DEPENDENCIES_DIR}/lib")
-
 target_include_directories(klarity PRIVATE
         include
         include/decoder
@@ -38,15 +30,14 @@ target_include_directories(klarity PRIVATE
         include/sampler/dsp
         include/sampler/portaudio
         include/sampler/stretch
-        ${FFMPEG_INCLUDE_DIR}
-        ${PORTAUDIO_INCLUDE_DIR}
 )
 
-link_directories(${FFMPEG_LIB_DIR} ${PORTAUDIO_LIB_DIR})
+target_link_directories(klarity PRIVATE bin/ffmpeg bin/portaudio)
 
-target_link_libraries(klarity PRIVATE avcodec avformat avutil swresample swscale portaudio)
-
-message(STATUS "FFMPEG_INCLUDE_DIR=${FFMPEG_INCLUDE_DIR}")
-message(STATUS "PORTAUDIO_INCLUDE_DIR=${PORTAUDIO_INCLUDE_DIR}")
-message(STATUS "FFMPEG_LIB_DIR=${FFMPEG_LIB_DIR}")
-message(STATUS "PORTAUDIO_LIB_DIR=${PORTAUDIO_LIB_DIR}")
+if (APPLE)
+    target_link_libraries(klarity PRIVATE avcodec.61 avformat.61 avutil.59 swresample.5 swscale.8 libportaudio)
+elseif (WIN32)
+    target_link_libraries(klarity PRIVATE avcodec-61 avformat-61 avutil-59 swresample-5 swscale-8 libportaudio)
+elseif (UNIX)
+    target_link_libraries(klarity PRIVATE avcodec avformat avutil swresample swscale portaudio)
+endif ()
