@@ -18,13 +18,11 @@ jobs:
         uses: dawidd6/action-download-artifact@v9
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: |
-            ${{ matrix.os == 'ubuntu-latest' && 'Compile Ubuntu Dependencies' || 
-               matrix.os == 'macos-latest' && 'Compile macOS Dependencies' || 
-               'Compile Windows Dependencies' }}
+          workflow: ${{ matrix.os == 'ubuntu-latest' && 'compile-ubuntu-dependencies' || matrix.os == 'macos-latest' && 'compile-macos-dependencies' || 'compile-windows-dependencies' }}
           workflow_conclusion: success
           name: ffmpeg-portaudio-${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || matrix.os == 'macos-latest' && 'macos' || 'windows' }}.zip
           path: deps
+          repo: numq/Klarity
 
       - name: Set Up Build Environment
         run: |
