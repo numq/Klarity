@@ -1,7 +1,7 @@
 name: Build Klarity on Ubuntu
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Allows manual execution
 
 jobs:
   build_klarity_ubuntu:
@@ -15,14 +15,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ make wget
 
-      - name: Install OpenJDK 15 from Adoptium
+      - name: Add AdoptOpenJDK Repository and Install OpenJDK 15
         run: |
-          wget https://github.com/AdoptOpenJDK/openjdk15-binaries/releases/download/jdk-15.0.2+7/openjdk-15.0.2+7-20210113-linux-x64.tar.gz
-          sudo mkdir -p /usr/lib/jvm
-          sudo tar xzvf openjdk-15.0.2+7-20210113-linux-x64.tar.gz -C /usr/lib/jvm
-          sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-15.0.2+7/bin/java 1
-          sudo update-alternatives --set java /usr/lib/jvm/jdk-15.0.2+7/bin/java
-          java -version  # Verify the installation
+          wget -qO - https://adoptopenjdk.jfrog.io/adoptopenjdk/api/gpg/key/public | sudo apt-key add -
+          sudo add-apt-repository --yes https://adoptopenjdk.jfrog.io/adoptopenjdk/deb/
+
+          sudo apt-get update
+          sudo apt-get install -y adoptopenjdk-15-hotspot
+
+      - name: Verify OpenJDK Installation
+        run: |
+          java -version
 
       - name: Download Dependencies
         uses: actions/download-artifact@v4
