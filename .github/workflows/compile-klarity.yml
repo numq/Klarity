@@ -17,7 +17,7 @@ jobs:
       - name: Download Precompiled Dependencies
         uses: actions/download-artifact@v4
         with:
-          name: ffmpeg-portaudio-${{ matrix.os }}
+          name: ffmpeg-portaudio-${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || matrix.os == 'macos-latest' && 'macos' || 'windows' }}.zip
           path: deps
 
       - name: Set Up Build Environment
