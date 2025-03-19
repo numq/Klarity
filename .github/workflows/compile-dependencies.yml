@@ -87,10 +87,9 @@ jobs:
       # Install dependencies for Windows
       - name: Install dependencies (Windows)
         run: |
-          choco install nasm yasm cmake pkgconfiglite
-          winget install --id MSYS2.MSYS2 -e --source winget
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm autoconf automake libtool
+          choco install nasm yasm cmake pkgconfiglite msys2
+          refreshenv
+          C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm && pacman -S --noconfirm autoconf automake libtool make"
 
       # Clone and Build FFmpeg 7.1 (Windows)
       - name: Build FFmpeg 7.1 (Windows)
