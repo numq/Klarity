@@ -72,6 +72,15 @@ class PlayerControllerTest : JNITest() {
 
         val media = (controller.state.value as PlayerState.Ready.Stopped).media
 
+        val commands = listOf(
+            Command.Play,
+            Command.Pause,
+            Command.Resume,
+            Command.Stop,
+            Command.SeekTo((0L..media.durationMicros.microseconds.inWholeMilliseconds).random()),
+            Command.Release
+        )
+
         val expectedStates = listOf(
             PlayerState.Empty,
             PlayerState.Ready.Stopped(media = media),
@@ -82,15 +91,6 @@ class PlayerControllerTest : JNITest() {
             PlayerState.Ready.Seeking(media = media),
             PlayerState.Ready.Paused(media = media),
             PlayerState.Empty
-        )
-
-        val commands = listOf(
-            Command.Play,
-            Command.Pause,
-            Command.Resume,
-            Command.Stop,
-            Command.SeekTo((0L..media.durationMicros.microseconds.inWholeMilliseconds).random()),
-            Command.Release
         )
 
         commands.forEach { command ->
