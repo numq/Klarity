@@ -1,7 +1,7 @@
 name: Build macOS Dependencies
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Allows manual execution
 
 jobs:
   build_macos_dependencies:
@@ -34,9 +34,8 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           mkdir -p $GITHUB_WORKSPACE/deps/include
           
-          cp -r $GITHUB_WORKSPACE/deps/include/* $GITHUB_WORKSPACE/deps/include/
-
-          cp /usr/local/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/include/ $GITHUB_WORKSPACE/deps/include/
+          rsync -av --ignore-existing /usr/local/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
