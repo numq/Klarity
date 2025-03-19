@@ -18,7 +18,7 @@ jobs:
       - name: Install Required Dependencies (Ubuntu)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ make libjni-dev
+          sudo apt-get install -y cmake g++ make openjdk-15-jdk
 
       - name: Build Klarity Library (Ubuntu)
         run: |
