@@ -1,7 +1,7 @@
 name: Compile Windows Dependencies
 
 on:
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:
 
 jobs:
   build_windows_dependencies:
@@ -14,15 +14,22 @@ jobs:
         run: |
           choco install nasm yasm cmake
           choco install --ignore-checksums autoconf automake libtool
-          choco install pkgconfiglite
+          choco install pkgconfiglite msys2
 
-      - name: Install MSYS2
-        run: |
-          Invoke-WebRequest -Uri https://github.com/msys2/msys2-installer/releases/latest/download/msys2-x86_64.exe -OutFile msys2.exe
-          Start-Process -FilePath msys2.exe -ArgumentList "/S" -NoNewWindow -Wait
-          refreshenv
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-yasm
+            mingw-w64-x86_64-pkg-config
 
       - name: Build FFmpeg 7.1
+        shell: msys2 {0}
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
@@ -31,6 +38,7 @@ jobs:
           make install
 
       - name: Build PortAudio v19.7.0
+        shell: msys2 {0}
         run: |
           git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
           cd portaudio
