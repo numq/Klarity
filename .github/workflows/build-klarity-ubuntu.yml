@@ -1,7 +1,10 @@
 name: Build Klarity on Ubuntu
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build Ubuntu Dependencies"]
+    types:
+      - completed
 
 jobs:
   build_klarity_ubuntu:
