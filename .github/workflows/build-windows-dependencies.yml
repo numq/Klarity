@@ -33,7 +33,6 @@ jobs:
             mingw-w64-x86_64-libiconv
             mingw-w64-x86_64-xz
             mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-rsync
 
       - name: Clone FFmpeg
         run: git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
@@ -62,16 +61,15 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           mkdir -p $GITHUB_WORKSPACE/deps/include
 
-          rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/include/ $GITHUB_WORKSPACE/deps/include/
-
-          rsync -av --ignore-existing /mingw64/bin/av*.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/sw*.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/libiconv-2.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/liblzma-5.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/zlib1.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/libwinpthread-1.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/libgcc_s_seh-1.dll $GITHUB_WORKSPACE/deps/bin/
-          rsync -av --ignore-existing /mingw64/bin/libstdc++-6.dll $GITHUB_WORKSPACE/deps/bin/
+          xcopy /E /I /H /Y /F $GITHUB_WORKSPACE/deps/include\* $GITHUB_WORKSPACE/deps/include\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\av*.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\sw*.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libiconv-2.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\liblzma-5.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\zlib1.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libwinpthread-1.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libgcc_s_seh-1.dll $GITHUB_WORKSPACE/deps/bin\
+          xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\libstdc++-6.dll $GITHUB_WORKSPACE/deps/bin\
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
