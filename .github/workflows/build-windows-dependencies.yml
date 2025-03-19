@@ -1,4 +1,4 @@
-name: Build Klarity on Windows
+name: Build Windows dependencies
 
 on:
   workflow_dispatch:  # Allows manual execution
