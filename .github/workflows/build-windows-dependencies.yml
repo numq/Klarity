@@ -58,8 +58,8 @@ jobs:
       - name: Organize Required Files
         shell: msys2 {0}
         run: |
-          mkdir -p $GITHUB_WORKSPACE/deps/bin
-          mkdir -p $GITHUB_WORKSPACE/deps/include
+          mkdir $GITHUB_WORKSPACE/deps/bin
+          mkdir $GITHUB_WORKSPACE/deps/include
 
           xcopy /E /I /H /Y /F $GITHUB_WORKSPACE/deps/include\* $GITHUB_WORKSPACE/deps/include\
           xcopy /E /I /H /Y /F C:\msys64\mingw64\bin\av*.dll $GITHUB_WORKSPACE/deps/bin\
