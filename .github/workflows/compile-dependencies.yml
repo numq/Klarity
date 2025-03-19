@@ -4,34 +4,18 @@ on:
   workflow_dispatch:  # Allows manual execution
 
 jobs:
-  build_dependencies:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]  # Target platforms
-      fail-fast: false  # Allow other jobs to continue if one fails
-    runs-on: ${{ matrix.os }}
+  # Ubuntu build
+  build_ubuntu:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # Install dependencies for Linux
+      # Install dependencies for Ubuntu
       - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config
-
-      # Install dependencies for macOS
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macos'
-        run: |
-          brew install nasm yasm cmake autoconf automake libtool pkg-config
-
-      # Install dependencies for Windows
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install nasm yasm cmake autoconf automake libtool pkgconfiglite
 
       # Clone and Build FFmpeg 7.1
       - name: Build FFmpeg 7.1
@@ -42,7 +26,7 @@ jobs:
           make -j$(nproc)
           make install
 
-      # Clone and Build PortAudio
+      # Clone and Build PortAudio v19.7.0
       - name: Build PortAudio v19.7.0
         run: |
           git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
@@ -50,20 +34,84 @@ jobs:
           cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
           cmake --build build --config Release --target install
 
-      # Debug: Check if the files exist
-      - name: Debug Files Before Upload
-        run: |
-          echo "Contents of deps directory:"
-          ls -R $GITHUB_WORKSPACE/deps
-
       # Upload compiled binaries and headers
       - name: Upload FFmpeg & PortAudio
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-portaudio-${{ matrix.os }}
-          path: |
-            deps/lib/*.so
-            deps/lib/*.dylib
-            deps/lib/*.dll
-            deps/include
+          name: ffmpeg-portaudio-ubuntu
+          path: deps/
+
+  # macOS build
+  build_macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install dependencies for macOS
+      - name: Install dependencies (macOS)
+        run: |
+          brew install nasm yasm cmake autoconf automake libtool pkg-config
+
+      # Clone and Build FFmpeg 7.1 (macOS)
+      - name: Build FFmpeg 7.1 (macOS)
+        run: |
+          git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
+          cd FFmpeg
+          ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps --disable-videotoolbox --disable-metal
+          make -j$(sysctl -n hw.ncpu)
+          make install
+
+      # Clone and Build PortAudio v19.7.0 (macOS)
+      - name: Build PortAudio v19.7.0 (macOS)
+        run: |
+          git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
+          cd portaudio
+          cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
+          cmake --build build --config Release --target install
+
+      # Upload compiled binaries and headers
+      - name: Upload FFmpeg & PortAudio (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-portaudio-macos
+          path: deps/
+
+  # Windows build
+  build_windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install dependencies for Windows
+      - name: Install dependencies (Windows)
+        run: |
+          choco install nasm yasm cmake pkgconfiglite
+          winget install --id MSYS2.MSYS2 -e --source winget
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm autoconf automake libtool
+
+      # Clone and Build FFmpeg 7.1 (Windows)
+      - name: Build FFmpeg 7.1 (Windows)
+        run: |
+          git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
+          cd FFmpeg
+          ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
+          make -j$(nproc)
+          make install
+
+      # Clone and Build PortAudio v19.7.0 (Windows)
+      - name: Build PortAudio v19.7.0 (Windows)
+        run: |
+          git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
+          cd portaudio
+          cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
+          cmake --build build --config Release --target install
+
+      # Upload compiled binaries and headers
+      - name: Upload FFmpeg & PortAudio (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-portaudio-windows
+          path: deps/
