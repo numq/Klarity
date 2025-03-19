@@ -58,13 +58,18 @@ jobs:
       - name: Organize Required Files
         shell: pwsh
         run: |
+          if (!(Test-Path "$GITHUB_WORKSPACE\\deps")) {
+            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps"
+          }
+          
           if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\bin")) {
-            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\bin"
+            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\bin" -Force
           }
+          
           if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\include")) {
-            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\include"
+            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\include" -Force
           }
-
+          
           xcopy /E /I /H /Y /F $GITHUB_WORKSPACE\\deps\\include\\* $GITHUB_WORKSPACE\\deps\\include\\
           xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\av*.dll $GITHUB_WORKSPACE\\deps\\bin\\
           xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\sw*.dll $GITHUB_WORKSPACE\\deps\\bin\\
