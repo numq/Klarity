@@ -1,0 +1,33 @@
+name: Build Klarity on macOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_klarity_macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-portaudio-macos
+          path: $GITHUB_WORKSPACE/deps
+
+      - name: Install Required Dependencies (macOS)
+        run: |
+          brew install cmake make libjni
+
+      - name: Build Klarity Library (macOS)
+        run: |
+          cd core/src/main/cpp
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -B build -S .
+          cmake --build build --config Release
+
+      - name: Upload Klarity Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-macos
+          path: core/src/main/cpp/build/

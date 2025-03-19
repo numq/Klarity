@@ -1,0 +1,34 @@
+name: Build Klarity on Ubuntu
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_klarity_ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-portaudio-ubuntu
+          path: $GITHUB_WORKSPACE/deps
+
+      - name: Install Required Dependencies (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ make libjni-dev
+
+      - name: Build Klarity Library (Ubuntu)
+        run: |
+          cd core/src/main/cpp
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -B build -S .
+          cmake --build build --config Release
+
+      - name: Upload Klarity Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-ubuntu
+          path: core/src/main/cpp/build/
