@@ -33,6 +33,7 @@ jobs:
             mingw-w64-x86_64-libiconv
             mingw-w64-x86_64-xz
             mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-rsync
 
       - name: Clone FFmpeg
         run: git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git

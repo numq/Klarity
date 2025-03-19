@@ -35,7 +35,13 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/deps/include
           
           rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/include/ $GITHUB_WORKSPACE/deps/include/
-          rsync -av --ignore-existing /usr/local/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          
+          if [ -d "/opt/homebrew/lib" ]; then
+            rsync -av --ignore-existing /opt/homebrew/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          fi
+          if [ -d "/usr/local/lib" ]; then
+            rsync -av --ignore-existing /usr/local/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          fi
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
