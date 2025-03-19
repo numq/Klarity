@@ -1,19 +1,19 @@
-name: Build Ubuntu Dependencies
+name: Build Klarity on Ubuntu
 
 on:
   workflow_dispatch:  # Allows manual execution
 
 jobs:
-  build_ubuntu_dependencies:
+  build_klarity_ubuntu:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (Ubuntu)
+      - name: Install Dependencies (Ubuntu)
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config
+          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ make wget
 
       - name: Build FFmpeg 7.1
         run: |
@@ -43,3 +43,25 @@ jobs:
         with:
           name: ffmpeg-portaudio-ubuntu
           path: deps/
+
+      - name: Set up Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Verify OpenJDK Installation
+        run: |
+          java -version
+
+      - name: Build Klarity Library (Ubuntu)
+        run: |
+          cd core/src/main/cpp
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -B build -S .
+          cmake --build build --config Release
+
+      - name: Upload Klarity Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-ubuntu
+          path: core/src/main/cpp/build/

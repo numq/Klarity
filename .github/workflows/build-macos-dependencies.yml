@@ -1,10 +1,10 @@
-name: Build macOS Dependencies
+name: Build Klarity on macOS
 
 on:
   workflow_dispatch:  # Allows manual execution
 
 jobs:
-  build_macos_dependencies:
+  build_klarity_macos:
     runs-on: macos-latest
 
     steps:
@@ -42,3 +42,15 @@ jobs:
         with:
           name: ffmpeg-portaudio-macos
           path: deps/
+
+      - name: Build Klarity Library (macOS)
+        run: |
+          cd core/src/main/cpp
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -B build -S .
+          cmake --build build --config Release
+
+      - name: Upload Klarity Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-macos
+          path: core/src/main/cpp/build/
