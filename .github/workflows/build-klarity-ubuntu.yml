@@ -28,6 +28,8 @@ jobs:
       - name: Download Dependencies
         uses: actions/download-artifact@v4
         with:
+          name: ffmpeg-portaudio-ubuntu
+          path: deps
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Klarity Library (Ubuntu)

@@ -13,7 +13,7 @@ jobs:
 
       - name: Install Chocolatey Dependencies
         run: |
-          choco install nasm yasm cmake pkgconfiglite
+          choco install nasm yasm cmake pkgconfiglite -y
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
@@ -58,27 +58,38 @@ jobs:
       - name: Organize Required Files
         shell: pwsh
         run: |
-          if (!(Test-Path "$GITHUB_WORKSPACE\\deps")) {
-            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps"
+          if (-not $env:GITHUB_WORKSPACE) {
+            $env:GITHUB_WORKSPACE = (Get-Location).Path
+            Write-Host "GITHUB_WORKSPACE is now: $env:GITHUB_WORKSPACE"
           }
-          
-          if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\bin")) {
-            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\bin" -Force
+
+          $depsPath = Join-Path -Path $env:GITHUB_WORKSPACE -ChildPath "deps"
+          if (!(Test-Path "$depsPath")) {
+            New-Item -ItemType Directory -Path "$depsPath" -Force
           }
-          
-          if (!(Test-Path "$GITHUB_WORKSPACE\\deps\\include")) {
-            New-Item -ItemType Directory -Path "$GITHUB_WORKSPACE\\deps\\include" -Force
+
+          if (!(Test-Path "$depsPath\\bin")) {
+            New-Item -ItemType Directory -Path "$depsPath\\bin" -Force
           }
-          
-          xcopy /E /I /H /Y /F $GITHUB_WORKSPACE\\deps\\include\\* $GITHUB_WORKSPACE\\deps\\include\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\av*.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\sw*.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libiconv-2.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\liblzma-5.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\zlib1.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libwinpthread-1.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libgcc_s_seh-1.dll $GITHUB_WORKSPACE\\deps\\bin\\
-          xcopy /E /I /H /Y /F C:\\msys64\\mingw64\\bin\\libstdc++-6.dll $GITHUB_WORKSPACE\\deps\\bin\\
+          if (!(Test-Path "$depsPath\\include")) {
+            New-Item -ItemType Directory -Path "$depsPath\\include" -Force
+          }
+
+          $dlls = @(
+            "av*.dll",
+            "sw*.dll",
+            "libiconv-2.dll",
+            "liblzma-5.dll",
+            "zlib1.dll",
+            "libwinpthread-1.dll",
+            "libgcc_s_seh-1.dll",
+            "libstdc++-6.dll"
+          )
+
+          foreach ($dll in $dlls) {
+            $sourcePath = Join-Path -Path "C:\\msys64\\mingw64\\bin" -ChildPath $dll
+            Copy-Item -Path $sourcePath -Destination "$depsPath\\bin\\" -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
