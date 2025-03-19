@@ -34,8 +34,8 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           mkdir -p $GITHUB_WORKSPACE/deps/include
           
-          find $GITHUB_WORKSPACE/deps/lib -name "*.dylib" -exec cp {} $GITHUB_WORKSPACE/deps/bin/ \;
-          cp -r $GITHUB_WORKSPACE/deps/include/* $GITHUB_WORKSPACE/deps/include/
+          rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/include/ $GITHUB_WORKSPACE/deps/include/
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
