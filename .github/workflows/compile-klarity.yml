@@ -1,0 +1,38 @@
+name: Compile Klarity
+
+on:
+  workflow_dispatch:  # Allows manual execution
+
+jobs:
+  build_klarity:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Precompiled Dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-portaudio-${{ matrix.os }}
+          path: deps
+
+      - name: Set Up Build Environment
+        run: |
+          echo "CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
+          echo "CMAKE_LIBRARY_PATH=$GITHUB_WORKSPACE/deps/lib" >> $GITHUB_ENV
+          echo "CMAKE_INCLUDE_PATH=$GITHUB_WORKSPACE/deps/include" >> $GITHUB_ENV
+
+      - name: Configure and Build Klarity
+        run: |
+          cmake -S core/src/main/cpp -B build -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps
+          cmake --build build --config Release
+
+      - name: Upload Klarity Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-${{ matrix.os }}
+          path: build/klarity.*
