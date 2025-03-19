@@ -8,6 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]  # Target platforms
+      fail-fast: false  # Allow other jobs to continue if one fails
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -49,9 +50,10 @@ jobs:
           cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
           cmake --build build --config Release --target install
 
-      # Check if the files exist and upload
+      # Debug: Check if the files exist
       - name: Debug Files Before Upload
         run: |
+          echo "Contents of deps directory:"
           ls -R $GITHUB_WORKSPACE/deps
 
       # Upload compiled binaries and headers
