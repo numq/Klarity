@@ -19,7 +19,7 @@ jobs:
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
+          ./configure --enable-shared --disable-static --disable-autodetect --prefix=$GITHUB_WORKSPACE/deps
           make -j$(nproc)
           make install
 

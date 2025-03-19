@@ -41,7 +41,7 @@ jobs:
         shell: msys2 {0}
         run: |
           cd FFmpeg
-          ./configure --enable-shared --disable-static --prefix=$GITHUB_WORKSPACE/deps
+          ./configure --enable-shared --disable-static --disable-autodetect --prefix=$GITHUB_WORKSPACE/deps
           make -j$(nproc)
           make install
 
@@ -77,13 +77,7 @@ jobs:
 
           $dlls = @(
             "av*.dll",
-            "sw*.dll",
-            "libiconv-2.dll",
-            "liblzma-5.dll",
-            "zlib1.dll",
-            "libwinpthread-1.dll",
-            "libgcc_s_seh-1.dll",
-            "libstdc++-6.dll"
+            "sw*.dll"
           )
 
           foreach ($dll in $dlls) {
