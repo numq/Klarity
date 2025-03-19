@@ -1,9 +1,6 @@
 #ifndef KLARITY_SAMPLER_H
 #define KLARITY_SAMPLER_H
 
-#include <cstring>
-#include <iostream>
-#include <memory>
 #include <mutex>
 #include "exception.h"
 #include "portaudio.h"
@@ -19,7 +16,7 @@ private:
 
     PaStream *stream = nullptr;
 
-    signalsmith::stretch::SignalsmithStretch<float> *stretch = nullptr;
+    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
 
     float playbackSpeedFactor = 1.0f;
 
@@ -39,6 +36,8 @@ public:
     int start();
 
     void play(const uint8_t *samples, uint64_t size);
+
+    void pause();
 
     void stop();
 };

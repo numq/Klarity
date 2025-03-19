@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -116,7 +117,7 @@ fun Renderer(
             coroutineScope.launch {
                 var renderJob: Job? = null
                 foreground.renderer.frame.collectLatest { frame ->
-                    renderJob?.cancel()
+                    renderJob?.cancelAndJoin()
                     renderJob = launch {
                         val renderingTime = measureTime {
                             val newImage = frame?.let {

@@ -19,6 +19,7 @@ class SnapshotManagerTest : JNITest() {
     fun `single snapshot`() = runTest {
         val snapshot = SnapshotManager.snapshot(
             location = location,
+            keyframesOnly = false,
             timestampMillis = { durationMillis ->
                 (0L..durationMillis).random()
             }).getOrThrow()

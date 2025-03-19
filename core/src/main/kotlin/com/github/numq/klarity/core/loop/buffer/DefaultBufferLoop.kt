@@ -17,7 +17,9 @@ internal class DefaultBufferLoop(
 ) : BufferLoop {
     private val mutex = Mutex()
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
+    private val coroutineContext = Dispatchers.Default + Job()
+
+    private val coroutineScope = CoroutineScope(coroutineContext)
 
     private var job: Job? = null
 
@@ -222,5 +224,5 @@ internal class DefaultBufferLoop(
         }
     }
 
-    override fun close() = coroutineScope.coroutineContext.cancelChildren()
+    override fun close() = coroutineContext.cancelChildren()
 }

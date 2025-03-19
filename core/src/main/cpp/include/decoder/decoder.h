@@ -21,6 +21,8 @@ private:
 
     const AVPixelFormat pixelFormat = AV_PIX_FMT_RGBA;
 
+    const int swsFlags = SWS_BILINEAR;
+
     std::mutex mutex;
 
     std::vector<uint8_t> audioBuffer;
@@ -37,6 +39,8 @@ private:
 
     int videoStreamIndex = -1;
 
+    bool isSeekable = true;
+
     SwrContext *swrContext = nullptr;
 
     SwsContext *swsContext = nullptr;
@@ -47,49 +51,19 @@ private:
 
     int swsHeight = -1;
 
+    AVPacket *packet = nullptr;
+
+    AVFrame *frame = nullptr;
+
     static AVCodecContext *_initializeCodecContext(AVCodecParameters *avCodecParameters);
+
+    void _prepareSwsContext(AVPixelFormat srcFormat, int width, int height, int dstWidth, int dstHeight);
 
     void _processAudioFrame(const AVFrame &src);
 
     void _processVideoFrame(const AVFrame &src, int dstWidth, int dstHeight);
 
     void _cleanUp();
-
-    class AVPacketGuard {
-    public:
-        AVPacketGuard() {
-            packet = av_packet_alloc();
-        }
-
-        ~AVPacketGuard() {
-            if (packet) {
-                av_packet_free(&packet);
-            }
-        }
-
-        AVPacket *get() { return packet; }
-
-    private:
-        AVPacket *packet = nullptr;
-    };
-
-    class AVFrameGuard {
-    public:
-        AVFrameGuard() {
-            frame = av_frame_alloc();
-        }
-
-        ~AVFrameGuard() {
-            if (frame) {
-                av_frame_free(&frame);
-            }
-        }
-
-        AVFrame *get() { return frame; }
-
-    private:
-        AVFrame *frame = nullptr;
-    };
 
 public:
     Format format;

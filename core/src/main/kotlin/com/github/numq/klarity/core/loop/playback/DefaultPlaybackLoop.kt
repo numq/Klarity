@@ -24,7 +24,9 @@ internal class DefaultPlaybackLoop(
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + Job())
+    private val coroutineContext = Dispatchers.Default + Job()
+
+    private val coroutineScope = CoroutineScope(coroutineContext)
 
     private var job: Job? = null
 
@@ -237,7 +239,7 @@ internal class DefaultPlaybackLoop(
                                     },
                                 )
 
-                                timestampJob.cancel()
+                                timestampJob.cancelAndJoin()
                             }
 
                             is Pipeline.Audio -> handleAudioPlayback(
@@ -271,5 +273,5 @@ internal class DefaultPlaybackLoop(
         }
     }
 
-    override fun close() = coroutineScope.coroutineContext.cancelChildren()
+    override fun close() = coroutineContext.cancelChildren()
 }

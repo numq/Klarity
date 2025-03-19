@@ -272,7 +272,9 @@ internal class DefaultPlayerController(
 
             check(currentInternalState is InternalPlayerState.Ready) { "Unable to execute playback command" }
 
-            command(currentInternalState)
+            if (currentInternalState.media.durationMicros > 0L) {
+                command(currentInternalState)
+            }
         }.onFailure { t ->
             handlePlaybackError(t)
         }.getOrDefault(Unit)
@@ -415,9 +417,9 @@ internal class DefaultPlayerController(
         playbackLoop.stop().getOrThrow()
 
         when (val pipeline = pipeline) {
-            is Pipeline.AudioVideo -> pipeline.sampler.stop().getOrThrow()
+            is Pipeline.AudioVideo -> pipeline.sampler.pause().getOrThrow()
 
-            is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
+            is Pipeline.Audio -> pipeline.sampler.pause().getOrThrow()
 
             is Pipeline.Video -> Unit
         }
@@ -468,9 +470,9 @@ internal class DefaultPlayerController(
             }
         }
 
-        bufferTimestamp.emit(com.github.numq.klarity.core.timestamp.Timestamp.ZERO)
+        bufferTimestamp.emit(Timestamp.ZERO)
 
-        playbackTimestamp.emit(com.github.numq.klarity.core.timestamp.Timestamp.ZERO)
+        playbackTimestamp.emit(Timestamp.ZERO)
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.STOPPED))
     }
@@ -640,8 +642,10 @@ internal class DefaultPlayerController(
     }
 
     override fun close() {
-        executionScope.coroutineContext.cancelChildren()
-        playerScope.coroutineContext.cancelChildren()
+        executionContext.cancelChildren()
+
+        playerContext.cancelChildren()
+
         when (val currentState = internalState.value) {
             is InternalPlayerState.Empty,
             is InternalPlayerState.Preparing,

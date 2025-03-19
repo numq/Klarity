@@ -51,19 +51,33 @@ class AudioDecoderTest : JNITest() {
 
     @Test
     fun `return next frame until the end of media`() = runTest {
-        var frames = 0
+        val expectedTimestamps = buildList {
+            val sampleRate = decoder.media.format.sampleRate
+            val frameSize = 1024
+            val totalFrames = decoder.media.durationMicros.microseconds.inWholeSeconds * sampleRate / frameSize
 
-        while (isActive) {
-            when (val frame = decoder.nextFrame(width = null, height = null).getOrThrow()) {
-                is Frame.Audio.Content -> {
-                    assertEquals(44100, frame.sampleRate)
-                    assertEquals(2, frame.channels)
-                    assertTrue(frame.timestampMicros < decoder.media.durationMicros)
-                    frames += 1
-                }
-
-                is Frame.Audio.EndOfStream -> break
+            repeat(totalFrames.toInt()) { index ->
+                add(((index * frameSize * 1_000_000.0 + sampleRate / 2) / sampleRate).toLong())
             }
+        }
+
+        val actualTimestamps = buildList {
+            while (isActive) {
+                when (val frame = decoder.nextFrame(width = null, height = null).getOrThrow()) {
+                    is Frame.Audio.Content -> {
+                        assertEquals(44100, frame.sampleRate)
+                        assertEquals(2, frame.channels)
+                        assertTrue(frame.timestampMicros < decoder.media.durationMicros)
+                        add(frame.timestampMicros)
+                    }
+
+                    is Frame.Audio.EndOfStream -> break
+                }
+            }
+        }
+
+        expectedTimestamps.zip(actualTimestamps).forEach { (expected, actual) ->
+            assertEquals(expected, actual)
         }
     }
 

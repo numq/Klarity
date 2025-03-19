@@ -56,6 +56,12 @@ internal class DefaultSampler(
         }.recoverCatching(NativeException::create)
     }
 
+    override suspend fun pause() = mutex.withLock {
+        runCatching {
+            sampler.pause()
+        }.recoverCatching(NativeException::create)
+    }
+
     override suspend fun stop() = mutex.withLock {
         runCatching {
             sampler.stop()

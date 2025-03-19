@@ -10,17 +10,18 @@ object SnapshotManager {
         location: String,
         width: Int? = null,
         height: Int? = null,
-        keyframesOnly: Boolean = false,
+        keyframesOnly: Boolean = true,
         timestampMillis: (durationMillis: Long) -> (Long),
     ) = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(location = location)
     ).mapCatching { decoder ->
         with(decoder) {
             use {
-                seekTo(
-                    micros = timestampMillis(media.durationMicros.microseconds.inWholeMilliseconds),
-                    keyframesOnly = keyframesOnly
-                ).getOrThrow()
+                timestampMillis(media.durationMicros.microseconds.inWholeMilliseconds).takeIf {
+                    it > 0
+                }?.let { timestampMicros ->
+                    seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrThrow()
+                }
 
                 nextFrame(width = width, height = height).getOrThrow() as? Frame.Video.Content
             }
@@ -33,7 +34,7 @@ object SnapshotManager {
         location: String,
         width: Int? = null,
         height: Int? = null,
-        keyframesOnly: Boolean = false,
+        keyframesOnly: Boolean = true,
         timestampsMillis: (durationMillis: Long) -> (List<Long>),
     ) = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(location = location)
@@ -46,7 +47,7 @@ object SnapshotManager {
                         seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrThrow()
 
                         nextFrame(width = width, height = height).getOrThrow() as? Frame.Video.Content
-                    }.toList()
+                    }
             }
         }
     }.recoverCatching { t ->

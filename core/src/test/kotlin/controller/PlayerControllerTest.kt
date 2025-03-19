@@ -15,9 +15,7 @@ import com.github.numq.klarity.core.renderer.RendererFactory
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.PlayerState
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -62,9 +60,9 @@ class PlayerControllerTest : JNITest() {
 
     @Test
     fun `handle command execution`() = runTest {
-        val actualStates = mutableListOf<PlayerState>()
-
-        controller.state.onEach(actualStates::add).launchIn(backgroundScope)
+        val actualStates = flow {
+            controller.state.buffer().onEach(::emit).launchIn(backgroundScope)
+        }
 
         controller.execute(Command.Prepare(location, 1, 1))
 
@@ -99,7 +97,7 @@ class PlayerControllerTest : JNITest() {
             controller.execute(command)
         }
 
-        expectedStates.zip(actualStates).forEach { (expectedState, actualState) ->
+        expectedStates.zip(actualStates.toList()).forEach { (expectedState, actualState) ->
             assertEquals(expectedState, actualState)
         }
     }

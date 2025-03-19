@@ -5,10 +5,6 @@ void Sampler::_cleanUp() {
         Pa_CloseStream(stream);
         stream = nullptr;
     }
-    if (stretch) {
-        delete stretch;
-        stretch = nullptr;
-    }
 }
 
 Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
@@ -17,6 +13,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
 
     PaDeviceIndex deviceIndex = Pa_GetDefaultOutputDevice();
     if (deviceIndex == paNoDevice) {
+        _cleanUp();
         throw SamplerException("Error: No default output device");
     }
 
@@ -42,7 +39,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
         throw SamplerException(std::string(Pa_GetErrorText(err)));
     }
 
-    stretch = new signalsmith::stretch::SignalsmithStretch<float>();
+    stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
 
     stretch->presetDefault(static_cast<int>(channels), static_cast<float>(sampleRate));
 }
@@ -54,19 +51,11 @@ Sampler::~Sampler() {
 void Sampler::setPlaybackSpeed(float factor) {
     std::unique_lock<std::mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr) {
-        throw SamplerException("Unable to set playback speed on uninitialized sampler");
-    }
-
     playbackSpeedFactor = factor;
 }
 
 void Sampler::setVolume(float value) {
     std::unique_lock<std::mutex> lock(mutex);
-
-    if (!stretch || stream == nullptr) {
-        throw SamplerException("Unable to setVolume on uninitialized sampler");
-    }
 
     volume = value;
 }
@@ -81,8 +70,6 @@ int Sampler::start() {
     if (Pa_IsStreamActive(stream) == 1) {
         throw SamplerException("Unable to start active sampler");
     }
-
-    stretch->reset();
 
     PaError err = Pa_StartStream(stream);
     if (err != paNoError) {
@@ -126,11 +113,30 @@ void Sampler::play(const uint8_t *samples, uint64_t size) {
     output.reserve(outputSamples * channels);
     for (int i = 0; i < outputSamples; ++i) {
         for (int ch = 0; ch < channels; ++ch) {
-            output.push_back(outputBuffers[ch][i] * volume);
+            output.push_back(std::clamp(outputBuffers[ch][i] * volume, -1.0f, 1.0f));
         }
     }
 
     Pa_WriteStream(stream, output.data(), outputSamples);
+}
+
+void Sampler::pause() {
+    std::unique_lock<std::mutex> lock(mutex);
+
+    if (!stretch || stream == nullptr) {
+        throw SamplerException("Unable to pause uninitialized sampler");
+    }
+
+    auto isStreamActive = Pa_IsStreamActive(stream);
+
+    if (isStreamActive == 1) {
+        PaError err = Pa_StopStream(stream);
+        if (err != paNoError) {
+            throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+        }
+    } else if (isStreamActive < 0) {
+        throw SamplerException("Failed to check stream status: " + std::string(Pa_GetErrorText(isStreamActive)));
+    }
 }
 
 void Sampler::stop() {
@@ -143,11 +149,19 @@ void Sampler::stop() {
     auto isStreamActive = Pa_IsStreamActive(stream);
 
     if (isStreamActive == 1) {
-        PaError err = Pa_StopStream(stream);
+        PaError err = Pa_AbortStream(stream);
         if (err != paNoError) {
-            throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+            throw SamplerException("Failed to abort PortAudio stream: " + std::string(Pa_GetErrorText(err)));
         }
-    } else if (isStreamActive < 0) {
-        throw SamplerException("Failed to check stream status: " + std::string(Pa_GetErrorText(isStreamActive)));
+    }
+
+    if (stretch) {
+        int outputSamples = stretch->outputLatency();
+
+        std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
+
+        stretch->flush(outputBuffers, outputSamples);
+
+        stretch->reset();
     }
 }

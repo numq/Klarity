@@ -51,6 +51,13 @@ class NativeSamplerTest : JNITest() {
     }
 
     @Test
+    fun `start, pause and stop playback`() {
+        sampler.start()
+        sampler.pause()
+        sampler.stop()
+    }
+
+    @Test
     fun `start and stop playback`() {
         sampler.start()
         sampler.stop()

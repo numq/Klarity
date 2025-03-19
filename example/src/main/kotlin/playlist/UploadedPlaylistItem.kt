@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.Renderer
@@ -28,32 +29,39 @@ fun UploadedPlaylistItem(
     select: () -> Unit,
     delete: () -> Unit,
 ) {
-    TooltipArea(tooltip = {
-        Text(text = playlistItem.media.location.path)
-    }, content = {
-        Card(modifier = Modifier.alpha(if (isSelected) .5f else 1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).clickable(onClick = select).padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(space = 8.dp, alignment = Alignment.Start),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Card(shape = CircleShape) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        horizontalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.Start),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TooltipArea(tooltip = {
+            Text(text = playlistItem.media.location.path)
+        }, modifier = Modifier.weight(1f), content = {
+            Card(modifier = Modifier.alpha(if (isSelected) .5f else 1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = select),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = 4.dp, alignment = Alignment.Start
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Renderer(
-                        modifier = Modifier.fillMaxHeight().aspectRatio(1f),
+                        modifier = Modifier.aspectRatio(1f).clip(CircleShape),
                         foreground = playlistItem.snapshot?.let { snapshot ->
                             Foreground.Frame(frame = snapshot, scale = ImageScale.Crop)
                         } ?: Foreground.Empty,
                     )
-                }
-                Text(
-                    text = playlistItem.media.location.path,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
-                IconButton(onClick = delete) {
-                    Icon(Icons.Default.Remove, null)
+                    Text(
+                        text = playlistItem.media.location.path,
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
                 }
             }
+        })
+        IconButton(onClick = delete) {
+            Icon(Icons.Default.Remove, null)
         }
-    })
+    }
 }

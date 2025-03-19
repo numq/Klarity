@@ -46,13 +46,15 @@ fun HubScreen(
     val pendingChannel = remember { Channel<HubItem.Pending>(Channel.UNLIMITED) }
 
     var hubItems by remember { mutableStateOf(emptyList<HubItem>()) }
+
     var isDragAndDrop by remember { mutableStateOf(false) }
+
     var isRemoteUploadingDialogVisible by remember { mutableStateOf(false) }
 
     DisposableEffect(pendingChannel) {
         uploadingJob = pendingChannel.consumeAsFlow().onEach { pendingItem ->
-            coroutineScope.launch(Dispatchers.Default + Job()) {
-                hubItems += pendingItem
+            hubItems += pendingItem
+            coroutineScope.launch(Dispatchers.Default) {
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = HubItem.Uploaded(
                         media = media,
@@ -139,12 +141,13 @@ fun HubScreen(
                     Icon(Icons.Rounded.UploadFile, null)
                 }
             })
+
             LazyVerticalGrid(
                 columns = GridCells.Fixed(sliderStep + 2),
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = PaddingValues(4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Top),
+                verticalArrangement = Arrangement.Top,
             ) {
                 items(hubItems, key = { item ->
                     when (item) {
@@ -159,15 +162,21 @@ fun HubScreen(
                         ), contentAlignment = Alignment.Center
                     ) {
                         when (hubItem) {
-                            is HubItem.Pending -> PendingHubItem(hubItem = hubItem, delete = { deleteHubItem(hubItem) })
+                            is HubItem.Pending -> PendingHubItem(
+                                hubItem = hubItem,
+                                delete = { deleteHubItem(hubItem) }
+                            )
 
                             is HubItem.Uploaded -> UploadedHubItem(
-                                hubItem = hubItem, delete = { deleteHubItem(hubItem) }, notify = notify
+                                hubItem = hubItem,
+                                delete = { deleteHubItem(hubItem) },
+                                notify = notify
                             )
                         }
                     }
                 }
             }
+
             Divider(modifier = Modifier.fillMaxWidth())
 
             val sliderColor by ButtonDefaults.buttonColors().contentColor(true)

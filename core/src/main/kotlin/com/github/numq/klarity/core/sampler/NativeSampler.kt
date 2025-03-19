@@ -33,6 +33,9 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
         private external fun playNative(handle: Long, bytes: ByteArray, size: Int)
 
         @JvmStatic
+        private external fun pauseNative(handle: Long)
+
+        @JvmStatic
         private external fun stopNative(handle: Long)
 
         @JvmStatic
@@ -46,6 +49,8 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
     fun start() = startNative(handle = nativeHandle)
 
     fun play(data: ByteArray, size: Int) = playNative(handle = nativeHandle, bytes = data, size = size)
+
+    fun pause() = pauseNative(handle = nativeHandle)
 
     fun stop() = stopNative(handle = nativeHandle)
 

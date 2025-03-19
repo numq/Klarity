@@ -24,6 +24,9 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_playNative
         (JNIEnv *, jclass, jlong, jbyteArray, jint);
 
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_pauseNative
+        (JNIEnv *, jclass, jlong);
+
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative
         (JNIEnv *, jclass, jlong);
 

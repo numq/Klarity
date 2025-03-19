@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPreviewManager(private val videoDecoderFactory: VideoDecoderFactory) : PreviewManager {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val coroutineContext = Dispatchers.Default + SupervisorJob()
+
+    private val coroutineScope = CoroutineScope(coroutineContext)
 
     private val internalState = MutableStateFlow<InternalPreviewState>(InternalPreviewState.Empty)
 
@@ -68,7 +70,7 @@ internal class DefaultPreviewManager(private val videoDecoderFactory: VideoDecod
     }
 
     override fun close() {
-        coroutineScope.coroutineContext.cancelChildren()
+        coroutineContext.cancelChildren()
 
         when (val internalState = internalState.value) {
             is InternalPreviewState.Empty -> Unit

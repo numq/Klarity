@@ -10,6 +10,7 @@ interface Sampler : AutoCloseable {
     suspend fun setMuted(state: Boolean): Result<Unit>
     suspend fun start(): Result<Unit>
     suspend fun play(bytes: ByteArray): Result<Unit>
+    suspend fun pause(): Result<Unit>
     suspend fun stop(): Result<Unit>
 
     companion object {

@@ -51,20 +51,33 @@ class VideoDecoderTest : JNITest() {
 
     @Test
     fun `return next frame until the end of media`() = runTest {
-        var frames = 0
+        val expectedTimestamps = buildList {
+            val frameRate = decoder.media.format.frameRate
+            val totalFrames = decoder.media.durationMicros.microseconds.inWholeSeconds * frameRate
 
-        while (isActive) {
-            when (val frame = decoder.nextFrame(width = null, height = null).getOrThrow()) {
-                is Frame.Video.Content -> {
-                    assertEquals(500, frame.width)
-                    assertEquals(500, frame.height)
-                    assertEquals(25.0, frame.frameRate)
-                    assertTrue(frame.timestampMicros < decoder.media.durationMicros)
-                    frames += 1
-                }
-
-                is Frame.Video.EndOfStream -> break
+            repeat(totalFrames.toInt()) { index ->
+                add((index * 1_000_000.0 / frameRate).toLong())
             }
+        }
+
+        val actualTimestamps = buildList {
+            while (isActive) {
+                when (val frame = decoder.nextFrame(width = null, height = null).getOrThrow()) {
+                    is Frame.Video.Content -> {
+                        assertEquals(500, frame.width)
+                        assertEquals(500, frame.height)
+                        assertEquals(25.0, frame.frameRate)
+                        assertTrue(frame.timestampMicros < decoder.media.durationMicros)
+                        add(frame.timestampMicros)
+                    }
+
+                    is Frame.Video.EndOfStream -> break
+                }
+            }
+        }
+
+        expectedTimestamps.zip(actualTimestamps).forEach { (expected, actual) ->
+            assertEquals(expected, actual)
         }
     }
 

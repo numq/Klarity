@@ -12,7 +12,7 @@ interface PreviewManager : AutoCloseable {
         timestampMillis: Long,
         width: Int?,
         height: Int?,
-        keyframesOnly: Boolean = false,
+        keyframesOnly: Boolean = true,
     ): Result<Frame.Video.Content?>
 
     companion object {
