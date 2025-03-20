@@ -2,6 +2,7 @@
 #define KLARITY_DECODER_EXCEPTION_H
 
 #include <stdexcept>
+#include <string>
 
 class DecoderException : public std::runtime_error {
 public:

@@ -1,7 +1,6 @@
 #ifndef KLARITY_DECODER_DECODER_H
 #define KLARITY_DECODER_DECODER_H
 
-#include <iostream>
 #include <mutex>
 #include <optional>
 #include "exception.h"
