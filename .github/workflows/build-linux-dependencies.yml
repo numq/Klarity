@@ -1,10 +1,10 @@
-name: Build Linux dependencies
+name: Build FFmpeg with CUDA and NVENC
 
 on:
   workflow_dispatch:  # Allows manual execution
 
 jobs:
-  build_klarity_linux:
+  build_ffmpeg:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,31 +13,10 @@ jobs:
       - name: Install Dependencies (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ wget
-          sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
-          sudo apt-get install -y build-essential git
-
-      - name: Clean up CUDA cache
-        run: |
-          rm -rf /home/runner/.cuda
-          rm -rf /usr/local/cuda*
-
-      - name: Install CUDA Toolkit (Network Method)
-        uses: Jimver/cuda-toolkit@v0.2.22
-        id: cuda-toolkit
-        with:
-          cuda: '12.8.1'
-          method: 'network'
-
-      - name: Verify CUDA Installation
-        run: |
-          echo "Installed CUDA version:"
-          nvcc --version
-
-      - name: Verify CUDA Installation
-        run: |
-          echo "Installed CUDA version:"
-          nvcc --version
+          sudo apt-get install -y \
+            nasm yasm cmake autoconf automake libtool make pkg-config g++ \
+            libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev \
+            nvidia-cuda-toolkit nvidia-driver build-essential git
 
       - name: Clone and Build ffnvcodec (nv-codec-headers)
         run: |
@@ -46,41 +25,18 @@ jobs:
           make
           sudo make install
 
-      - name: Build FFmpeg 7.1
+      - name: Clone and Build FFmpeg 7.1 with CUDA and NVENC
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          ./configure --enable-shared --disable-static --disable-autodetect --enable-cuda --enable-nvenc --enable-cuvid --enable-vaapi --enable-libmfx --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
+          ./configure --enable-shared --disable-static --disable-autodetect \
+            --enable-cuda --enable-nvenc --enable-cuvid --enable-vaapi \
+            --enable-libmfx --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
           make -j$(nproc)
           make install
 
-      - name: Build PortAudio v19.7.0
-        run: |
-          git clone --branch v19.7.0 --depth 1 https://github.com/PortAudio/portaudio.git
-          cd portaudio
-          cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/deps
-          cmake --build build --config Release --target install
-
-      - name: Organize Required Files
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/deps/bin
-          cp -a $GITHUB_WORKSPACE/deps/lib/*.so* $GITHUB_WORKSPACE/deps/bin/
-          cp -a $GITHUB_WORKSPACE/deps/lib/libportaudio.so* $GITHUB_WORKSPACE/deps/bin/
-
-      - name: Upload FFmpeg & PortAudio
+      - name: Upload FFmpeg
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-portaudio-linux
+          name: ffmpeg-cuda-linux
           path: deps/
-
-      - name: Build Klarity Library (Linux)
-        run: |
-          cd core/src/main/cpp
-          cmake -DBIN_FOLDER=$GITHUB_WORKSPACE/deps/bin -B build -S .
-          cmake --build build --config Release
-
-      - name: Upload Klarity Library
-        uses: actions/upload-artifact@v4
-        with:
-          name: klarity-linux
-          path: core/src/main/cpp/build/
