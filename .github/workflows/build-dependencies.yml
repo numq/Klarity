@@ -20,26 +20,27 @@ jobs:
           ./vcpkg/vcpkg update
           ./vcpkg/vcpkg upgrade --no-dry-run
 
-      - name: Install dependencies
+      - name: Install FFmpeg and PortAudio
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx]:x64-windows +shared -static
-            ./vcpkg/vcpkg install portaudio:x64-windows +shared -static
+            # Install FFmpeg and PortAudio with specific flags for Windows
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx]:x64-windows --disable-static --enable-nvdec --enable-d3d11va --enable-d3d12va --enable-libmfx --enable-vulkan
+            ./vcpkg/vcpkg install portaudio:x64-windows
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin" >> $GITHUB_ENV
+            echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/include" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx +shared -static
-            ./vcpkg/vcpkg install portaudio:x64-osx +shared -static
+            # Install FFmpeg and PortAudio with specific flags for macOS
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx --disable-static --enable-videotoolbox --enable-libmfx
+            ./vcpkg/vcpkg install portaudio:x64-osx
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
+            echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/include" >> $GITHUB_ENV
           else
-            # Install system VAAPI packages on Ubuntu
+            # Install FFmpeg and PortAudio with specific flags for Linux
             sudo apt update && sudo apt install -y libva-dev libva2
-
-            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx]:x64-linux +shared -static
-            ./vcpkg/vcpkg install portaudio:x64-linux +shared -static
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx]:x64-linux --disable-static --enable-nvdec --enable-vaapi --enable-libmfx --enable-vulkan
+            ./vcpkg/vcpkg install portaudio:x64-linux
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/bin" >> $GITHUB_ENV
+            echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/include" >> $GITHUB_ENV
           fi
 
       - name: Configure CMake
@@ -49,7 +50,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DBIN_FOLDER=$BIN_FOLDER
 
-      - name: Build
+      - name: Build Klarity
         run: |
           cmake --build build
 
@@ -57,4 +58,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.os }}
-          path: build/bin
+          path: |
+            build/bin/avcodec
+            build/bin/avformat
+            build/bin/avutil
+            build/bin/swresample
+            build/bin/swscale
+            build/bin/klarity
+            $INCLUDE_FOLDER/ffmpeg
+            $INCLUDE_FOLDER/portaudio
