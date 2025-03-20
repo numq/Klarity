@@ -13,9 +13,14 @@ jobs:
       - name: Install Dependencies (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ make wget
+          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ wget
           sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
-          sudo apt-get install -y build-essential git
+          sudo apt-get install -y build-essential git libcuda1 nvidia-cuda-toolkit
+
+      - name: Verify CUDA Installation
+        run: |
+          nvcc --version
+          nvidia-smi
 
       - name: Clone and Build ffnvcodec (nv-codec-headers)
         run: |
@@ -23,6 +28,7 @@ jobs:
           cd nv-codec-headers
           make
           sudo make install
+          sudo apt-get install -y libcuda1
 
       - name: Build FFmpeg 7.1
         run: |
@@ -44,7 +50,6 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           
           cp -a $GITHUB_WORKSPACE/deps/lib/*.so* $GITHUB_WORKSPACE/deps/bin/
-
           cp -a $GITHUB_WORKSPACE/deps/lib/libportaudio.so* $GITHUB_WORKSPACE/deps/bin/
 
       - name: Upload FFmpeg & PortAudio
