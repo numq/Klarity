@@ -16,6 +16,10 @@ jobs:
           sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ make wget
           sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
           sudo apt-get install -y build-essential git
+          git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
+          cd nv-codec-headers
+          sudo make install
+          cd ..
 
       - name: Clone and Build FFmpeg 7.1
         run: |
