@@ -1,16 +1,13 @@
 name: Build Dependencies
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
