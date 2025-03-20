@@ -2,14 +2,8 @@
 
 AVHWDeviceType Decoder::_toHWDeviceType(HardwareAcceleration hwAccel) {
     switch (hwAccel) {
-        case HardwareAcceleration::CUDA:
-            return AV_HWDEVICE_TYPE_CUDA;
-
-        case HardwareAcceleration::VAAPI:
-            return AV_HWDEVICE_TYPE_VAAPI;
-
-        case HardwareAcceleration::QSV:
-            return AV_HWDEVICE_TYPE_QSV;
+        case HardwareAcceleration::VIDEOTOOLBOX:
+            return AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
 
         case HardwareAcceleration::D3D11VA:
             return AV_HWDEVICE_TYPE_D3D11VA;
@@ -17,11 +11,14 @@ AVHWDeviceType Decoder::_toHWDeviceType(HardwareAcceleration hwAccel) {
         case HardwareAcceleration::D3D12VA:
             return AV_HWDEVICE_TYPE_D3D12VA;
 
-        case HardwareAcceleration::VIDEOTOOLBOX:
-            return AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
+        case HardwareAcceleration::CUDA:
+            return AV_HWDEVICE_TYPE_CUDA;
 
-        case HardwareAcceleration::VULKAN:
-            return AV_HWDEVICE_TYPE_VULKAN;
+        case HardwareAcceleration::QSV:
+            return AV_HWDEVICE_TYPE_QSV;
+
+        case HardwareAcceleration::OPENCL:
+            return AV_HWDEVICE_TYPE_OPENCL;
 
         default:
             throw DecoderException("Invalid hardware acceleration device type");
