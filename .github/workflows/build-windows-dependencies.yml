@@ -16,6 +16,13 @@ jobs:
         run: |
           choco install nasm yasm cmake pkgconfiglite -y
 
+      - name: Install NVIDIA Codec Headers (NVDEC/CUVID)
+        shell: pwsh
+        run: |
+          git clone https://github.com/FFmpeg/nv-codec-headers.git
+          New-Item -ItemType Directory -Path "C:\ffnvcodec" -Force
+          Copy-Item -Path nv-codec-headers\include\* -Destination "C:\ffnvcodec" -Recurse -Force
+
       - name: Clone FFmpeg
         shell: pwsh
         run: git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
@@ -24,7 +31,9 @@ jobs:
         shell: cmd
         run: |
           cd FFmpeg
-          ./configure --toolchain=msvc --arch=x86_64 --enable-shared --disable-static --enable-cuda --enable-nvenc --enable-cuvid --enable-d3d11va --enable-d3d12va --enable-libmfx --prefix=%GITHUB_WORKSPACE%\deps
+          ./configure --toolchain=msvc --arch=x86_64 --enable-shared --disable-static \
+                      --enable-nvdec --enable-d3d11va --enable-d3d12va --enable-libmfx \
+                      --prefix=%GITHUB_WORKSPACE%\deps
           make -j%NUMBER_OF_PROCESSORS%
           make install
 
@@ -43,19 +52,14 @@ jobs:
         shell: pwsh
         run: |
           $depsPath = Join-Path -Path $env:GITHUB_WORKSPACE -ChildPath "deps"
-          if (!(Test-Path "$depsPath")) {
-            New-Item -ItemType Directory -Path "$depsPath" -Force
-          }
-
-          if (!(Test-Path "$depsPath\\bin")) {
-            New-Item -ItemType Directory -Path "$depsPath\\bin" -Force
-          }
+          New-Item -ItemType Directory -Path "$depsPath" -Force
+          New-Item -ItemType Directory -Path "$depsPath\bin" -Force
 
           $ffmpegBinPath = Join-Path -Path $env:GITHUB_WORKSPACE -ChildPath "FFmpeg"
-          Copy-Item -Path "$ffmpegBinPath\\*.dll" -Destination "$depsPath\\bin\\" -Force
+          Get-ChildItem "$ffmpegBinPath\*.dll" | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$depsPath\bin\" -Force }
 
-          $portaudioBuildPath = Join-Path -Path $env:GITHUB_WORKSPACE -ChildPath "portaudio\\build\\Release"
-          Copy-Item -Path "$portaudioBuildPath\\portaudio.dll" -Destination "$depsPath\\bin\\" -Force
+          $portaudioBuildPath = Join-Path -Path $env:GITHUB_WORKSPACE -ChildPath "portaudio\build\Release"
+          Get-ChildItem "$portaudioBuildPath\portaudio.dll" | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$depsPath\bin\" -Force }
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4

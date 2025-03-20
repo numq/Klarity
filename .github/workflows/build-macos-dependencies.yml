@@ -18,7 +18,11 @@ jobs:
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          ./configure --enable-shared --disable-static --disable-autodetect --enable-videotoolbox --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
+          ./configure --enable-shared --disable-static --disable-autodetect \
+                      --enable-nvdec --enable-videotoolbox --enable-libmfx \
+                      --extra-cflags=-I/usr/local/include \
+                      --extra-ldflags=-L/usr/local/lib \
+                      --prefix=$GITHUB_WORKSPACE/deps
           make -j$(sysctl -n hw.logicalcpu)
           make install
 
@@ -32,9 +36,7 @@ jobs:
       - name: Organize Required Files
         run: |
           mkdir -p $GITHUB_WORKSPACE/deps/bin
-          
           cp -a $GITHUB_WORKSPACE/deps/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
-
           cp -a $GITHUB_WORKSPACE/deps/lib/libportaudio.dylib $GITHUB_WORKSPACE/deps/bin/
 
       - name: Upload FFmpeg & PortAudio
