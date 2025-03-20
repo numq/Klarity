@@ -16,7 +16,7 @@ internal class NativeDecoder(
             location,
             findAudioStream,
             findVideoStream,
-            hardwareAcceleration
+            hardwareAcceleration.ordinal
         ).takeIf { it != -1L }
     ) { "Unable to instantiate native decoder" }
 
@@ -27,12 +27,17 @@ internal class NativeDecoder(
     companion object {
         private val cleaner = Cleaner.create()
 
+        fun getSupportedHardwareAcceleration() = getSupportedHardwareAccelerationNative() ?: intArrayOf()
+
+        @JvmStatic
+        private external fun getSupportedHardwareAccelerationNative(): IntArray?
+
         @JvmStatic
         private external fun createNative(
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
-            hardwareAcceleration: HardwareAcceleration,
+            hardwareAcceleration: Int,
         ): Long
 
         @JvmStatic

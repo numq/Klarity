@@ -9,6 +9,9 @@
 extern "C" {
 #endif
 
+JNIEXPORT jintArray JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getSupportedHardwareAccelerationNative
+        (JNIEnv *, jclass);
+
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative
         (JNIEnv *, jclass, jstring, jboolean, jboolean, jint);
 

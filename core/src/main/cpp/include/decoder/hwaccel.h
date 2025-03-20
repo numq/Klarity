@@ -1,13 +1,17 @@
 #ifndef KLARITY_HWACCEL_H
 #define KLARITY_HWACCEL_H
 
-enum class HardwareAcceleration {
-    NONE,
-    CUDA,
-    VAAPI,
-    DXVA2,
-    QSV
-};
+#include "libavutil/hwcontext.h"
 
+enum class HardwareAcceleration {
+    NONE = AV_HWDEVICE_TYPE_NONE,
+    CUDA = AV_HWDEVICE_TYPE_CUDA,
+    VAAPI = AV_HWDEVICE_TYPE_VAAPI,
+    QSV = AV_HWDEVICE_TYPE_QSV,
+    D3D11VA = AV_HWDEVICE_TYPE_D3D11VA,
+    D3D12VA = AV_HWDEVICE_TYPE_D3D12VA,
+    VIDEOTOOLBOX = AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
+    VULKAN = AV_HWDEVICE_TYPE_VULKAN
+};
 
 #endif //KLARITY_HWACCEL_H

@@ -22,7 +22,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.compose.renderer.Foreground
+import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
@@ -35,9 +39,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import notification.Notification
-import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.Renderer
-import com.github.numq.klarity.compose.scale.ImageScale
 import kotlin.time.Duration.Companion.microseconds
 
 @Composable
@@ -139,7 +140,8 @@ fun UploadedHubItem(
                                             player.prepare(
                                                 location = hubItem.media.location.path,
                                                 enableAudio = true,
-                                                enableVideo = true
+                                                enableVideo = true,
+                                                hardwareAcceleration = HardwareAcceleration.CUDA
                                             )
                                             play()
                                         }

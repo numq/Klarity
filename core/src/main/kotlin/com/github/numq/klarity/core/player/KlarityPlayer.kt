@@ -4,6 +4,7 @@ import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
+import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
@@ -157,6 +158,13 @@ interface KlarityPlayer : AutoCloseable {
         }.onSuccess {
             isLoaded = true
         }
+
+        /**
+         * Retrieves a list of supported hardware acceleration methods for video decoding.
+         *
+         * @return A [Result] containing a list of supported [HardwareAcceleration] types.
+         */
+        fun getSupportedHardwareAcceleration() = Decoder.getSupportedHardwareAcceleration()
 
         /**
          * Creates a new instance of the KlarityPlayer.

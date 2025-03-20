@@ -174,5 +174,11 @@ interface Decoder<Media, Frame> : AutoCloseable {
                 )
             }
         }
+
+        internal fun getSupportedHardwareAcceleration() = runCatching {
+            NativeDecoder.getSupportedHardwareAcceleration().map { hardwareAcceleration ->
+                HardwareAcceleration.entries.getOrNull(hardwareAcceleration)
+            }.filterNotNull()
+        }
     }
 }

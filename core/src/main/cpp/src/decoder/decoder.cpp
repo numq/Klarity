@@ -1,32 +1,45 @@
 #include "decoder.h"
 
-AVBufferRef *Decoder::_initializeHWDevice(HardwareAcceleration hwAccel) {
-    AVBufferRef *hw_device_ctx = nullptr;
-
-    AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
-
+AVHWDeviceType Decoder::_toHWDeviceType(HardwareAcceleration hwAccel) {
     switch (hwAccel) {
         case HardwareAcceleration::CUDA:
-            type = AV_HWDEVICE_TYPE_CUDA;
-            break;
+            return AV_HWDEVICE_TYPE_CUDA;
 
         case HardwareAcceleration::VAAPI:
-            type = AV_HWDEVICE_TYPE_VAAPI;
-            break;
-
-        case HardwareAcceleration::DXVA2:
-            type = AV_HWDEVICE_TYPE_DXVA2;
-            break;
+            return AV_HWDEVICE_TYPE_VAAPI;
 
         case HardwareAcceleration::QSV:
-            type = AV_HWDEVICE_TYPE_QSV;
-            break;
+            return AV_HWDEVICE_TYPE_QSV;
+
+        case HardwareAcceleration::D3D11VA:
+            return AV_HWDEVICE_TYPE_D3D11VA;
+
+        case HardwareAcceleration::D3D12VA:
+            return AV_HWDEVICE_TYPE_D3D12VA;
+
+        case HardwareAcceleration::VIDEOTOOLBOX:
+            return AV_HWDEVICE_TYPE_VIDEOTOOLBOX;
+
+        case HardwareAcceleration::VULKAN:
+            return AV_HWDEVICE_TYPE_VULKAN;
 
         default:
-            return nullptr;
+            throw DecoderException("Invalid hardware acceleration device type");
     }
+}
 
-    if (av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0) < 0) {
+AVBufferRef *Decoder::_initializeHWDevice(HardwareAcceleration hardwareAcceleration) {
+    AVBufferRef *hw_device_ctx = nullptr;
+
+    auto hwDeviceType = _toHWDeviceType(hardwareAcceleration);
+
+    if (av_hwdevice_ctx_create(
+            &hw_device_ctx,
+            hwDeviceType,
+            nullptr,
+            nullptr,
+            0
+    ) < 0) {
         throw DecoderException("Failed to create hardware device context");
     }
 
@@ -34,29 +47,24 @@ AVBufferRef *Decoder::_initializeHWDevice(HardwareAcceleration hwAccel) {
 }
 
 
-AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParameters, HardwareAcceleration hwAccel) {
+std::pair<AVCodecContext *, HardwareAcceleration> Decoder::_initializeCodecContext(
+        AVCodecParameters *avCodecParameters,
+        HardwareAcceleration hardwareAcceleration
+) {
     const AVCodec *codec = nullptr;
 
-    switch (hwAccel) {
-        case HardwareAcceleration::CUDA:
-            codec = avcodec_find_decoder_by_name("h264_cuvid");
-            break;
+    if (hardwareAcceleration == HardwareAcceleration::NONE) {
+        codec = avcodec_find_decoder(avCodecParameters->codec_id);
+    } else {
+        auto hwDeviceType = _toHWDeviceType(hardwareAcceleration);
 
-        case HardwareAcceleration::VAAPI:
-            codec = avcodec_find_decoder_by_name("h264_vaapi");
-            break;
+        auto hwDeviceTypeName = av_hwdevice_get_type_name(hwDeviceType);
 
-        case HardwareAcceleration::DXVA2:
-            codec = avcodec_find_decoder_by_name("h264_dxva2");
-            break;
+        if (!hwDeviceTypeName) {
+            throw DecoderException("Unknown hardware acceleration device type name");
+        }
 
-        case HardwareAcceleration::QSV:
-            codec = avcodec_find_decoder_by_name("h264_qsv");
-            break;
-
-        default:
-            codec = avcodec_find_decoder(avCodecParameters->codec_id);
-            break;
+        codec = avcodec_find_decoder_by_name(hwDeviceTypeName);
     }
 
     if (!codec) {
@@ -73,8 +81,8 @@ AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParam
         throw DecoderException("Could not copy codec parameters to context");
     }
 
-    if (hwAccel != HardwareAcceleration::NONE) {
-        codecContext->hw_device_ctx = _initializeHWDevice(hwAccel);
+    if (hardwareAcceleration != HardwareAcceleration::NONE) {
+        codecContext->hw_device_ctx = _initializeHWDevice(hardwareAcceleration);
         if (!codecContext->hw_device_ctx) {
             avcodec_free_context(&codecContext);
             throw DecoderException("Failed to initialize hardware device context");
@@ -89,7 +97,7 @@ AVCodecContext *Decoder::_initializeCodecContext(AVCodecParameters *avCodecParam
         throw DecoderException("Could not open codec");
     }
 
-    return codecContext;
+    return std::make_pair(codecContext, hardwareAcceleration);
 }
 
 void Decoder::_prepareSwsContext(AVPixelFormat srcFormat, int srcWidth, int srcHeight, int dstWidth, int dstHeight) {
@@ -275,10 +283,12 @@ void Decoder::_processVideoFrame(const AVFrame &src, int dstWidth, int dstHeight
 void Decoder::_cleanUp() {
     if (frame) {
         av_frame_free(&frame);
+        frame = nullptr;
     }
 
     if (packet) {
         av_packet_free(&packet);
+        packet = nullptr;
     }
 
     if (swrContext) {
@@ -297,6 +307,10 @@ void Decoder::_cleanUp() {
     }
 
     if (videoCodecContext) {
+        if (videoCodecContext->hw_frames_ctx) {
+            av_buffer_unref(&videoCodecContext->hw_frames_ctx);
+            videoCodecContext->hw_frames_ctx = nullptr;
+        }
         avcodec_free_context(&videoCodecContext);
         videoCodecContext = nullptr;
     }
@@ -308,6 +322,7 @@ void Decoder::_cleanUp() {
 
     if (hwDeviceContext) {
         av_buffer_unref(&hwDeviceContext);
+        hwDeviceContext = nullptr;
     }
 
     std::vector<uint8_t>().swap(audioBuffer);
@@ -319,7 +334,7 @@ Decoder::Decoder(
         const std::string &location,
         bool findAudioStream,
         bool findVideoStream,
-        HardwareAcceleration hwAccel
+        HardwareAcceleration hardwareAcceleration
 ) {
     formatContext = avformat_alloc_context();
     if (!formatContext) {
@@ -348,7 +363,7 @@ Decoder::Decoder(
 
             if (avCodecParameters) {
                 if (findAudioStream && avCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-                    audioCodecContext = _initializeCodecContext(avCodecParameters, HardwareAcceleration::NONE);
+                    audioCodecContext = _initializeCodecContext(avCodecParameters, HardwareAcceleration::NONE).first;
 
                     audioStreamIndex = streamIndex;
 
@@ -377,7 +392,11 @@ Decoder::Decoder(
                 }
 
                 if (findVideoStream && avCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
-                    videoCodecContext = _initializeCodecContext(avCodecParameters, hwAccel);
+                    auto codecContext = _initializeCodecContext(avCodecParameters, hardwareAcceleration);
+
+                    videoCodecContext = codecContext.first;
+
+                    hardwareAcceleration = codecContext.second;
 
                     videoStreamIndex = streamIndex;
 
@@ -422,6 +441,18 @@ Decoder::Decoder(
 
 Decoder::~Decoder() {
     _cleanUp();
+}
+
+std::vector<HardwareAcceleration> Decoder::getSupportedHardwareAcceleration() {
+    std::vector<HardwareAcceleration> hwAccels;
+
+    AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
+
+    while ((type = av_hwdevice_iterate_types(type)) != AV_HWDEVICE_TYPE_NONE) {
+        hwAccels.push_back(static_cast<HardwareAcceleration>(type));
+    }
+
+    return hwAccels;
 }
 
 std::optional<Frame> Decoder::nextFrame(int width, int height) {
@@ -482,13 +513,39 @@ std::optional<Frame> Decoder::nextFrame(int width, int height) {
 
             int ret;
             while ((ret = avcodec_receive_frame(videoCodecContext, frame)) == 0) {
-                _processVideoFrame(*frame, width, height);
-
                 const auto timestampMicros = frame->best_effort_timestamp == AV_NOPTS_VALUE ? 0 : av_rescale_q(
                         frame->best_effort_timestamp,
                         formatContext->streams[videoStreamIndex]->time_base,
                         AVRational{1, 1'000'000}
                 );
+
+                if (hardwareAcceleration != HardwareAcceleration::NONE) {
+                    auto swFrame = av_frame_alloc();
+
+                    if (!swFrame) throw DecoderException("Memory allocation failed for software frame");
+
+                    if (av_hwframe_transfer_data(swFrame, frame, 0) < 0) {
+                        av_frame_free(&swFrame);
+
+                        throw DecoderException("Error transferring frame to system memory");
+                    }
+
+                    try {
+                        _processVideoFrame(*swFrame, width, height);
+
+                        av_frame_free(&swFrame);
+                    } catch (...) {
+                        av_frame_free(&swFrame);
+
+                        throw;
+                    }
+
+                    av_packet_unref(packet);
+
+                    return Frame{Frame::VIDEO, timestampMicros, videoBuffer};
+                }
+
+                _processVideoFrame(*frame, width, height);
 
                 av_packet_unref(packet);
 

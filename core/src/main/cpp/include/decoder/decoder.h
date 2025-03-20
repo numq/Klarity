@@ -1,6 +1,7 @@
 #ifndef KLARITY_DECODER_DECODER_H
 #define KLARITY_DECODER_DECODER_H
 
+#include <iostream>
 #include <mutex>
 #include <optional>
 #include "exception.h"
@@ -54,13 +55,20 @@ private:
 
     int swsHeight = -1;
 
+    HardwareAcceleration hardwareAcceleration = HardwareAcceleration::NONE;
+
     AVPacket *packet = nullptr;
 
     AVFrame *frame = nullptr;
 
-    static AVBufferRef *_initializeHWDevice(HardwareAcceleration hwAccel);
+    static AVHWDeviceType _toHWDeviceType(HardwareAcceleration hwAccel);
 
-    static AVCodecContext *_initializeCodecContext(AVCodecParameters *avCodecParameters, HardwareAcceleration hwAccel);
+    static AVBufferRef *_initializeHWDevice(HardwareAcceleration hardwareAcceleration);
+
+    static std::pair<AVCodecContext *, HardwareAcceleration> _initializeCodecContext(
+            AVCodecParameters *avCodecParameters,
+            HardwareAcceleration hardwareAcceleration
+    );
 
     void _prepareSwsContext(AVPixelFormat srcFormat, int width, int height, int dstWidth, int dstHeight);
 
@@ -77,10 +85,12 @@ public:
             const std::string &location,
             bool findAudioStream,
             bool findVideoStream,
-            HardwareAcceleration hwAccel
+            HardwareAcceleration hardwareAcceleration
     );
 
     ~Decoder();
+
+    static std::vector<HardwareAcceleration> getSupportedHardwareAcceleration();
 
     std::optional<Frame> nextFrame(int width, int height);
 

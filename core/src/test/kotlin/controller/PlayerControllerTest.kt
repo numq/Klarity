@@ -9,6 +9,7 @@ import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.RendererFactory
@@ -64,7 +65,7 @@ class PlayerControllerTest : JNITest() {
             controller.state.buffer().onEach(::emit).launchIn(backgroundScope)
         }
 
-        controller.execute(Command.Prepare(location, 1, 1))
+        controller.execute(Command.Prepare(location, 1, 1, HardwareAcceleration.NONE))
 
         val preparedState = controller.state.first()
 

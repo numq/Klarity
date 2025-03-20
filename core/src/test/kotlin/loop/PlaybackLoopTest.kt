@@ -6,6 +6,7 @@ import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoop
@@ -39,7 +40,10 @@ class PlaybackLoopTest : JNITest() {
     fun beforeEach() = runBlocking {
         val media = ProbeDecoderFactory().create(
             parameters = ProbeDecoderFactory.Parameters(
-                location = location, findAudioStream = true, findVideoStream = true
+                location = location,
+                findAudioStream = true,
+                findVideoStream = true,
+                hardwareAcceleration = HardwareAcceleration.NONE
             )
         ).getOrThrow().media
 
@@ -48,7 +52,10 @@ class PlaybackLoopTest : JNITest() {
         ).getOrThrow()
 
         val videoDecoder = VideoDecoderFactory().create(
-            parameters = VideoDecoderFactory.Parameters(location = location)
+            parameters = VideoDecoderFactory.Parameters(
+                location = location,
+                hardwareAcceleration = HardwareAcceleration.NONE
+            )
         ).getOrThrow()
 
         val audioBuffer = AudioBufferFactory().create(AudioBufferFactory.Parameters(capacity = 100)).getOrThrow()

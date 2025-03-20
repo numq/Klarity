@@ -1,5 +1,35 @@
 #include "com_github_numq_klarity_core_decoder_NativeDecoder.h"
 
+JNIEXPORT jintArray JNICALL
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_getSupportedHardwareAccelerationNative(
+        JNIEnv *env,
+        jclass thisClass
+) {
+    std::shared_lock<std::shared_mutex> lock(decoderMutex);
+
+    try {
+        auto hwAccels = Decoder::getSupportedHardwareAcceleration();
+
+        auto size = static_cast<jsize>(hwAccels.size());
+        if (size == 0) {
+            return nullptr;
+        }
+
+        auto result = env->NewIntArray(size);
+        if (!result) {
+            return nullptr;
+        }
+
+        env->SetIntArrayRegion(result, 0, size, reinterpret_cast<const jint *>(hwAccels.data()));
+
+        return result;
+    } catch (const std::exception &e) {
+        handleException(env, e.what());
+
+        return nullptr;
+    }
+}
+
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
         JNIEnv *env,
         jclass thisClass,

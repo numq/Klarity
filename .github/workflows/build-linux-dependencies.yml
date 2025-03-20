@@ -1,25 +1,26 @@
-name: Build macOS dependencies
+name: Build Linux dependencies
 
 on:
   workflow_dispatch:  # Allows manual execution
 
 jobs:
-  build_klarity_macos:
-    runs-on: macos-latest
+  build_klarity_linux:
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies (macOS)
+      - name: Install Dependencies (Linux)
         run: |
-          brew install nasm yasm cmake autoconf automake libtool pkg-config
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ make wget
 
       - name: Build FFmpeg 7.1
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          ./configure --enable-shared --disable-static --disable-autodetect --enable-videotoolbox --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
-          make -j$(sysctl -n hw.logicalcpu)
+          ./configure --enable-shared --disable-static --disable-autodetect --enable-cuda --enable-nvenc --enable-cuvid --enable-vaapi --enable-libmfx --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
+          make -j$(nproc)
           make install
 
       - name: Build PortAudio v19.7.0
@@ -33,17 +34,17 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           
-          cp -a $GITHUB_WORKSPACE/deps/lib/*.dylib $GITHUB_WORKSPACE/deps/bin/
+          cp -a $GITHUB_WORKSPACE/deps/lib/*.so* $GITHUB_WORKSPACE/deps/bin/
 
-          cp -a $GITHUB_WORKSPACE/deps/lib/libportaudio.dylib $GITHUB_WORKSPACE/deps/bin/
+          cp -a $GITHUB_WORKSPACE/deps/lib/libportaudio.so* $GITHUB_WORKSPACE/deps/bin/
 
       - name: Upload FFmpeg & PortAudio
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-portaudio-macos
+          name: ffmpeg-portaudio-linux
           path: deps/
 
-      - name: Build Klarity Library (macOS)
+      - name: Build Klarity Library (Linux)
         run: |
           cd core/src/main/cpp
           cmake -DBIN_FOLDER=$GITHUB_WORKSPACE/deps/bin -B build -S .
@@ -52,5 +53,5 @@ jobs:
       - name: Upload Klarity Library
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-macos
+          name: klarity-linux
           path: core/src/main/cpp/build/

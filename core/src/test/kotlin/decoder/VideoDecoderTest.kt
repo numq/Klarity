@@ -4,6 +4,7 @@ import JNITest
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.isActive
@@ -28,7 +29,10 @@ class VideoDecoderTest : JNITest() {
 
     @BeforeEach
     fun beforeEach() {
-        decoder = Decoder.createVideoDecoder(location = location).getOrThrow()
+        decoder = Decoder.createVideoDecoder(
+            location = location,
+            hardwareAcceleration = HardwareAcceleration.NONE
+        ).getOrThrow()
     }
 
     @AfterEach

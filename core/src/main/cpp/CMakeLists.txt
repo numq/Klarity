@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
+set(BIN_FOLDER bin)
+
 add_library(klarity SHARED
         src/common.cpp
         src/decoder/decoder.cpp
@@ -32,12 +34,13 @@ target_include_directories(klarity PRIVATE
         include/sampler/stretch
 )
 
-target_link_directories(klarity PRIVATE bin/ffmpeg bin/portaudio)
+target_link_directories(klarity PRIVATE ${BIN_FOLDER})
 
-if (APPLE)
-    target_link_libraries(klarity PRIVATE avcodec.61 avformat.61 avutil.59 swresample.5 swscale.8 libportaudio)
-elseif (WIN32)
-    target_link_libraries(klarity PRIVATE avcodec-61 avformat-61 avutil-59 swresample-5 swscale-8 libportaudio)
-elseif (UNIX)
-    target_link_libraries(klarity PRIVATE avcodec avformat avutil swresample swscale portaudio)
-endif ()
+target_link_libraries(klarity PRIVATE
+        avcodec
+        avformat
+        avutil
+        swresample
+        swscale
+        portaudio
+)

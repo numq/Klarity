@@ -24,6 +24,7 @@ import com.github.numq.klarity.compose.renderer.Background
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.Renderer
 import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
@@ -169,7 +170,12 @@ fun PlaylistScreenSuccess(
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
                         previewManager.prepare(location = media.location.path)
-                        player.prepare(location = media.location.path, enableAudio = true, enableVideo = true)
+                        player.prepare(
+                            location = media.location.path,
+                            enableAudio = true,
+                            enableVideo = true,
+                            hardwareAcceleration = HardwareAcceleration.CUDA
+                        )
                         player.play()
                     }
 
@@ -197,7 +203,8 @@ fun PlaylistScreenSuccess(
                                 player.prepare(
                                     location = media.location.path,
                                     enableAudio = true,
-                                    enableVideo = true
+                                    enableVideo = true,
+                                    hardwareAcceleration = HardwareAcceleration.CUDA
                                 )
                                 player.play()
                             }
