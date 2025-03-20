@@ -1,0 +1,54 @@
+name: Build Dependencies
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx,vulkan]:x64-windows
+            ./vcpkg/vcpkg install portaudio:x64-windows
+            echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin" >> $GITHUB_ENV
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx
+            ./vcpkg/vcpkg install portaudio:x64-osx
+            echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
+          else
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,vaapi,libmfx,vulkan]:x64-linux
+            ./vcpkg/vcpkg install portaudio:x64-linux
+            echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/bin" >> $GITHUB_ENV
+          fi
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S core/src/main/cpp \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DBIN_FOLDER=$BIN_FOLDER
+
+      - name: Build
+        run: |
+          cmake --build build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries-${{ matrix.os }}
+          path: build/bin
