@@ -3,6 +3,9 @@ name: Build Dependencies
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -45,7 +48,7 @@ jobs:
           cmake --build build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.2
         with:
           name: binaries-${{ matrix.os }}
           path: build/bin
