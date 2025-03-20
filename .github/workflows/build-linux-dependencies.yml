@@ -14,7 +14,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ make wget
-          sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free
+          sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
 
       - name: Build FFmpeg 7.1
         run: |
