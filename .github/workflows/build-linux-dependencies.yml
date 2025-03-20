@@ -1,7 +1,7 @@
 name: Build FFmpeg with CUDA and NVENC
 
 on:
-  workflow_dispatch:  # Allows manual execution
+  workflow_dispatch:
 
 jobs:
   build_ffmpeg:
