@@ -1,4 +1,4 @@
-name: Build Dependencies
+name: Build Klarity Dependencies
 
 on:
   workflow_dispatch:
@@ -27,6 +27,20 @@ jobs:
           echo BIN_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows\bin >> %GITHUB_ENV%
           echo INCLUDE_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows\include >> %GITHUB_ENV%
 
+      - name: Upload FFmpeg and PortAudio Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-portaudio-artifacts
+          path: |
+            $INCLUDE_FOLDER/ffmpeg
+            $INCLUDE_FOLDER/portaudio
+            $BIN_FOLDER/avcodec.lib
+            $BIN_FOLDER/avformat.lib
+            $BIN_FOLDER/avutil.lib
+            $BIN_FOLDER/swresample.lib
+            $BIN_FOLDER/swscale.lib
+            $BIN_FOLDER/portaudio.lib
+
       - name: Configure CMake
         shell: bash
         run: |
@@ -34,22 +48,21 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows
+            -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows \
+            -DFFmpeg_DIR=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/share/ffmpeg
 
       - name: Build Klarity
         shell: bash
         run: cmake --build build --config Release
 
-      - name: Upload artifacts
+      - name: Upload Klarity Binaries
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-windows
+          name: klarity-binaries
           path: |
+            build/bin/klarity
             build/bin/avcodec
             build/bin/avformat
             build/bin/avutil
             build/bin/swresample
             build/bin/swscale
-            build/bin/klarity
-            $INCLUDE_FOLDER/ffmpeg
-            $INCLUDE_FOLDER/portaudio
