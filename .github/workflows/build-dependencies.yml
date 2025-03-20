@@ -23,20 +23,22 @@ jobs:
       - name: Install dependencies
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx]:x64-windows
-            ./vcpkg/vcpkg install portaudio:x64-windows
+            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx]:x64-windows +shared -static
+            ./vcpkg/vcpkg install portaudio:x64-windows +shared -static
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx
-            ./vcpkg/vcpkg install portaudio:x64-osx
+            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx +shared -static
+            ./vcpkg/vcpkg install portaudio:x64-osx +shared -static
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
           else
-            # Install system VAAPI packages
+            # Install system VAAPI packages on Ubuntu
             sudo apt update && sudo apt install -y libva-dev libva2
 
-            # Install dependencies without vaapi
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx]:x64-linux
-            ./vcpkg/vcpkg install portaudio:x64-linux
+            # Install FFmpeg and PortAudio as shared libraries and disable static libraries
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx]:x64-linux +shared -static
+            ./vcpkg/vcpkg install portaudio:x64-linux +shared -static
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/bin" >> $GITHUB_ENV
           fi
 
@@ -44,6 +46,7 @@ jobs:
         run: |
           cmake -B build -S core/src/main/cpp \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DBUILD_SHARED_LIBS=ON \
             -DBIN_FOLDER=$BIN_FOLDER
 
       - name: Build
