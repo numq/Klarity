@@ -30,7 +30,7 @@ jobs:
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/include" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
             # Install FFmpeg and PortAudio with specific flags for macOS
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx --disable-static --enable-videotoolbox --enable-libmfx
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx --disable-static --enable-videotoolbox
             ./vcpkg/vcpkg install portaudio:x64-osx
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/include" >> $GITHUB_ENV
