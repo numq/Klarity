@@ -15,7 +15,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y nasm yasm cmake autoconf automake libtool make pkg-config g++ wget
           sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
-          sudo apt-get install -y build-essential git libcuda1 nvidia-cuda-toolkit
+          sudo apt-get install -y build-essential git nvidia-cuda-toolkit
+          sudo apt-get install -y libnvidia-compute-570-server
 
       - name: Verify CUDA Installation
         run: |
