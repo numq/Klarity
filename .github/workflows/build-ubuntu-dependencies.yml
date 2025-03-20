@@ -32,9 +32,11 @@ jobs:
 
       - name: Organize Required Files
         run: |
+          mkdir -p $GITHUB_WORKSPACE/core/src/main/cpp/bin
           mkdir -p $GITHUB_WORKSPACE/deps/bin
           mkdir -p $GITHUB_WORKSPACE/deps/include
           
+          rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/lib/*.so* $GITHUB_WORKSPACE/core/src/main/cpp/bin/
           rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/lib/*.so* $GITHUB_WORKSPACE/deps/bin/
           rsync -av --ignore-existing $GITHUB_WORKSPACE/deps/include/ $GITHUB_WORKSPACE/deps/include/
 
@@ -57,7 +59,8 @@ jobs:
       - name: Build Klarity Library (Ubuntu)
         run: |
           cd core/src/main/cpp
-          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -DCMAKE_INSTALL_RPATH=$GITHUB_WORKSPACE/deps/bin -B build -S .
+          # Run CMake after libraries are copied to core/src/main/cpp/bin
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/deps -DCMAKE_LIBRARY_PATH=$GITHUB_WORKSPACE/deps/lib -DCMAKE_INSTALL_RPATH=$GITHUB_WORKSPACE/core/src/main/cpp/bin -B build -S .
           cmake --build build --config Release
 
       - name: Upload Klarity Library
