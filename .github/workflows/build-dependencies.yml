@@ -17,26 +17,28 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           git clone https://github.com/microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
-          .\vcpkg\vcpkg update
-          .\vcpkg\vcpkg upgrade --no-dry-run
+          cd vcpkg
+          bootstrap-vcpkg.bat
+          vcpkg.exe update
+          vcpkg.exe upgrade --no-dry-run
         shell: cmd
 
       - name: Set up vcpkg (macOS/Linux)
         if: runner.os != 'Windows'
         run: |
           git clone https://github.com/microsoft/vcpkg.git
-          ./vcpkg/bootstrap-vcpkg.sh
-          ./vcpkg/vcpkg update
-          ./vcpkg/vcpkg upgrade --no-dry-run
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+          ./vcpkg update
+          ./vcpkg upgrade --no-dry-run
         shell: bash
 
       - name: Install FFmpeg and PortAudio
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             # Windows
-            .\vcpkg\vcpkg install ffmpeg[nvcodec,qsv]:x64-windows
-            .\vcpkg\vcpkg install portaudio:x64-windows
+            vcpkg\vcpkg.exe install ffmpeg[nvcodec,qsv]:x64-windows
+            vcpkg\vcpkg.exe install portaudio:x64-windows
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin" >> $GITHUB_ENV
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/include" >> $GITHUB_ENV
           elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
