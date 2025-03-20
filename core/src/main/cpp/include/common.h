@@ -1,12 +1,13 @@
 #ifndef KLARITY_COMMON_H
 #define KLARITY_COMMON_H
 
-#include "jni.h"
-#include "decoder.h"
-#include "sampler.h"
-#include <unordered_map>
 #include <memory>
 #include <shared_mutex>
+#include <string>
+#include <unordered_map>
+#include <jni.h>
+#include "decoder.h"
+#include "sampler.h"
 
 extern std::shared_mutex decoderMutex;
 

@@ -1,5 +1,6 @@
-#include <jni.h>
+#include <string>
 #include <shared_mutex>
+#include <jni.h>
 #include "common.h"
 #include "decoder.h"
 

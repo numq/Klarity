@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <shared_mutex>
+#include <string>
 #include "common.h"
 #include "sampler.h"
 

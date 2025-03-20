@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <optional>
+#include <string>
 #include "exception.h"
 #include "format.h"
 #include "frame.h"

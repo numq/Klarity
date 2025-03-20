@@ -32,6 +32,7 @@ jobs:
         run: |
           cmake -B build -S core/src/main/cpp \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
             -DBIN_FOLDER=$BIN_FOLDER
 
