@@ -34,11 +34,11 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
-            -DBIN_FOLDER=$BIN_FOLDER
+            -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows
 
       - name: Build Klarity
         shell: bash
-        run: cmake --build build
+        run: cmake --build build --config Release
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
