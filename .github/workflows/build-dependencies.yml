@@ -3,9 +3,6 @@ name: Build Dependencies
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     strategy:
@@ -21,6 +18,7 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
           ./vcpkg/vcpkg update
+          ./vcpkg/vcpkg upgrade --no-dry-run
 
       - name: Install dependencies
         run: |
@@ -33,7 +31,11 @@ jobs:
             ./vcpkg/vcpkg install portaudio:x64-osx
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
           else
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,vaapi,libmfx]:x64-linux
+            # Install system VAAPI packages
+            sudo apt update && sudo apt install -y libva-dev libva2
+
+            # Install dependencies without vaapi
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx]:x64-linux
             ./vcpkg/vcpkg install portaudio:x64-linux
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/bin" >> $GITHUB_ENV
           fi
