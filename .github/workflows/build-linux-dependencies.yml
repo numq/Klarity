@@ -30,8 +30,7 @@ jobs:
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
           ./configure --enable-shared --disable-static --disable-autodetect \
-                      --enable-cuda-llvm --enable-nvdec --enable-cuvid \
-                      --enable-vaapi --enable-libmfx --enable-vulkan \
+                      --enable-nvdec --enable-vaapi --enable-libmfx --enable-vulkan \
                       --extra-cflags=-I/usr/local/include \
                       --extra-ldflags=-L/usr/local/lib \
                       --prefix=$GITHUB_WORKSPACE/deps
