@@ -24,20 +24,20 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             # Install FFmpeg and PortAudio with specific flags for Windows
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx,vulkan]:x64-windows
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,d3d11va,d3d12va,libmfx]:x64-windows
             ./vcpkg/vcpkg install portaudio:x64-windows
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/bin" >> $GITHUB_ENV
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows/include" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" == "macos-latest" ]; then
             # Install FFmpeg and PortAudio with specific flags for macOS
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx,vulkan]:x64-osx
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,videotoolbox,libmfx]:x64-osx
             ./vcpkg/vcpkg install portaudio:x64-osx
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/bin" >> $GITHUB_ENV
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-osx/include" >> $GITHUB_ENV
           else
             # Install FFmpeg and PortAudio with specific flags for Linux
             sudo apt update && sudo apt install -y libva-dev libva2
-            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx,vulkan,vaapi]:x64-linux
+            ./vcpkg/vcpkg install ffmpeg[avcodec,avformat,avutil,swresample,swscale,nvdec,libmfx,vaapi]:x64-linux
             ./vcpkg/vcpkg install portaudio:x64-linux
             echo "BIN_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/bin" >> $GITHUB_ENV
             echo "INCLUDE_FOLDER=$GITHUB_WORKSPACE/vcpkg/installed/x64-linux/include" >> $GITHUB_ENV
