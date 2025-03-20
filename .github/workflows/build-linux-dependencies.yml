@@ -17,32 +17,13 @@ jobs:
           sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
           sudo apt-get install -y build-essential git
 
-      - name: Clone and Build ffnvcodec (nv-codec-headers)
-        run: |
-          git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git
-          cd nv-codec-headers
-          make
-          sudo make install
-
-      - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.22
-        id: cuda-toolkit
-        with:
-          cuda: '12.8.1'
-
       - name: Clone and Build FFmpeg 7.1
         run: |
           git clone --branch n7.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git
           cd FFmpeg
-          ./configure --enable-shared --disable-static --disable-autodetect --enable-cuda --enable-nvenc --enable-cuvid --enable-vaapi --enable-libmfx --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
+          ./configure --enable-shared --disable-static --disable-autodetect --enable-cuda-llvm --enable-nvdec --enable-cuvid --enable-vaapi --enable-libmfx --enable-vulkan --prefix=$GITHUB_WORKSPACE/deps
           make -j$(nproc)
           make install
-
-      - name: Upload FFmpeg Config Log
-        uses: actions/upload-artifact@v4
-        with:
-          name: ffmpeg-config-log
-          path: FFmpeg/ffbuild/config.log
 
       - name: Build PortAudio v19.7.0
         run: |
