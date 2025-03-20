@@ -17,11 +17,22 @@ jobs:
           sudo apt-get install -y libmfx1 libmfx-tools intel-media-va-driver-non-free libmfx-dev
           sudo apt-get install -y build-essential git
 
-      - name: Install CUDA Toolkit
+      - name: Clean up CUDA cache
+        run: |
+          rm -rf /home/runner/.cuda
+          rm -rf /usr/local/cuda*
+
+      - name: Install CUDA Toolkit (Network Method)
         uses: Jimver/cuda-toolkit@v0.2.22
         id: cuda-toolkit
         with:
           cuda: '12.8.1'
+          method: 'network'
+
+      - name: Verify CUDA Installation
+        run: |
+          echo "Installed CUDA version:"
+          nvcc --version
 
       - name: Verify CUDA Installation
         run: |
