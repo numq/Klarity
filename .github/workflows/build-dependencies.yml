@@ -27,6 +27,11 @@ jobs:
           echo BIN_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows\bin >> %GITHUB_ENV%
           echo INCLUDE_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows\include >> %GITHUB_ENV%
 
+      - name: Verify FFmpeg Installation
+        shell: bash
+        run: |
+          ls $GITHUB_WORKSPACE/vcpkg/installed/x64-windows/lib
+
       - name: Configure CMake
         shell: bash
         run: |
