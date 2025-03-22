@@ -19,11 +19,13 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         samplerPointers[handle] = std::move(sampler);
 
         return handle;
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return -1;
+        handleRuntimeException(env, e.what());
     }
+
+    return -1;
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setPlaybackSpeedNative(
@@ -38,8 +40,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         auto sampler = getSamplerPointer(handle);
 
         sampler->setPlaybackSpeed(static_cast<float>(factor));
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -55,8 +59,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         auto sampler = getSamplerPointer(handle);
 
         sampler->setVolume(static_cast<float>(value));
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -71,11 +77,13 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         auto sampler = getSamplerPointer(handle);
 
         return static_cast<jlong>(sampler->start());
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return -1;
+        handleRuntimeException(env, e.what());
     }
+
+    return -1;
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_playNative(
@@ -104,8 +112,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
 
         sampler->play(samples.data(), samples.size());
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -120,8 +130,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         auto sampler = getSamplerPointer(handle);
 
         sampler->pause();
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -136,8 +148,10 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         auto sampler = getSamplerPointer(handle);
 
         sampler->stop();
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -159,7 +173,9 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_d
                     return p.first == handle;
                 }
         );
+    } catch (const SamplerException &e) {
+        handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }

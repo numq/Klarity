@@ -23,11 +23,15 @@ Java_com_github_numq_klarity_core_decoder_NativeDecoder_getSupportedHardwareAcce
         env->SetIntArrayRegion(result, 0, size, reinterpret_cast<const jint *>(hwAccels.data()));
 
         return result;
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return nullptr;
+        handleRuntimeException(env, e.what());
     }
+
+    return nullptr;
 }
 
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
@@ -63,11 +67,15 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         decoderPointers[handle] = std::move(decoder);
 
         return handle;
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return -1;
+        handleRuntimeException(env, e.what());
     }
+
+    return -1;
 }
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
@@ -103,11 +111,15 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         env->DeleteLocalRef(location);
 
         return javaObject;
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return nullptr;
+        handleRuntimeException(env, e.what());
     }
+
+    return nullptr;
 }
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_nextFrameNative(
@@ -152,11 +164,15 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         }
 
         return nullptr;
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
-
-        return nullptr;
+        handleRuntimeException(env, e.what());
     }
+
+    return nullptr;
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
@@ -172,8 +188,12 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_s
         auto decoder = getDecoderPointer(handle);
 
         decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly);
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -188,8 +208,12 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_r
         auto decoder = getDecoderPointer(handle);
 
         decoder->reset();
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }
 
@@ -211,7 +235,11 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_d
                     return p.first == handle;
                 }
         );
+    } catch (const DecoderException &e) {
+        handleDecoderException(env, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        handleHardwareAccelerationException(env, e.what());
     } catch (const std::exception &e) {
-        handleException(env, e.what());
+        handleRuntimeException(env, e.what());
     }
 }

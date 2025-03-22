@@ -8,7 +8,13 @@ std::unordered_map<jlong, std::unique_ptr<Decoder>> decoderPointers;
 
 std::unordered_map<jlong, std::unique_ptr<Sampler>> samplerPointers;
 
-jclass exceptionClass = nullptr;
+jclass runtimeExceptionClass = nullptr;
+
+jclass decoderExceptionClass = nullptr;
+
+jclass hardwareAccelerationExceptionClass = nullptr;
+
+jclass samplerExceptionClass = nullptr;
 
 jclass formatClass = nullptr;
 
@@ -18,8 +24,20 @@ jclass frameClass = nullptr;
 
 jmethodID frameConstructor = nullptr;
 
-void handleException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(exceptionClass, errorMessage.c_str());
+void handleRuntimeException(JNIEnv *env, const std::string &errorMessage) {
+    env->ThrowNew(runtimeExceptionClass, errorMessage.c_str());
+}
+
+void handleDecoderException(JNIEnv *env, const std::string &errorMessage) {
+    env->ThrowNew(decoderExceptionClass, errorMessage.c_str());
+}
+
+void handleHardwareAccelerationException(JNIEnv *env, const std::string &errorMessage) {
+    env->ThrowNew(hardwareAccelerationExceptionClass, errorMessage.c_str());
+}
+
+void handleSamplerException(JNIEnv *env, const std::string &errorMessage) {
+    env->ThrowNew(samplerExceptionClass, errorMessage.c_str());
 }
 
 Decoder *getDecoderPointer(jlong handle) {
@@ -41,12 +59,35 @@ Sampler *getSamplerPointer(jlong handle) {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
-    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8) != JNI_OK) {
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_10) != JNI_OK) {
         return JNI_ERR;
     }
 
-    exceptionClass = reinterpret_cast<jclass>(env->NewGlobalRef(env->FindClass("java/lang/RuntimeException")));
-    if (exceptionClass == nullptr) {
+    runtimeExceptionClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("java/lang/RuntimeException"))
+    );
+    if (runtimeExceptionClass == nullptr) {
+        return JNI_ERR;
+    }
+
+    decoderExceptionClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/decoder/DecoderException"))
+    );
+    if (decoderExceptionClass == nullptr) {
+        return JNI_ERR;
+    }
+
+    hardwareAccelerationExceptionClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/decoder/HardwareAccelerationException"))
+    );
+    if (hardwareAccelerationExceptionClass == nullptr) {
+        return JNI_ERR;
+    }
+
+    samplerExceptionClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/sampler/SamplerException"))
+    );
+    if (samplerExceptionClass == nullptr) {
         return JNI_ERR;
     }
 
@@ -76,13 +117,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    return JNI_VERSION_1_8;
+    return JNI_VERSION_10;
 }
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
-    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8) != JNI_OK) return;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_10) != JNI_OK) return;
 
     {
         std::unique_lock<std::shared_mutex> decoderLock(decoderMutex);
@@ -97,9 +138,24 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     Pa_Terminate();
 
-    if (exceptionClass) {
-        env->DeleteGlobalRef(exceptionClass);
-        exceptionClass = nullptr;
+    if (runtimeExceptionClass) {
+        env->DeleteGlobalRef(runtimeExceptionClass);
+        runtimeExceptionClass = nullptr;
+    }
+
+    if (decoderExceptionClass) {
+        env->DeleteGlobalRef(decoderExceptionClass);
+        decoderExceptionClass = nullptr;
+    }
+
+    if (hardwareAccelerationExceptionClass) {
+        env->DeleteGlobalRef(hardwareAccelerationExceptionClass);
+        hardwareAccelerationExceptionClass = nullptr;
+    }
+
+    if (samplerExceptionClass) {
+        env->DeleteGlobalRef(samplerExceptionClass);
+        samplerExceptionClass = nullptr;
     }
 
     if (formatClass) {

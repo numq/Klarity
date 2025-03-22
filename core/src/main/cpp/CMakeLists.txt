@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
-set(BIN_FOLDER bin)
+set(BIN_FOLDER "${CMAKE_SOURCE_DIR}/bin")
+set(LIB_FOLDER "${CMAKE_SOURCE_DIR}/lib")
 
 add_library(klarity SHARED
         src/common.cpp
@@ -34,10 +35,11 @@ target_include_directories(klarity PRIVATE
         include/sampler/stretch
 )
 
-target_link_directories(klarity PRIVATE ${BIN_FOLDER})
+target_link_directories(klarity PRIVATE ${BIN_FOLDER} ${LIB_FOLDER})
 
 target_link_libraries(klarity PRIVATE
         avcodec
+        avfilter
         avformat
         avutil
         swresample
