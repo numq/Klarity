@@ -1,58 +1,56 @@
-name: Build Klarity Dependencies
+name: Build Dependencies
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Set up vcpkg
-        shell: cmd
+      - name: Set up VCPKG
+        id: vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          bootstrap-vcpkg.bat
-          vcpkg.exe update
-          vcpkg.exe upgrade --no-dry-run
+          ./vcpkg/bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
 
-      - name: Install FFmpeg and PortAudio (Release Only)
-        shell: cmd
+      - name: Install PortAudio
         run: |
-          vcpkg\vcpkg.exe install ffmpeg[nvcodec,qsv]:x64-windows-release
-          vcpkg\vcpkg.exe install portaudio:x64-windows-release
-          echo BIN_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows-release\bin >> %GITHUB_ENV%
-          echo INCLUDE_FOLDER=%GITHUB_WORKSPACE%\vcpkg\installed\x64-windows-release\include >> %GITHUB_ENV%
+          $VCPKG_ROOT/vcpkg install portaudio --triplet ${{ matrix.triplet }}
 
-      - name: Verify FFmpeg Installation
-        shell: bash
-        run: |
-          ls $GITHUB_WORKSPACE/vcpkg/installed/x64-windows-release/lib
+      - name: Set up CMake
+        uses: actions/setup-cmake@v4
 
-      - name: Configure CMake
-        shell: bash
+      - name: Configure and Build klarity
+        env:
+          BIN_FOLDER: ${{ github.workspace }}/bin/${{ matrix.os }}
+          LIB_FOLDER: ${{ github.workspace }}/lib/${{ matrix.os }}
         run: |
+          mkdir -p $BIN_FOLDER $LIB_FOLDER
           cmake -B build -S core/src/main/cpp \
-            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/vcpkg/installed/x64-windows-release
+            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DBIN_FOLDER=$BIN_FOLDER \
+            -DLIB_FOLDER=$LIB_FOLDER
+          cmake --build build --config Release
 
-      - name: Build Klarity
-        shell: bash
-        run: cmake --build build --config Release
+      - name: Collect artifacts
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}/bin
+          mkdir -p artifacts/${{ matrix.os }}/lib
+          mkdir -p artifacts/${{ matrix.os }}/include
+          cp $BIN_FOLDER/* artifacts/${{ matrix.os }}/bin/
+          cp $LIB_FOLDER/* artifacts/${{ matrix.os }}/lib/
+          cp -r $VCPKG_ROOT/installed/${{ matrix.triplet }}/include/* artifacts/${{ matrix.os }}/include/
 
-      - name: Upload Klarity Binaries
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-binaries
-          path: |
-            build/bin/klarity
-            build/bin/avcodec
-            build/bin/avformat
-            build/bin/avutil
-            build/bin/swresample
-            build/bin/swscale
+          name: ${{ matrix.os }}-artifacts
+          path: artifacts/${{ matrix.os }}
