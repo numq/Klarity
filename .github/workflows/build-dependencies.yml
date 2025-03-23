@@ -9,12 +9,12 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Visual Studio
         uses: microsoft/setup-msbuild@v1
         with:
-          vs-version: 'latest'  # Use the latest version of Visual Studio
+          vs-version: 'latest'
 
       - name: Install CUDA
         run: |
@@ -37,7 +37,7 @@ jobs:
           msbuild /p:Configuration=Release /p:Platform=x64
 
       - name: Upload FFmpeg artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-build-artifacts
           path: |
