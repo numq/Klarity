@@ -1,56 +1,75 @@
-name: Build Dependencies
+name: Build FFmpeg with CUDA Acceleration
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       matrix:
-        os: [ windows-latest, ubuntu-latest, macos-latest ]
+#        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      - name: Set up VCPKG
-        id: vcpkg
+      - name: Set up CUDA for Windows
+        if: matrix.os == 'windows-latest'
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          ./vcpkg/bootstrap-vcpkg.sh
-          echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
+          choco install cuda --version=11.6
+          setx PATH "%PATH%;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\bin"
 
-      - name: Install PortAudio
+      - name: Set up dependencies for Linux
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          $VCPKG_ROOT/vcpkg install portaudio --triplet ${{ matrix.triplet }}
+          sudo apt update
+          sudo apt install -y build-essential yasm nasm libvpx-dev libx264-dev
+          sudo apt install -y nvidia-cuda-toolkit
 
-      - name: Set up CMake
-        uses: actions/setup-cmake@v4
-
-      - name: Configure and Build klarity
-        env:
-          BIN_FOLDER: ${{ github.workspace }}/bin/${{ matrix.os }}
-          LIB_FOLDER: ${{ github.workspace }}/lib/${{ matrix.os }}
+      - name: Set up dependencies for macOS
+        if: matrix.os == 'macos-latest'
         run: |
-          mkdir -p $BIN_FOLDER $LIB_FOLDER
-          cmake -B build -S core/src/main/cpp \
-            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DBIN_FOLDER=$BIN_FOLDER \
-            -DLIB_FOLDER=$LIB_FOLDER
-          cmake --build build --config Release
+          brew install yasm nasm
 
-      - name: Collect artifacts
+      - name: Install FFmpeg dependencies
         run: |
-          mkdir -p artifacts/${{ matrix.os }}/bin
-          mkdir -p artifacts/${{ matrix.os }}/lib
-          mkdir -p artifacts/${{ matrix.os }}/include
-          cp $BIN_FOLDER/* artifacts/${{ matrix.os }}/bin/
-          cp $LIB_FOLDER/* artifacts/${{ matrix.os }}/lib/
-          cp -r $VCPKG_ROOT/installed/${{ matrix.triplet }}/include/* artifacts/${{ matrix.os }}/include/
+          if [ ${{ matrix.os }} == 'windows-latest' ]; then
+            choco install yasm
+            choco install nasm
+          fi
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.os }}-artifacts
-          path: artifacts/${{ matrix.os }}
+      - name: Compile FFmpeg with CUDA support
+        run: |
+          if [ ${{ matrix.os }} == 'windows-latest' ]; then
+            call "%VS140COMNTOOLS%..\..\..\VC\vcvarsall.bat" amd64
+            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+            cd ffmpeg
+            git checkout release/7.1
+            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
+            make -j$(nproc)
+            make install
+          fi
+          
+          if [ ${{ matrix.os }} == 'ubuntu-latest' ]; then
+            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+            cd ffmpeg
+            git checkout release/7.1
+            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
+            make -j$(nproc)
+            sudo make install
+          fi
+          
+          if [ ${{ matrix.os }} == 'macos-latest' ]; then
+            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+            cd ffmpeg
+            git checkout release/7.1
+            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
+            make -j$(nproc)
+            sudo make install
+          fi
