@@ -1,4 +1,4 @@
-name: Build FFmpeg with CUDA Acceleration
+name: Build FFmpeg with CUDA support
 
 on:
   workflow_dispatch:
@@ -6,65 +6,41 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-#        os: [windows-latest, ubuntu-latest, macos-latest]
-        os: [windows-latest]
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Checkout the repository
+        uses: actions/checkout@v3
 
-      - name: Set up CUDA for Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          choco install cuda --version=11.6
-          setx PATH "%PATH%;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\bin"
+      - name: Set up Visual Studio
+        uses: microsoft/setup-msbuild@v1
+        with:
+          vs-version: 'latest'  # Use the latest version of Visual Studio
 
-      - name: Set up dependencies for Linux
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install CUDA
         run: |
-          sudo apt update
-          sudo apt install -y build-essential yasm nasm libvpx-dev libx264-dev
-          sudo apt install -y nvidia-cuda-toolkit
+          choco install cuda --version=11.2  # Ensure CUDA is installed (version 11.2 or as needed)
 
-      - name: Set up dependencies for macOS
-        if: matrix.os == 'macos-latest'
+      - name: Download FFmpeg source
         run: |
-          brew install yasm nasm
+          git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+          cd ffmpeg
+          git checkout release/5.1 # You can adjust the release version as necessary
 
-      - name: Install FFmpeg dependencies
+      - name: Configure FFmpeg with CUDA support
         run: |
-          if [ ${{ matrix.os }} == 'windows-latest' ]; then
-            choco install yasm
-            choco install nasm
-          fi
+          cd ffmpeg
+          ./configure --enable-nvenc --enable-nvdec --enable-cuda --enable-libnpp --enable-shared --prefix=%cd%/ffmpeg_build --extra-cflags="-I%cd%/ffmpeg_build/include" --extra-ldflags="-L%cd%/ffmpeg_build/lib"
 
-      - name: Compile FFmpeg with CUDA support
+      - name: Build FFmpeg with Visual Studio
         run: |
-          if [ ${{ matrix.os }} == 'windows-latest' ]; then
-            call "%VS140COMNTOOLS%..\..\..\VC\vcvarsall.bat" amd64
-            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-            cd ffmpeg
-            git checkout release/7.1
-            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
-            make -j$(nproc)
-            make install
-          fi
-          
-          if [ ${{ matrix.os }} == 'ubuntu-latest' ]; then
-            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-            cd ffmpeg
-            git checkout release/7.1
-            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
-            make -j$(nproc)
-            sudo make install
-          fi
-          
-          if [ ${{ matrix.os }} == 'macos-latest' ]; then
-            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-            cd ffmpeg
-            git checkout release/7.1
-            ./configure --enable-cuda --enable-cuvid --enable-nvenc --enable-nonfree --enable-gpl
-            make -j$(nproc)
-            sudo make install
-          fi
+          cd ffmpeg
+          msbuild /p:Configuration=Release /p:Platform=x64
+
+      - name: Upload FFmpeg artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ffmpeg-build-artifacts
+          path: |
+            ffmpeg_build/include
+            ffmpeg_build/bin
+            ffmpeg_build/lib
