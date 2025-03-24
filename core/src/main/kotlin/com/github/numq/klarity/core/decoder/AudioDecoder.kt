@@ -1,6 +1,5 @@
 package com.github.numq.klarity.core.decoder
 
-import com.github.numq.klarity.core.exception.NativeException
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
@@ -27,26 +26,20 @@ internal class AudioDecoder(
                     else -> null
                 }
             } ?: Frame.Audio.EndOfStream
-        }.recoverCatching { t ->
-            throw Exception("Audio decoder: ${t.message}", t)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun seekTo(micros: Long, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
             decoder.seekTo(micros, keyframesOnly)
-        }.recoverCatching { t ->
-            throw Exception("Audio decoder: ${t.message}", t)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun reset() = mutex.withLock {
         runCatching {
             decoder.reset()
-        }.recoverCatching { t ->
-            throw Exception("Audio decoder: ${t.message}", t)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
-    override fun close() = runCatching { decoder.close() }.recoverCatching(NativeException::create).getOrThrow()
+    override fun close() = decoder.close()
 }

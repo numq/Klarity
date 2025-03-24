@@ -2,7 +2,6 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 
 class ProbeDecoderFactory : SuspendFactory<ProbeDecoderFactory.Parameters, Decoder<Media, Frame.Probe>> {

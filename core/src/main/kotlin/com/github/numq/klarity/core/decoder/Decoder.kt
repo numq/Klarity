@@ -3,7 +3,6 @@ package com.github.numq.klarity.core.decoder
 import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import java.io.File
@@ -175,8 +174,8 @@ interface Decoder<Media, Frame> : AutoCloseable {
             }
         }
 
-        internal fun getSupportedHardwareAcceleration() = runCatching {
-            NativeDecoder.getSupportedHardwareAcceleration().map { hardwareAcceleration ->
+        internal fun getAvailableHardwareAcceleration() = runCatching {
+            NativeDecoder.getAvailableHardwareAcceleration().map { hardwareAcceleration ->
                 HardwareAcceleration.entries.getOrNull(hardwareAcceleration)
             }.filterNotNull()
         }

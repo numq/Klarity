@@ -1,7 +1,5 @@
 package com.github.numq.klarity.core.settings
 
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-
 /**
  * Data class representing the settings for the media player.
  *

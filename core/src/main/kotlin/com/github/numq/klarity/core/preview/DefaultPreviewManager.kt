@@ -1,8 +1,8 @@
 package com.github.numq.klarity.core.preview
 
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPreviewManager(
-    private val hardwareAcceleration: HardwareAcceleration,
     private val videoDecoderFactory: VideoDecoderFactory,
 ) : PreviewManager {
     private val coroutineContext = Dispatchers.Default + SupervisorJob()
@@ -31,7 +30,7 @@ internal class DefaultPreviewManager(
         }
     }.stateIn(scope = coroutineScope, started = SharingStarted.Lazily, initialValue = PreviewState.Empty)
 
-    override suspend fun prepare(location: String) = runCatching {
+    override suspend fun prepare(location: String, hardwareAcceleration: HardwareAcceleration) = runCatching {
         val currentState = internalState.value
 
         check(currentState is InternalPreviewState.Empty) { "Unable to load non-empty preview manager" }
@@ -69,11 +68,11 @@ internal class DefaultPreviewManager(
     override suspend fun release() = runCatching {
         val currentState = internalState.value
 
-        check(currentState is InternalPreviewState.Ready) { "Unable to unload empty preview manager" }
+        if (currentState is InternalPreviewState.Ready) {
+            currentState.decoder.close()
 
-        currentState.decoder.close()
-
-        internalState.emit(InternalPreviewState.Empty)
+            internalState.emit(InternalPreviewState.Empty)
+        }
     }
 
     override fun close() {

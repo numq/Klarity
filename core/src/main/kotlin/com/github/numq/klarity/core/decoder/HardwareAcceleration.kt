@@ -1,4 +1,4 @@
-package com.github.numq.klarity.core.hwaccel
+package com.github.numq.klarity.core.decoder
 
 enum class HardwareAcceleration {
     NONE,

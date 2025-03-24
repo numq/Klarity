@@ -1,6 +1,5 @@
 package com.github.numq.klarity.core.decoder
 
-import com.github.numq.klarity.core.exception.NativeException
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
@@ -24,5 +23,5 @@ internal class ProbeDecoder(
         Result.success(Unit)
     }
 
-    override fun close() = runCatching { decoder.close() }.recoverCatching(NativeException::create).getOrThrow()
+    override fun close() = decoder.close()
 }

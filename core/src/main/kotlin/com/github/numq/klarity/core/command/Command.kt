@@ -1,6 +1,6 @@
 package com.github.numq.klarity.core.command
 
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 
 sealed interface Command {
     enum class Descriptor {

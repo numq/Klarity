@@ -2,7 +2,6 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.format.NativeFormat
 import com.github.numq.klarity.core.frame.NativeFrame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import java.lang.ref.Cleaner
 
 internal class NativeDecoder(
@@ -27,10 +26,10 @@ internal class NativeDecoder(
     companion object {
         private val cleaner = Cleaner.create()
 
-        fun getSupportedHardwareAcceleration() = getSupportedHardwareAccelerationNative() ?: intArrayOf()
+        fun getAvailableHardwareAcceleration() = getAvailableHardwareAccelerationNative() ?: intArrayOf()
 
         @JvmStatic
-        private external fun getSupportedHardwareAccelerationNative(): IntArray?
+        private external fun getAvailableHardwareAccelerationNative(): IntArray?
 
         @JvmStatic
         private external fun createNative(

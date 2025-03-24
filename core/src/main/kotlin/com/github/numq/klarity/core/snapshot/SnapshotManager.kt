@@ -1,19 +1,27 @@
 package com.github.numq.klarity.core.snapshot
 
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
 object SnapshotManager {
+    /**
+     * Retrieves a list of available hardware acceleration methods for video decoding.
+     *
+     * @return A [Result] containing a list of supported [HardwareAcceleration] types.
+     */
+    fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
+
     suspend fun snapshot(
         location: String,
         width: Int? = null,
         height: Int? = null,
         keyframesOnly: Boolean = true,
         hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE,
-        timestampMillis: (durationMillis: Long) -> (Long),
+        timestampMillis: (durationMillis: Long) -> (Long) = { 0L },
     ) = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(location = location, hardwareAcceleration = hardwareAcceleration)
     ).mapCatching { decoder ->
@@ -28,8 +36,6 @@ object SnapshotManager {
                 nextFrame(width = width, height = height).getOrThrow() as? Frame.Video.Content
             }
         }
-    }.recoverCatching { t ->
-        throw Exception("Snapshot is only available for media containing video: ${t.localizedMessage}")
     }
 
     suspend fun snapshots(
@@ -38,7 +44,7 @@ object SnapshotManager {
         height: Int? = null,
         keyframesOnly: Boolean = true,
         hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.NONE,
-        timestampsMillis: (durationMillis: Long) -> (List<Long>),
+        timestampsMillis: (durationMillis: Long) -> (List<Long>) = { listOf(0L) },
     ) = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(location = location, hardwareAcceleration = hardwareAcceleration)
     ).mapCatching { decoder ->
@@ -53,7 +59,5 @@ object SnapshotManager {
                     }
             }
         }
-    }.recoverCatching { t ->
-        throw Exception("Snapshots are only available for media containing video: ${t.localizedMessage}")
     }
 }

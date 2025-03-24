@@ -3,12 +3,8 @@ package com.github.numq.klarity.core.player
 import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
-import com.github.numq.klarity.core.decoder.AudioDecoderFactory
-import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
-import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.decoder.*
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.Renderer
@@ -131,28 +127,37 @@ interface KlarityPlayer : AutoCloseable {
          * This method must be called before creating an instance.
          *
          * @param avutil The path to the `avutil-59` binary.
-         * @param swscale The path to the `swscale-8` binary.
+         * @param postproc The path to the `postproc-58` binary.
          * @param swresample The path to the `swresample-5` binary.
+         * @param swscale The path to the `swscale-8` binary.
          * @param avcodec The path to the `avcodec-61` binary.
          * @param avformat The path to the `avformat-61` binary.
+         * @param avfilter The path to the `avfilter-10` binary.
+         * @param avdevice The path to the `avdevice-61` binary.
          * @param portaudio The path to the `portaudio` binary.
          * @param klarity The path to the `klarity` binary.
          * @return A [Result] indicating the success or failure of the operation.
          */
         fun load(
             avutil: String,
+            postproc: String,
             swscale: String,
             swresample: String,
             avcodec: String,
             avformat: String,
+            avfilter: String,
+            avdevice: String,
             portaudio: String,
             klarity: String,
         ) = runCatching {
             System.load(avutil)
-            System.load(swscale)
+            System.load(postproc)
             System.load(swresample)
+            System.load(swscale)
             System.load(avcodec)
             System.load(avformat)
+            System.load(avfilter)
+            System.load(avdevice)
             System.load(portaudio)
             System.load(klarity)
         }.onSuccess {
@@ -160,11 +165,11 @@ interface KlarityPlayer : AutoCloseable {
         }
 
         /**
-         * Retrieves a list of supported hardware acceleration methods for video decoding.
+         * Retrieves a list of available hardware acceleration methods for video decoding.
          *
          * @return A [Result] containing a list of supported [HardwareAcceleration] types.
          */
-        fun getSupportedHardwareAcceleration() = Decoder.getSupportedHardwareAcceleration()
+        fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
 
         /**
          * Creates a new instance of the KlarityPlayer.

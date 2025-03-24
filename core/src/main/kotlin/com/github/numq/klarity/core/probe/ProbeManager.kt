@@ -2,7 +2,7 @@ package com.github.numq.klarity.core.probe
 
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 
 object ProbeManager {

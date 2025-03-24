@@ -2,7 +2,7 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.settings.PlayerSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

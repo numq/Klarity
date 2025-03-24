@@ -1,6 +1,5 @@
 package com.github.numq.klarity.core.sampler
 
-import com.github.numq.klarity.core.exception.NativeException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,7 +24,7 @@ internal class DefaultSampler(
             sampler.setPlaybackSpeed(factor)
 
             playbackSpeedFactor.emit(factor)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun setVolume(value: Float) = mutex.withLock {
@@ -35,38 +34,38 @@ internal class DefaultSampler(
             sampler.setVolume(value)
 
             currentVolume = value
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun setMuted(state: Boolean) = mutex.withLock {
         runCatching {
             sampler.setVolume(if (state) 0f else currentVolume)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun start() = mutex.withLock {
         runCatching {
             latency = sampler.start()
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun play(bytes: ByteArray) = mutex.withLock {
         runCatching {
             sampler.play(bytes, bytes.size)
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun pause() = mutex.withLock {
         runCatching {
             sampler.pause()
-        }.recoverCatching(NativeException::create)
+        }
     }
 
     override suspend fun stop() = mutex.withLock {
         runCatching {
             sampler.stop()
-        }.recoverCatching(NativeException::create)
+        }
     }
 
-    override fun close() = runCatching { sampler.close() }.recoverCatching(NativeException::create).getOrThrow()
+    override fun close() = sampler.close()
 }
