@@ -1,12 +1,13 @@
 package com.github.numq.klarity.core.preview
 
+import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
 import kotlinx.coroutines.flow.StateFlow
 
-interface PreviewManager : AutoCloseable {
+interface PreviewManager : SuspendAutoCloseable {
     val state: StateFlow<PreviewState>
     suspend fun prepare(
         location: String,
@@ -27,7 +28,7 @@ interface PreviewManager : AutoCloseable {
          *
          * @return A [Result] containing a list of supported [HardwareAcceleration] types.
          */
-        fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
+        suspend fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
 
         fun create(): Result<PreviewManager> = runCatching {
             DefaultPreviewManager(videoDecoderFactory = VideoDecoderFactory())

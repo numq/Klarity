@@ -1,13 +1,14 @@
 package com.github.numq.klarity.core.pipeline
 
 import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 
-sealed interface Pipeline : AutoCloseable {
+sealed interface Pipeline : SuspendAutoCloseable {
     val media: Media
 
     data class AudioVideo(
@@ -19,7 +20,7 @@ sealed interface Pipeline : AutoCloseable {
         val sampler: Sampler,
         val renderer: Renderer,
     ) : Pipeline {
-        override fun close() {
+        override suspend fun close() {
             sampler.close()
             audioDecoder.close()
             videoDecoder.close()
@@ -32,7 +33,7 @@ sealed interface Pipeline : AutoCloseable {
         val buffer: Buffer<Frame.Audio>,
         val sampler: Sampler,
     ) : Pipeline {
-        override fun close() {
+        override suspend fun close() {
             sampler.close()
             decoder.close()
         }
@@ -44,7 +45,7 @@ sealed interface Pipeline : AutoCloseable {
         val buffer: Buffer<Frame.Video>,
         val renderer: Renderer,
     ) : Pipeline {
-        override fun close() {
+        override suspend fun close() {
             decoder.close()
         }
     }

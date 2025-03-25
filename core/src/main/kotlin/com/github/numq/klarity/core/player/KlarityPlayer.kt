@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
+import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.*
 import com.github.numq.klarity.core.event.PlayerEvent
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
  * The player provides various functionalities for controlling playback, changing settings,
  * and monitoring player state and events.
  */
-interface KlarityPlayer : AutoCloseable {
+interface KlarityPlayer : SuspendAutoCloseable {
     /**
      * A flow that emits the current settings of the player.
      */
@@ -169,7 +170,7 @@ interface KlarityPlayer : AutoCloseable {
          *
          * @return A [Result] containing a list of supported [HardwareAcceleration] types.
          */
-        fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
+        suspend fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
 
         /**
          * Creates a new instance of the KlarityPlayer.

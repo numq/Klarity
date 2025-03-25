@@ -2,11 +2,11 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
+import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.settings.PlayerSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.withContext
 
 internal class DefaultKlarityPlayer(
@@ -70,8 +70,8 @@ internal class DefaultKlarityPlayer(
         playerController.execute(Command.Release)
     }
 
-    override fun close() {
-        coroutineContext.cancelChildren()
+    override suspend fun close() {
+        coroutineContext.cancelChildrenAndJoin()
 
         playerController.close()
     }

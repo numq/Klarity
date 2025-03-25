@@ -7,6 +7,7 @@ import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -28,11 +29,13 @@ class AudioDecoderTest : JNITest() {
 
     @BeforeEach
     fun beforeEach() {
-        decoder = Decoder.createAudioDecoder(location = location).getOrThrow()
+        decoder = runBlocking {
+            Decoder.createAudioDecoder(location = location).getOrThrow()
+        }
     }
 
     @AfterEach
-    fun afterEach() {
+    fun afterEach() = runBlocking {
         decoder.close()
     }
 

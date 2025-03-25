@@ -23,5 +23,7 @@ internal class ProbeDecoder(
         Result.success(Unit)
     }
 
-    override fun close() = decoder.close()
+    override suspend fun close() = mutex.withLock {
+        decoder.close()
+    }
 }

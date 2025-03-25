@@ -1,5 +1,6 @@
 package com.github.numq.klarity.core.snapshot
 
+import com.github.numq.klarity.core.closeable.use
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
@@ -13,7 +14,7 @@ object SnapshotManager {
      *
      * @return A [Result] containing a list of supported [HardwareAcceleration] types.
      */
-    fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
+    suspend fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
 
     suspend fun snapshot(
         location: String,

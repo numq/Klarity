@@ -1,6 +1,7 @@
 package com.github.numq.klarity.core.loop.playback
 
 import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.media.Media
@@ -273,5 +274,7 @@ internal class DefaultPlaybackLoop(
         }
     }
 
-    override fun close() = coroutineContext.cancelChildren()
+    override suspend fun close() = mutex.withLock {
+        coroutineContext.cancelChildrenAndJoin()
+    }
 }

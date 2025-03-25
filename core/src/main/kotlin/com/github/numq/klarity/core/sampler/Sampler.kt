@@ -1,8 +1,9 @@
 package com.github.numq.klarity.core.sampler
 
+import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import kotlinx.coroutines.flow.StateFlow
 
-interface Sampler : AutoCloseable {
+interface Sampler : SuspendAutoCloseable {
     val playbackSpeedFactor: StateFlow<Float>
     suspend fun getLatency(): Result<Long>
     suspend fun setPlaybackSpeed(factor: Float): Result<Unit>

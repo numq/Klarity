@@ -2,13 +2,14 @@ package decoder
 
 import JNITest
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class DecoderTest : JNITest() {
     @Test
-    fun `should throw an exception on empty location`() {
+    fun `should throw an exception on empty location`() = runTest {
         assertThrows<IllegalStateException> {
             Decoder.createProbeDecoder(
                 location = "",

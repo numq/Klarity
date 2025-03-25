@@ -1,9 +1,10 @@
 package decoder
 
 import JNITest
+import com.github.numq.klarity.core.decoder.DecoderException
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.NativeDecoder
 import com.github.numq.klarity.core.frame.NativeFrame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -59,7 +60,7 @@ class NativeDecoderTest : JNITest() {
 
     @Test
     fun `should handle invalid location`() {
-        assertThrows(RuntimeException::class.java) {
+        assertThrows(DecoderException::class.java) {
             NativeDecoder(
                 location = "some invalid media location",
                 findAudioStream = true,

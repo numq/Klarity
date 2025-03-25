@@ -1,12 +1,12 @@
 package com.github.numq.klarity.core.preview
 
+import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
@@ -37,8 +37,7 @@ internal class DefaultPreviewManager(
 
         videoDecoderFactory.create(
             parameters = VideoDecoderFactory.Parameters(
-                location = location,
-                hardwareAcceleration = hardwareAcceleration
+                location = location, hardwareAcceleration = hardwareAcceleration
             )
         ).mapCatching { decoder ->
             internalState.emit(InternalPreviewState.Ready(decoder = decoder))
@@ -57,8 +56,7 @@ internal class DefaultPreviewManager(
 
         with(currentState.decoder) {
             seekTo(
-                micros = timestampMillis.milliseconds.inWholeMicroseconds,
-                keyframesOnly = keyframesOnly
+                micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).map {
                 nextFrame(width, height).getOrNull() as? Frame.Video.Content
             }.getOrThrow()
@@ -75,8 +73,8 @@ internal class DefaultPreviewManager(
         }
     }
 
-    override fun close() {
-        coroutineContext.cancelChildren()
+    override suspend fun close() {
+        coroutineContext.cancelChildrenAndJoin()
 
         when (val internalState = internalState.value) {
             is InternalPreviewState.Empty -> Unit

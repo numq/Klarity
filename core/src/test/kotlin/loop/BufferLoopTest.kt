@@ -6,7 +6,7 @@ import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.pipeline.Pipeline

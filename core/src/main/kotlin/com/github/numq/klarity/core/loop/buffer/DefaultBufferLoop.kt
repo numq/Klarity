@@ -1,6 +1,7 @@
 package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
@@ -224,5 +225,7 @@ internal class DefaultBufferLoop(
         }
     }
 
-    override fun close() = coroutineContext.cancelChildren()
+    override suspend fun close() = mutex.withLock {
+        coroutineContext.cancelChildrenAndJoin()
+    }
 }

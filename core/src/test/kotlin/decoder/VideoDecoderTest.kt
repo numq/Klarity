@@ -2,12 +2,13 @@ package decoder
 
 import JNITest
 import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -28,7 +29,7 @@ class VideoDecoderTest : JNITest() {
     private lateinit var decoder: Decoder<Media.Video, Frame.Video>
 
     @BeforeEach
-    fun beforeEach() {
+    fun beforeEach() = runBlocking {
         decoder = Decoder.createVideoDecoder(
             location = location,
             hardwareAcceleration = HardwareAcceleration.NONE
@@ -36,7 +37,7 @@ class VideoDecoderTest : JNITest() {
     }
 
     @AfterEach
-    fun afterEach() {
+    fun afterEach() = runBlocking {
         decoder.close()
     }
 

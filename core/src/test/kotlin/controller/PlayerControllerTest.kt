@@ -7,9 +7,9 @@ import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.RendererFactory
@@ -17,6 +17,7 @@ import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -55,7 +56,7 @@ class PlayerControllerTest : JNITest() {
     }
 
     @AfterEach
-    fun afterEach() {
+    fun afterEach() = runBlocking {
         controller.close()
     }
 

@@ -2,6 +2,7 @@ package sampler
 
 import JNITest
 import com.github.numq.klarity.core.sampler.Sampler
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -19,7 +20,7 @@ class SamplerTest : JNITest() {
     }
 
     @AfterEach
-    fun afterEach() {
+    fun afterEach() = runBlocking {
         sampler.close()
     }
 

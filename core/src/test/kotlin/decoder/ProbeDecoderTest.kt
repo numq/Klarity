@@ -2,12 +2,13 @@ package decoder
 
 import JNITest
 import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -28,7 +29,7 @@ class ProbeDecoderTest : JNITest() {
     private lateinit var decoder: Decoder<Media, Frame.Probe>
 
     @BeforeEach
-    fun beforeEach() {
+    fun beforeEach() = runBlocking {
         decoder = Decoder.createProbeDecoder(
             location = location,
             findAudioStream = true,
@@ -38,7 +39,7 @@ class ProbeDecoderTest : JNITest() {
     }
 
     @AfterEach
-    fun afterEach() {
+    fun afterEach() = runBlocking {
         decoder.close()
     }
 
