@@ -35,8 +35,6 @@ interface Decoder<Media, Frame> : SuspendAutoCloseable {
 
                 checkNotNull(mediaLocation) { "Unable to find media" }
 
-                val media: Media
-
                 NativeDecoder(location, findAudioStream, findVideoStream, hardwareAcceleration).use { decoder ->
                     val format = decoder.format
 
@@ -63,7 +61,7 @@ interface Decoder<Media, Frame> : SuspendAutoCloseable {
                         } else null
                     }.getOrNull()
 
-                    media = when {
+                    when {
                         audioFormat != null && videoFormat != null -> Media.AudioVideo(
                             id = decoder.hashCode().toLong(),
                             durationMicros = format.durationMicros,
@@ -89,8 +87,6 @@ interface Decoder<Media, Frame> : SuspendAutoCloseable {
                         else -> throw Exception("Unsupported media format")
                     }
                 }
-
-                media
             }
         }
 
