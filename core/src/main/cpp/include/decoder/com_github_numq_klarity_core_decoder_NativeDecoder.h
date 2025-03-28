@@ -1,8 +1,10 @@
+#include <jni.h>
 #include <string>
 #include <shared_mutex>
-#include <jni.h>
 #include "common.h"
+#include "exception.h"
 #include "decoder.h"
+#include "hwaccel.h"
 
 #ifndef _Included_com_github_numq_klarity_core_decoder_NativeDecoder
 #define _Included_com_github_numq_klarity_core_decoder_NativeDecoder
@@ -10,7 +12,7 @@
 extern "C" {
 #endif
 
-JNIEXPORT jintArray JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getSupportedHardwareAccelerationNative
+JNIEXPORT jintArray JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative
         (JNIEnv *, jclass);
 
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative

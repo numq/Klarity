@@ -1,53 +1,110 @@
 #ifndef KLARITY_DECODER_DECODER_H
 #define KLARITY_DECODER_DECODER_H
 
-#include <mutex>
+#include <map>
+#include <shared_mutex>
 #include <optional>
 #include <string>
+#include <functional>
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
 #include "hwaccel.h"
 
 extern "C" {
-#include "libavutil/imgutils.h"
-#include "libswresample/swresample.h"
-#include "libswscale/swscale.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
+#include "libavutil/imgutils.h"
+#include <libavutil/opt.h>
+#include "libswresample/swresample.h"
+#include "libswscale/swscale.h"
 }
 
 class Decoder {
 private:
+    struct AVFormatContextDeleter {
+        void operator()(AVFormatContext *p) const {
+            avformat_close_input(&p);
+        }
+    };
+
+    struct AVCodecContextDeleter {
+        void operator()(AVCodecContext *p) const {
+            p->get_format = nullptr;
+
+            p->opaque = nullptr;
+
+            if (p->hw_device_ctx) {
+                av_buffer_unref(&p->hw_device_ctx);
+
+                p->hw_device_ctx = nullptr;
+            }
+
+            avcodec_free_context(&p);
+        }
+    };
+
+    struct SwrContextDeleter {
+        void operator()(SwrContext *p) const {
+            swr_free(&p);
+        }
+    };
+
+    struct SwsContextDeleter {
+        void operator()(SwsContext *p) const {
+            sws_freeContext(p);
+        }
+    };
+
+    struct AVPacketDeleter {
+        void operator()(AVPacket *p) const {
+            av_packet_free(&p);
+        }
+    };
+
+    struct AVFrameDeleter {
+        void operator()(AVFrame *p) const {
+            av_frame_free(&p);
+        }
+    };
+
+    struct AVBufferRefDeleter {
+        void operator()(AVBufferRef *p) const {
+            av_buffer_unref(&p);
+        }
+    };
+
+    std::shared_mutex mutex;
+
     const AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLT;
 
     const AVPixelFormat pixelFormat = AV_PIX_FMT_RGBA;
 
     const int swsFlags = SWS_BILINEAR;
 
-    std::mutex mutex;
-
     std::vector<uint8_t> audioBuffer;
 
     std::vector<uint8_t> videoBuffer;
 
-    AVBufferRef *hwDeviceContext = nullptr;
+    std::unique_ptr<AVFormatContext, AVFormatContextDeleter> formatContext;
 
-    AVFormatContext *formatContext = nullptr;
+    std::unique_ptr<AVCodecContext, AVCodecContextDeleter> audioCodecContext;
 
-    AVCodecContext *audioCodecContext = nullptr;
+    std::unique_ptr<AVCodecContext, AVCodecContextDeleter> videoCodecContext;
 
-    AVCodecContext *videoCodecContext = nullptr;
+    const AVStream *audioStream = nullptr;
 
-    int audioStreamIndex = -1;
+    const AVStream *videoStream = nullptr;
 
-    int videoStreamIndex = -1;
+    const AVCodec *audioDecoder = nullptr;
+
+    const AVCodec *videoDecoder = nullptr;
 
     bool isSeekable = true;
 
-    SwrContext *swrContext = nullptr;
+    std::unique_ptr<SwrContext, SwrContextDeleter> swrContext;
 
-    SwsContext *swsContext = nullptr;
+    std::unique_ptr<SwsContext, SwsContextDeleter> swsContext;
 
     int swsPixelFormat = AV_PIX_FMT_NONE;
 
@@ -55,28 +112,27 @@ private:
 
     int swsHeight = -1;
 
-    HardwareAcceleration hardwareAcceleration = HardwareAcceleration::NONE;
+    std::unique_ptr<AVPacket, AVPacketDeleter> packet;
 
-    AVPacket *packet = nullptr;
+    std::unique_ptr<AVFrame, AVFrameDeleter> audioFrame;
 
-    AVFrame *frame = nullptr;
+    std::unique_ptr<AVFrame, AVFrameDeleter> swVideoFrame;
 
-    static AVHWDeviceType _toHWDeviceType(HardwareAcceleration hwAccel);
+    std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    static AVBufferRef *_initializeHWDevice(HardwareAcceleration hardwareAcceleration);
+    std::unique_ptr<AVBufferRef, AVBufferRefDeleter> hwDeviceContext;
 
-    static std::pair<AVCodecContext *, HardwareAcceleration> _initializeCodecContext(
-            AVCodecParameters *avCodecParameters,
-            HardwareAcceleration hardwareAcceleration
-    );
+    AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
+
+    void _prepareHardwareAcceleration();
 
     void _prepareSwsContext(AVPixelFormat srcFormat, int width, int height, int dstWidth, int dstHeight);
 
-    void _processAudioFrame(const AVFrame &src);
+    void _processAudioFrame();
 
-    void _processVideoFrame(const AVFrame &src, int dstWidth, int dstHeight);
+    void _processVideoFrame(int dstWidth, int dstHeight);
 
-    void _cleanUp();
+    void _transferFrameData();
 
 public:
     Format format;
@@ -85,12 +141,10 @@ public:
             const std::string &location,
             bool findAudioStream,
             bool findVideoStream,
-            HardwareAcceleration hardwareAcceleration
+            int hwDeviceType
     );
 
     ~Decoder();
-
-    static std::vector<HardwareAcceleration> getSupportedHardwareAcceleration();
 
     std::optional<Frame> nextFrame(int width, int height);
 

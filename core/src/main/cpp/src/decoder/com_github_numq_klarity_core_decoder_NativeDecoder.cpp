@@ -1,14 +1,14 @@
 #include "com_github_numq_klarity_core_decoder_NativeDecoder.h"
 
 JNIEXPORT jintArray JNICALL
-Java_com_github_numq_klarity_core_decoder_NativeDecoder_getSupportedHardwareAccelerationNative(
+Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative(
         JNIEnv *env,
         jclass thisClass
 ) {
     std::shared_lock<std::shared_mutex> lock(decoderMutex);
 
     try {
-        auto hwAccels = Decoder::getSupportedHardwareAcceleration();
+        auto hwAccels = HardwareAcceleration::getAvailableHardwareAcceleration();
 
         auto size = static_cast<jsize>(hwAccels.size());
         if (size == 0) {
@@ -59,7 +59,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
                 locationStr,
                 findAudioStream,
                 findVideoStream,
-                static_cast<HardwareAcceleration>(hardwareAcceleration)
+                hardwareAcceleration
         );
 
         auto handle = reinterpret_cast<jlong>(decoder.get());
@@ -225,16 +225,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_d
     std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
     try {
-        if (!getDecoderPointer(handle)) {
-            throw std::runtime_error("Invalid handle");
-        }
-
-        erase_if(
-                decoderPointers,
-                [&handle](const auto &p) {
-                    return p.first == handle;
-                }
-        );
+        deleteDecoderPointer(handle);
     } catch (const DecoderException &e) {
         handleDecoderException(env, e.what());
     } catch (const HardwareAccelerationException &e) {

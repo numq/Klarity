@@ -56,6 +56,32 @@ Sampler *getSamplerPointer(jlong handle) {
     return it->second.get();
 }
 
+void deleteDecoderPointer(jlong handle) {
+    if (decoderPointers.find(handle) == decoderPointers.end()) {
+        throw std::runtime_error("Invalid handle");
+    }
+
+    erase_if(
+            decoderPointers,
+            [&handle](const auto &p) {
+                return p.first == handle;
+            }
+    );
+}
+
+void deleteSamplerPointer(jlong handle) {
+    if (samplerPointers.find(handle) == samplerPointers.end()) {
+        throw std::runtime_error("Invalid handle");
+    }
+
+    erase_if(
+            samplerPointers,
+            [&handle](const auto &p) {
+                return p.first == handle;
+            }
+    );
+}
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
@@ -130,6 +156,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
         decoderPointers.clear();
     }
+
     {
         std::unique_lock<std::shared_mutex> samplerLock(samplerMutex);
 
@@ -137,6 +164,8 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     }
 
     Pa_Terminate();
+
+    HardwareAcceleration::cleanUp();
 
     if (runtimeExceptionClass) {
         env->DeleteGlobalRef(runtimeExceptionClass);

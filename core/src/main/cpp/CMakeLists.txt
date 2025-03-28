@@ -11,6 +11,7 @@ set(LIB_FOLDER "${CMAKE_SOURCE_DIR}/lib")
 add_library(klarity SHARED
         src/common.cpp
         src/decoder/decoder.cpp
+        src/decoder/hwaccel.cpp
         src/sampler/sampler.cpp
         src/decoder/com_github_numq_klarity_core_decoder_NativeDecoder.cpp
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp
@@ -38,11 +39,13 @@ target_include_directories(klarity PRIVATE
 target_link_directories(klarity PRIVATE ${BIN_FOLDER} ${LIB_FOLDER})
 
 target_link_libraries(klarity PRIVATE
-        avcodec
-        avfilter
-        avformat
         avutil
+        postproc
         swresample
         swscale
+        avcodec
+        avformat
+        avfilter
+        avdevice
         portaudio
 )

@@ -1,16 +1,30 @@
-#ifndef KLARITY_HWACCEL_H
-#define KLARITY_HWACCEL_H
+#ifndef KLARITY_DECODER_HWACCEL_H
+#define KLARITY_DECODER_HWACCEL_H
 
-#include "libavutil/hwcontext.h"
+#include <map>
+#include <iostream>
+#include <vector>
+#include <shared_mutex>
+#include "exception.h"
 
-enum class HardwareAcceleration {
-    NONE = AV_HWDEVICE_TYPE_NONE,
-    VIDEOTOOLBOX = AV_HWDEVICE_TYPE_VIDEOTOOLBOX, // macos
-    D3D11VA = AV_HWDEVICE_TYPE_D3D11VA, // windows
-    D3D12VA = AV_HWDEVICE_TYPE_D3D12VA, // windows
-    CUDA = AV_HWDEVICE_TYPE_CUDA, // windows, linux
-    QSV = AV_HWDEVICE_TYPE_QSV, // windows, linux
-    OPENCL = AV_HWDEVICE_TYPE_OPENCL, // windows, linux, macos
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
+
+class HardwareAcceleration {
+private:
+    static std::shared_mutex mutex;
+
+    static std::map<AVHWDeviceType, AVBufferRef *> contexts;
+
+public:
+    static std::vector<AVHWDeviceType> getAvailableHardwareAcceleration();
+
+    static AVBufferRef *requestContext(AVHWDeviceType type);
+
+    static void releaseContext(AVBufferRef *ctx);
+
+    static void cleanUp();
 };
 
-#endif //KLARITY_HWACCEL_H
+#endif //KLARITY_DECODER_HWACCEL_H

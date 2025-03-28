@@ -2,6 +2,7 @@
 #include <shared_mutex>
 #include <string>
 #include "common.h"
+#include "exception.h"
 #include "sampler.h"
 
 #ifndef _Included_com_github_numq_klarity_core_sampler_NativeSampler

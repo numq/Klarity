@@ -16,30 +16,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef AVCODEC_VERSION_H
-#define AVCODEC_VERSION_H
+#ifndef AVDEVICE_VERSION_H
+#define AVDEVICE_VERSION_H
 
 /**
  * @file
- * @ingroup libavc
- * Libavcodec version macros.
+ * @ingroup lavd
+ * Libavdevice version macros
  */
 
 #include "libavutil/version.h"
 
 #include "version_major.h"
 
-#define LIBAVCODEC_VERSION_MINOR  19
-#define LIBAVCODEC_VERSION_MICRO 101
+#define LIBAVDEVICE_VERSION_MINOR   3
+#define LIBAVDEVICE_VERSION_MICRO 100
 
-#define LIBAVCODEC_VERSION_INT  AV_VERSION_INT(LIBAVCODEC_VERSION_MAJOR, \
-                                               LIBAVCODEC_VERSION_MINOR, \
-                                               LIBAVCODEC_VERSION_MICRO)
-#define LIBAVCODEC_VERSION      AV_VERSION(LIBAVCODEC_VERSION_MAJOR,    \
-                                           LIBAVCODEC_VERSION_MINOR,    \
-                                           LIBAVCODEC_VERSION_MICRO)
-#define LIBAVCODEC_BUILD        LIBAVCODEC_VERSION_INT
+#define LIBAVDEVICE_VERSION_INT AV_VERSION_INT(LIBAVDEVICE_VERSION_MAJOR, \
+                                               LIBAVDEVICE_VERSION_MINOR, \
+                                               LIBAVDEVICE_VERSION_MICRO)
+#define LIBAVDEVICE_VERSION     AV_VERSION(LIBAVDEVICE_VERSION_MAJOR, \
+                                           LIBAVDEVICE_VERSION_MINOR, \
+                                           LIBAVDEVICE_VERSION_MICRO)
+#define LIBAVDEVICE_BUILD       LIBAVDEVICE_VERSION_INT
 
-#define LIBAVCODEC_IDENT        "Lavc" AV_STRINGIFY(LIBAVCODEC_VERSION)
+#define LIBAVDEVICE_IDENT       "Lavd" AV_STRINGIFY(LIBAVDEVICE_VERSION)
 
-#endif /* AVCODEC_VERSION_H */
+#endif /* AVDEVICE_VERSION_H */

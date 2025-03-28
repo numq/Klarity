@@ -2,20 +2,26 @@
 #define KLARITY_SAMPLER_H
 
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 #include "exception.h"
 #include "portaudio.h"
 #include "stretch/stretch.h"
 
 struct Sampler {
 private:
-    std::mutex mutex;
+    struct PaStreamDeleter {
+        void operator()(PaStream *p) const {
+            Pa_CloseStream(p);
+        }
+    };
+
+    std::shared_mutex mutex;
 
     uint32_t sampleRate;
 
     uint32_t channels;
 
-    PaStream *stream = nullptr;
+    std::unique_ptr<PaStream, PaStreamDeleter> stream;
 
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
 
@@ -23,12 +29,8 @@ private:
 
     float volume = 1.0f;
 
-    void _cleanUp();
-
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
-
-    ~Sampler();
 
     void setPlaybackSpeed(float factor);
 
