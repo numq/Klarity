@@ -26,7 +26,6 @@ import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.Renderer
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
@@ -57,7 +56,7 @@ fun UploadedHubItem(
 
     val renderer by player.renderer.collectAsState()
 
-    val event by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
+    val error by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
 
     val playbackTimestamp by player.playbackTimestamp.collectAsState()
 
@@ -92,7 +91,9 @@ fun UploadedHubItem(
         }.launchIn(coroutineScope)
 
         onDispose {
-            player.close()
+            coroutineScope.launch {
+                player.close()
+            }
         }
     }
 
@@ -119,8 +120,8 @@ fun UploadedHubItem(
         }
     }
 
-    LaunchedEffect(event) {
-        event?.run {
+    LaunchedEffect(error) {
+        error?.run {
             notify(Notification(exception.localizedMessage))
         }
     }
@@ -140,13 +141,15 @@ fun UploadedHubItem(
                                             player.prepare(
                                                 location = hubItem.media.location.path,
                                                 enableAudio = true,
-                                                enableVideo = true,
-                                                hardwareAcceleration = HardwareAcceleration.CUDA
+                                                enableVideo = true
                                             )
                                             play()
                                         }
 
-                                        is PlayerState.Ready.Playing -> stop()
+                                        is PlayerState.Ready.Playing -> {
+                                            stop()
+                                            hoverInteractionSource.tryEmit(HoverInteraction.Enter())
+                                        }
 
                                         is PlayerState.Ready.Stopped -> play()
 

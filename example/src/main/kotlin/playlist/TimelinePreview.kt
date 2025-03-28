@@ -40,7 +40,7 @@ fun TimelinePreview(
     height: Float,
     format: VideoFormat,
     hoveredTimestamps: SharedFlow<HoveredTimestamp?>,
-    preview: suspend (timestampMillis: Long, width: Int, height: Int) -> Result<Frame.Video.Content?>,
+    preview: suspend (timestampMillis: Long, width: Int, height: Int) -> Frame.Video.Content?,
 ) {
     var previewJob by remember { mutableStateOf<Job?>(null) }
 
@@ -60,7 +60,7 @@ fun TimelinePreview(
                             hoveredTimestamp.millis,
                             scaledWidth.toInt(),
                             scaledHeight.toInt()
-                        ).getOrNull()?.let { frame ->
+                        )?.let { frame ->
                             TimelinePreviewItem(
                                 offset = Offset(hoveredTimestamp.offset.x, 0f),
                                 millis = hoveredTimestamp.millis,

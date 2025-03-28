@@ -13,11 +13,12 @@ import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 @Composable
 fun VolumeControls(
@@ -28,6 +29,8 @@ fun VolumeControls(
     changeVolume: suspend (Float) -> Unit,
     enabled: Boolean = true,
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(space = 8.dp, alignment = Alignment.CenterHorizontally),
@@ -35,8 +38,10 @@ fun VolumeControls(
     ) {
         IconButton(
             onClick = {
-                if (enabled) runBlocking {
-                    toggleMute()
+                if (enabled) {
+                    coroutineScope.launch {
+                        toggleMute()
+                    }
                 }
             }, modifier = Modifier.alpha(if (enabled) 1f else .25f)
         ) {

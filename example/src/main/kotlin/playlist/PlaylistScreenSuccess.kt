@@ -24,7 +24,6 @@ import com.github.numq.klarity.compose.renderer.Background
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.Renderer
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
@@ -77,7 +76,7 @@ fun PlaylistScreenSuccess(
 
     val renderer by player.renderer.collectAsState()
 
-    val event by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
+    val error by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
 
     val bufferTimestamp by player.bufferTimestamp.collectAsState()
 
@@ -109,6 +108,8 @@ fun PlaylistScreenSuccess(
 
     val pendingChannel = remember { Channel<PlaylistItem.Pending>(Channel.UNLIMITED) }
 
+    fun handleException(throwable: Throwable) = notify(Notification(throwable.localizedMessage))
+
     DisposableEffect(Unit) {
         uploadingJob = pendingChannel.consumeAsFlow().onEach { pendingItem ->
             coroutineScope.launch(Dispatchers.Default + Job()) {
@@ -116,10 +117,10 @@ fun PlaylistScreenSuccess(
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = PlaylistItem.Uploaded(
                         media = media,
-                        snapshot = SnapshotManager.snapshot(location = media.location.path) { 0L }.getOrNull()
+                        snapshot = SnapshotManager.snapshot(location = media.location.path) { 0L }.getOrThrow()
                     )
                     queue.replace(pendingItem, uploadedItem)
-                }.onFailure {
+                }.onFailure(::handleException).onFailure {
                     queue.delete(pendingItem)
                 }
             }
@@ -153,8 +154,8 @@ fun PlaylistScreenSuccess(
         }
     }
 
-    LaunchedEffect(event) {
-        event?.run {
+    LaunchedEffect(error) {
+        error?.run {
             notify(Notification(exception.localizedMessage))
         }
     }
@@ -162,20 +163,17 @@ fun PlaylistScreenSuccess(
     LaunchedEffect(selectedItem) {
         when (selectedItem) {
             is SelectedItem.Absent -> {
-                previewManager.release()
+                previewManager.release().onFailure(::handleException).getOrDefault(Unit)
                 player.release()
             }
 
             is SelectedItem.Present<*> -> ((selectedItem as? SelectedItem.Present<*>)?.item as? PlaylistItem.Uploaded)?.run {
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
-                        previewManager.prepare(location = media.location.path)
-                        player.prepare(
-                            location = media.location.path,
-                            enableAudio = true,
-                            enableVideo = true,
-                            hardwareAcceleration = HardwareAcceleration.CUDA
-                        )
+                        previewManager.prepare(
+                            location = media.location.path
+                        ).onFailure(::handleException).getOrDefault(Unit)
+                        player.prepare(location = media.location.path, enableAudio = true, enableVideo = true)
                         player.play()
                     }
 
@@ -197,14 +195,14 @@ fun PlaylistScreenSuccess(
                             }
 
                             else -> {
-                                previewManager.release()
-                                previewManager.prepare(location = media.location.path)
+                                previewManager.release().onFailure(::handleException).getOrDefault(Unit)
+                                previewManager.prepare(location = media.location.path).onFailure(::handleException)
+                                    .getOrDefault(Unit)
                                 player.release()
                                 player.prepare(
                                     location = media.location.path,
                                     enableAudio = true,
-                                    enableVideo = true,
-                                    hardwareAcceleration = HardwareAcceleration.CUDA
+                                    enableVideo = true
                                 )
                                 player.play()
                             }
@@ -453,7 +451,7 @@ fun PlaylistScreenSuccess(
                                                             timestampMillis = timestampMillis,
                                                             width = width,
                                                             height = height
-                                                        )
+                                                        ).onFailure(::handleException).getOrNull()
                                                     }
                                                 )
                                             }

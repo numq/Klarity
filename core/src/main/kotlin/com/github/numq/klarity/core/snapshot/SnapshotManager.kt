@@ -1,7 +1,6 @@
 package com.github.numq.klarity.core.snapshot
 
 import com.github.numq.klarity.core.closeable.use
-import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
@@ -9,13 +8,6 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
 object SnapshotManager {
-    /**
-     * Retrieves a list of available hardware acceleration methods for video decoding.
-     *
-     * @return A [Result] containing a list of supported [HardwareAcceleration] types.
-     */
-    suspend fun getAvailableHardwareAcceleration() = Decoder.getAvailableHardwareAcceleration()
-
     suspend fun snapshot(
         location: String,
         width: Int? = null,
