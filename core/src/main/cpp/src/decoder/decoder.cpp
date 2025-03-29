@@ -582,59 +582,43 @@ void Decoder::seekTo(long timestampMicros, bool keyframesOnly) {
 
     if (swVideoFrame) av_frame_unref(swVideoFrame.get());
 
-    if (audioCodecContext && audioStream) {
+    if (av_seek_frame(formatContext.get(), streamIndex, timestamp, seekFlags) < 0) {
+        throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+    }
+
+    if (audioCodecContext) {
+        avcodec_flush_buffers(audioCodecContext.get());
+
         audioBuffer.clear();
-
-        avcodec_flush_buffers(audioCodecContext.get());
-
-        if (av_seek_frame(formatContext.get(), audioStream->index, timestamp, seekFlags) < 0) {
-            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
-        }
-
-        avcodec_flush_buffers(audioCodecContext.get());
     }
-
-    if (videoCodecContext && videoStream) {
-        videoBuffer.clear();
-
-        avcodec_flush_buffers(videoCodecContext.get());
-
-        if (av_seek_frame(formatContext.get(), videoStream->index, timestamp, seekFlags) < 0) {
-            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
-        }
-
-        avcodec_flush_buffers(videoCodecContext.get());
-    }
-
-//    if (av_seek_frame(formatContext.get(), streamIndex, timestamp, seekFlags) < 0) {
-//        throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
-//    }
 
     if (videoCodecContext) {
-        if (videoStream) {
-            if (packet) {
-                av_packet_unref(packet.get());
-            }
+        avcodec_flush_buffers(videoCodecContext.get());
 
-            while (av_read_frame(formatContext.get(), packet.get()) == 0) {
-                if (packet->stream_index == streamIndex && (!(keyframesOnly && !(packet->flags & AV_PKT_FLAG_KEY)))) {
-                    if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
-                        av_packet_unref(packet.get());
+        videoBuffer.clear();
 
-                        continue;
-                    }
+        if (packet) {
+            av_packet_unref(packet.get());
+        }
 
-                    if (swVideoFrame) {
-                        av_frame_unref(swVideoFrame.get());
-                    }
+        while (av_read_frame(formatContext.get(), packet.get()) == 0) {
+            if (packet->stream_index == streamIndex && (!(keyframesOnly && !(packet->flags & AV_PKT_FLAG_KEY)))) {
+                if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
+                    av_packet_unref(packet.get());
 
-                    if ((avcodec_receive_frame(videoCodecContext.get(), swVideoFrame.get())) >= 0) {
-                        break;
-                    }
+                    continue;
                 }
 
-                av_packet_unref(packet.get());
+                if (swVideoFrame) {
+                    av_frame_unref(swVideoFrame.get());
+                }
+
+                if ((avcodec_receive_frame(videoCodecContext.get(), swVideoFrame.get())) >= 0) {
+                    break;
+                }
             }
+
+            av_packet_unref(packet.get());
         }
     }
 }
