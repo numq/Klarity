@@ -437,7 +437,7 @@ std::optional<Frame> Decoder::nextFrame(int width, int height) {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (!audioStream && !videoStream) {
+    if (!audioCodecContext && !videoCodecContext) {
         return std::nullopt;
     }
 
@@ -493,25 +493,42 @@ std::optional<Frame> Decoder::nextFrame(int width, int height) {
 
             int ret;
 
-            while ((ret = avcodec_receive_frame(
-                    videoCodecContext.get(),
-                    hwVideoFrame ? hwVideoFrame.get() : swVideoFrame.get()
-            )) == 0) {
-                auto timestamp = (hwVideoFrame ? hwVideoFrame : swVideoFrame)->best_effort_timestamp;
+            if (hwVideoFrame) {
+                while ((ret = avcodec_receive_frame(
+                        videoCodecContext.get(),
+                        hwVideoFrame.get()
+                )) == 0) {
+                    auto timestamp = hwVideoFrame->best_effort_timestamp;
 
-                if (hwVideoFrame) {
                     _transferFrameData();
+
+                    _processVideoFrame(width, height);
+
+                    const auto timestampMicros = timestamp == AV_NOPTS_VALUE ? 0 : av_rescale_q(
+                            timestamp,
+                            videoStream->time_base,
+                            AVRational{1, 1'000'000}
+                    );
+
+                    return Frame{Frame::VIDEO, timestampMicros, videoBuffer};
                 }
+            } else {
+                while ((ret = avcodec_receive_frame(
+                        videoCodecContext.get(),
+                        swVideoFrame.get()
+                )) == 0) {
+                    auto timestamp = swVideoFrame->best_effort_timestamp;
 
-                _processVideoFrame(width, height);
+                    _processVideoFrame(width, height);
 
-                const auto timestampMicros = timestamp == AV_NOPTS_VALUE ? 0 : av_rescale_q(
-                        timestamp,
-                        videoStream->time_base,
-                        AVRational{1, 1'000'000}
-                );
+                    const auto timestampMicros = timestamp == AV_NOPTS_VALUE ? 0 : av_rescale_q(
+                            timestamp,
+                            videoStream->time_base,
+                            AVRational{1, 1'000'000}
+                    );
 
-                return Frame{Frame::VIDEO, timestampMicros, videoBuffer};
+                    return Frame{Frame::VIDEO, timestampMicros, videoBuffer};
+                }
             }
 
             if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -532,7 +549,7 @@ void Decoder::seekTo(long timestampMicros, bool keyframesOnly) {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (!isSeekable || (!audioStream && !videoStream)) {
+    if (!isSeekable || (!audioCodecContext && !videoCodecContext) || (!audioStream && !videoStream)) {
         return;
     }
 
@@ -557,17 +574,41 @@ void Decoder::seekTo(long timestampMicros, bool keyframesOnly) {
         seekFlags |= AVSEEK_FLAG_ANY;
     }
 
-    if (audioCodecContext) {
+    if (packet) av_packet_unref(packet.get());
+
+    if (audioFrame) av_frame_unref(audioFrame.get());
+
+    if (hwVideoFrame) av_frame_unref(hwVideoFrame.get());
+
+    if (swVideoFrame) av_frame_unref(swVideoFrame.get());
+
+    if (audioCodecContext && audioStream) {
+        audioBuffer.clear();
+
+        avcodec_flush_buffers(audioCodecContext.get());
+
+        if (av_seek_frame(formatContext.get(), audioStream->index, timestamp, seekFlags) < 0) {
+            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+        }
+
         avcodec_flush_buffers(audioCodecContext.get());
     }
 
-    if (videoCodecContext) {
+    if (videoCodecContext && videoStream) {
+        videoBuffer.clear();
+
+        avcodec_flush_buffers(videoCodecContext.get());
+
+        if (av_seek_frame(formatContext.get(), videoStream->index, timestamp, seekFlags) < 0) {
+            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+        }
+
         avcodec_flush_buffers(videoCodecContext.get());
     }
 
-    if (av_seek_frame(formatContext.get(), streamIndex, timestamp, seekFlags) < 0) {
-        throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
-    }
+//    if (av_seek_frame(formatContext.get(), streamIndex, timestamp, seekFlags) < 0) {
+//        throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+//    }
 
     if (videoCodecContext) {
         if (videoStream) {
@@ -605,37 +646,31 @@ void Decoder::reset() {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (!isSeekable || (!audioStream && !videoStream)) {
+    if (!isSeekable || (!audioCodecContext && !videoCodecContext) || (!audioStream && !videoStream)) {
         return;
     }
 
-    av_packet_unref(packet.get());
+    if (packet) av_packet_unref(packet.get());
 
-    av_frame_unref(audioFrame.get());
+    if (audioFrame) av_frame_unref(audioFrame.get());
 
-    if (hwVideoFrame) {
-        av_frame_unref(hwVideoFrame.get());
-    }
+    if (hwVideoFrame) av_frame_unref(hwVideoFrame.get());
 
-    av_frame_unref(swVideoFrame.get());
-
-    if (audioCodecContext) {
-        avcodec_flush_buffers(audioCodecContext.get());
-    }
-
-    if (videoCodecContext) {
-        avcodec_flush_buffers(videoCodecContext.get());
-    }
+    if (swVideoFrame) av_frame_unref(swVideoFrame.get());
 
     if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_BACKWARD) < 0) {
         throw DecoderException("Error resetting stream");
     }
 
-    if (packet) {
-        av_packet_unref(packet.get());
+    if (audioCodecContext) {
+        avcodec_flush_buffers(audioCodecContext.get());
+
+        audioBuffer.clear();
     }
 
-    while (av_read_frame(formatContext.get(), packet.get()) == 0) {
-        break;
+    if (videoCodecContext) {
+        avcodec_flush_buffers(videoCodecContext.get());
+
+        videoBuffer.clear();
     }
 }

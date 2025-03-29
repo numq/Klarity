@@ -100,7 +100,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 formatClass,
                 formatConstructor,
                 location,
-                format.durationMicros,
+                static_cast<jlong>(format.durationMicros),
                 static_cast<jint>(format.sampleRate),
                 static_cast<jint>(format.channels),
                 static_cast<jint>(format.width),

@@ -100,7 +100,7 @@ private:
 
     const AVCodec *videoDecoder = nullptr;
 
-    bool isSeekable = true;
+    bool isSeekable = false;
 
     std::unique_ptr<SwrContext, SwrContextDeleter> swrContext;
 
