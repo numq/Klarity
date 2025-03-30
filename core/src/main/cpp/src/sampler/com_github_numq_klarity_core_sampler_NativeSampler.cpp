@@ -71,7 +71,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         jclass thisClass,
         jlong handle
 ) {
-    std::shared_lock<std::shared_mutex> lock(samplerMutex);
+    std::unique_lock<std::shared_mutex> lock(samplerMutex);
 
     try {
         auto sampler = getSamplerPointer(handle);
@@ -93,12 +93,14 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         jbyteArray bytes,
         jint size
 ) {
-    std::shared_lock<std::shared_mutex> lock(samplerMutex);
+    std::unique_lock<std::shared_mutex> lock(samplerMutex);
+
+    jbyte *byteArray = nullptr;
 
     try {
         auto sampler = getSamplerPointer(handle);
 
-        jbyte *byteArray = env->GetByteArrayElements(bytes, nullptr);
+        byteArray = env->GetByteArrayElements(bytes, nullptr);
 
         if (!byteArray) {
             throw std::runtime_error("Failed to get byte array elements");
@@ -116,6 +118,8 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         handleSamplerException(env, e.what());
     } catch (const std::exception &e) {
         handleRuntimeException(env, e.what());
+    } catch (...) {
+        if (byteArray) env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
     }
 }
 
@@ -124,7 +128,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         jclass thisClass,
         jlong handle
 ) {
-    std::shared_lock<std::shared_mutex> lock(samplerMutex);
+    std::unique_lock<std::shared_mutex> lock(samplerMutex);
 
     try {
         auto sampler = getSamplerPointer(handle);
@@ -142,7 +146,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         jclass thisClass,
         jlong handle
 ) {
-    std::shared_lock<std::shared_mutex> lock(samplerMutex);
+    std::unique_lock<std::shared_mutex> lock(samplerMutex);
 
     try {
         auto sampler = getSamplerPointer(handle);

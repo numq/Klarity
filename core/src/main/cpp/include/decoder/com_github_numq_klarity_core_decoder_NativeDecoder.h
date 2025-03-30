@@ -21,7 +21,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative
         (JNIEnv *, jclass, jlong);
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_nextFrameNative
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative
         (JNIEnv *, jclass, jlong, jint, jint);
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative

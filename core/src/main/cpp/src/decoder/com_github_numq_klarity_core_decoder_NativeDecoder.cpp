@@ -122,19 +122,19 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
     return nullptr;
 }
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_nextFrameNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
         jint width,
         jint height
 ) {
-    std::shared_lock<std::shared_mutex> lock(decoderMutex);
+    std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
     try {
         auto decoder = getDecoderPointer(handle);
 
-        auto frame = decoder->nextFrame(width, height);
+        auto frame = decoder->decode(width, height);
 
         if (frame.has_value()) {
             jbyteArray byteArray = env->NewByteArray(static_cast<jsize>(frame->bytes.size()));
@@ -182,7 +182,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_s
         jlong timestampMicros,
         jboolean keyframesOnly
 ) {
-    std::shared_lock<std::shared_mutex> lock(decoderMutex);
+    std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
     try {
         auto decoder = getDecoderPointer(handle);
@@ -202,7 +202,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_r
         jclass thisClass,
         jlong handle
 ) {
-    std::shared_lock<std::shared_mutex> lock(decoderMutex);
+    std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
     try {
         auto decoder = getDecoderPointer(handle);

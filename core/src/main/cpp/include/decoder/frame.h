@@ -4,11 +4,11 @@
 #include <vector>
 
 struct Frame {
-    enum FrameType {
+    enum Type {
         AUDIO, VIDEO
     };
 
-    FrameType type;
+    Type type;
     int64_t timestampMicros;
     std::vector<uint8_t> bytes;
 };

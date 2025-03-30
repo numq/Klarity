@@ -100,8 +100,6 @@ private:
 
     const AVCodec *videoDecoder = nullptr;
 
-    bool isSeekable = false;
-
     std::unique_ptr<SwrContext, SwrContextDeleter> swrContext;
 
     std::unique_ptr<SwsContext, SwsContextDeleter> swsContext;
@@ -120,17 +118,29 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    std::unique_ptr<AVBufferRef, AVBufferRefDeleter> hwDeviceContext;
-
     AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
+
+    bool _hasAudio();
+
+    bool _hasVideo();
+
+    bool _isValid();
+
+    bool _isHardwareAccelerated();
 
     void _prepareHardwareAcceleration();
 
-    void _prepareSwsContext(AVPixelFormat srcFormat, int width, int height, int dstWidth, int dstHeight);
+    void _prepareSwsContext(
+            AVPixelFormat srcFormat,
+            uint32_t width,
+            uint32_t height,
+            uint32_t dstWidth,
+            uint32_t dstHeight
+    );
 
     void _processAudioFrame();
 
-    void _processVideoFrame(int dstWidth, int dstHeight);
+    void _processVideoFrame(uint32_t dstWidth, uint32_t dstHeight);
 
     void _transferFrameData();
 
@@ -141,12 +151,12 @@ public:
             const std::string &location,
             bool findAudioStream,
             bool findVideoStream,
-            int hwDeviceType
+            uint32_t hwDeviceType
     );
 
     ~Decoder();
 
-    std::optional<Frame> nextFrame(int width, int height);
+    std::optional<Frame> decode(uint32_t width, uint32_t height);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 

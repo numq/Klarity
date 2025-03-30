@@ -25,9 +25,9 @@ private:
 
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
 
-    float playbackSpeedFactor = 1.0f;
+    std::atomic<float> playbackSpeedFactor = 1.0f;
 
-    float volume = 1.0f;
+    std::atomic<float> volume = 1.0f;
 
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
