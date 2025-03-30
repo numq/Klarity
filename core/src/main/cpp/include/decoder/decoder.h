@@ -76,9 +76,9 @@ private:
 
     std::shared_mutex mutex;
 
-    const AVSampleFormat sampleFormat = AV_SAMPLE_FMT_FLT;
+    const AVSampleFormat targetSampleFormat = AV_SAMPLE_FMT_FLT;
 
-    const AVPixelFormat pixelFormat = AV_PIX_FMT_RGBA;
+    const AVPixelFormat targetPixelFormat = AV_PIX_FMT_RGBA;
 
     const int swsFlags = SWS_BILINEAR;
 
