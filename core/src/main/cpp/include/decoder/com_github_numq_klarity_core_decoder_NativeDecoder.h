@@ -12,26 +12,54 @@
 extern "C" {
 #endif
 
-JNIEXPORT jintArray JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative
-        (JNIEnv *, jclass);
+JNIEXPORT jintArray
+JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative(
+        JNIEnv *env,
+        jclass thisClass
+);
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative
-        (JNIEnv *, jclass, jstring, jboolean, jboolean, jint);
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jstring location,
+        jboolean findAudioStream,
+        jboolean findVideoStream,
+        jint hardwareAcceleration
+);
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative
-        (JNIEnv *, jclass, jlong);
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative
-        (JNIEnv *, jclass, jlong, jint, jint);
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle,
+        jint width,
+        jint height
+);
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative
-        (JNIEnv *, jclass, jlong, jlong, jboolean);
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle,
+        jlong timestampMicros,
+        jboolean keyframesOnly
+);
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_resetNative
-        (JNIEnv *, jclass, jlong);
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_resetNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_deleteNative
-        (JNIEnv *, jclass, jlong);
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_deleteNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
 
 #ifdef __cplusplus
 }

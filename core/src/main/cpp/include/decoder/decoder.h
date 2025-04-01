@@ -68,12 +68,6 @@ private:
         }
     };
 
-    struct AVBufferRefDeleter {
-        void operator()(AVBufferRef *p) const {
-            av_buffer_unref(&p);
-        }
-    };
-
     std::shared_mutex mutex;
 
     const AVSampleFormat targetSampleFormat = AV_SAMPLE_FMT_FLT;

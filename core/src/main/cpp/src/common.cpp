@@ -24,22 +24,6 @@ jclass frameClass = nullptr;
 
 jmethodID frameConstructor = nullptr;
 
-void handleRuntimeException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(runtimeExceptionClass, errorMessage.c_str());
-}
-
-void handleDecoderException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(decoderExceptionClass, errorMessage.c_str());
-}
-
-void handleHardwareAccelerationException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(hardwareAccelerationExceptionClass, errorMessage.c_str());
-}
-
-void handleSamplerException(JNIEnv *env, const std::string &errorMessage) {
-    env->ThrowNew(samplerExceptionClass, errorMessage.c_str());
-}
-
 Decoder *getDecoderPointer(jlong handle) {
     auto it = decoderPointers.find(handle);
     if (it == decoderPointers.end()) {
@@ -104,7 +88,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     }
 
     hardwareAccelerationExceptionClass = reinterpret_cast<jclass>(
-            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/decoder/HardwareAccelerationException"))
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/hwaccel/HardwareAccelerationException"))
     );
     if (hardwareAccelerationExceptionClass == nullptr) {
         return JNI_ERR;
@@ -117,7 +101,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    formatClass = (jclass) env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/format/NativeFormat"));
+    formatClass = reinterpret_cast<jclass>(env->NewGlobalRef(
+            env->FindClass("com/github/numq/klarity/core/format/NativeFormat")));
     if (formatClass == nullptr) {
         return JNI_ERR;
     }
@@ -127,7 +112,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    frameClass = (jclass) env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeFrame"));
+    frameClass = reinterpret_cast<jclass>(env->NewGlobalRef(
+            env->FindClass("com/github/numq/klarity/core/frame/NativeFrame")));
     if (frameClass == nullptr) {
         return JNI_ERR;
     }

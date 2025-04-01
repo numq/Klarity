@@ -1,37 +1,25 @@
 #include "com_github_numq_klarity_core_decoder_NativeDecoder.h"
 
-JNIEXPORT jintArray JNICALL
-Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative(
+JNIEXPORT jintArray
+JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative(
         JNIEnv *env,
         jclass thisClass
 ) {
-    std::shared_lock<std::shared_mutex> lock(decoderMutex);
-
-    try {
+    return handleException<jintArray>(env, [&] {
         auto hwAccels = HardwareAcceleration::getAvailableHardwareAcceleration();
 
         auto size = static_cast<jsize>(hwAccels.size());
-        if (size == 0) {
-            return nullptr;
-        }
 
         auto result = env->NewIntArray(size);
-        if (!result) {
-            return nullptr;
+
+        if (result) {
+            env->SetIntArrayRegion(result, 0, size, reinterpret_cast<const jint *>(hwAccels.data()));
+
+            return result;
         }
 
-        env->SetIntArrayRegion(result, 0, size, reinterpret_cast<const jint *>(hwAccels.data()));
-
-        return result;
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
-
-    return nullptr;
+        return static_cast<jintArray>(nullptr);
+    }, nullptr);
 }
 
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
@@ -42,13 +30,13 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jboolean findVideoStream,
         jint hardwareAcceleration
 ) {
-    std::unique_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException<jlong>(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
-        const char *locationChars = env->GetStringUTFChars(location, nullptr);
+        auto locationChars = env->GetStringUTFChars(location, nullptr);
 
         if (!locationChars) {
-            throw std::runtime_error("Failed to get location string");
+            throw std::runtime_error("Unable to get location string");
         }
 
         std::string locationStr(locationChars);
@@ -67,15 +55,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         decoderPointers[handle] = std::move(decoder);
 
         return handle;
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
-
-    return -1;
+    }, -1);
 }
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
@@ -83,20 +63,20 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jclass thisClass,
         jlong handle
 ) {
-    std::shared_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException<jobject>(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
         auto decoder = getDecoderPointer(handle);
 
         auto format = decoder->format;
 
-        jstring location = env->NewStringUTF(format.location.c_str());
+        auto location = env->NewStringUTF(format.location.c_str());
 
         if (!location) {
-            throw std::runtime_error("Failed to create location string");
+            throw std::runtime_error("Could not create location string");
         }
 
-        jobject javaObject = env->NewObject(
+        auto javaObject = env->NewObject(
                 formatClass,
                 formatConstructor,
                 location,
@@ -111,15 +91,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         env->DeleteLocalRef(location);
 
         return javaObject;
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
-
-    return nullptr;
+    }, nullptr);
 }
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
@@ -129,28 +101,30 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jint width,
         jint height
 ) {
-    std::unique_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException<jobject>(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
         auto decoder = getDecoderPointer(handle);
 
         auto frame = decoder->decode(width, height);
 
         if (frame.has_value()) {
-            jbyteArray byteArray = env->NewByteArray(static_cast<jsize>(frame->bytes.size()));
+            auto size = static_cast<jsize>(frame->bytes.size());
 
-            if (byteArray == nullptr) {
-                throw std::runtime_error("Failed to allocate byte array for frame data");
+            auto byteArray = env->NewByteArray(size);
+
+            if (!byteArray) {
+                throw std::runtime_error("Could not create byte array");
             }
 
             env->SetByteArrayRegion(
                     byteArray,
                     0,
-                    static_cast<jsize>(frame->bytes.size()),
+                    size,
                     reinterpret_cast<const jbyte *>(frame->bytes.data())
             );
 
-            jobject javaObject = env->NewObject(
+            auto javaObject = env->NewObject(
                     frameClass,
                     frameConstructor,
                     static_cast<jint>(frame->type),
@@ -160,19 +134,15 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 
             env->DeleteLocalRef(byteArray);
 
+            if (!javaObject) {
+                throw std::runtime_error("Could not create frame object");
+            }
+
             return javaObject;
         }
 
-        return nullptr;
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
-
-    return nullptr;
+        return static_cast<jobject>(nullptr);
+    }, nullptr);
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
@@ -182,19 +152,13 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_s
         jlong timestampMicros,
         jboolean keyframesOnly
 ) {
-    std::unique_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
         auto decoder = getDecoderPointer(handle);
 
         decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly);
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
+    });
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_resetNative(
@@ -202,19 +166,13 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_r
         jclass thisClass,
         jlong handle
 ) {
-    std::unique_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
         auto decoder = getDecoderPointer(handle);
 
         decoder->reset();
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
+    });
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_deleteNative(
@@ -222,15 +180,9 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_d
         jclass thisClass,
         jlong handle
 ) {
-    std::unique_lock<std::shared_mutex> lock(decoderMutex);
+    return handleException(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
 
-    try {
         deleteDecoderPointer(handle);
-    } catch (const DecoderException &e) {
-        handleDecoderException(env, e.what());
-    } catch (const HardwareAccelerationException &e) {
-        handleHardwareAccelerationException(env, e.what());
-    } catch (const std::exception &e) {
-        handleRuntimeException(env, e.what());
-    }
+    });
 }

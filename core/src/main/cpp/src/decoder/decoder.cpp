@@ -282,8 +282,6 @@ void Decoder::_transferFrameData() {
         throw HardwareAccelerationException("Invalid transfer frames");
     }
 
-    swVideoFrame->best_effort_timestamp = hwVideoFrame->best_effort_timestamp;
-
     if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
         throw HardwareAccelerationException("Error transferring frame to system memory");
     }
@@ -511,44 +509,44 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                 throw DecoderException("Error while receiving audio frame");
             }
         } else if (_hasVideo() && packet->stream_index == videoStream->index) {
-            if (packet->stream_index == videoStream->index) {
-                if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
-                    av_packet_unref(packet.get());
+            if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
+                av_packet_unref(packet.get());
 
-                    continue;
-                }
+                continue;
+            }
 
+            if (_isHardwareAccelerated()) {
+                av_frame_unref(hwVideoFrame.get());
+            }
+
+            av_frame_unref(swVideoFrame.get());
+
+            int ret;
+            while ((ret = avcodec_receive_frame(
+                    videoCodecContext.get(),
+                    _isHardwareAccelerated() ? hwVideoFrame.get() : swVideoFrame.get()
+            )) == 0) {
                 if (_isHardwareAccelerated()) {
-                    av_frame_unref(hwVideoFrame.get());
+                    _transferFrameData();
                 }
 
-                av_frame_unref(swVideoFrame.get());
+                _processVideoFrame(width, height);
 
-                int ret;
-                while ((ret = avcodec_receive_frame(
-                        videoCodecContext.get(),
-                        _isHardwareAccelerated() ? hwVideoFrame.get() : swVideoFrame.get()
-                )) == 0) {
-                    if (_isHardwareAccelerated()) {
-                        _transferFrameData();
-                    }
+                const auto frameTimestampMicros =
+                        _isHardwareAccelerated() ? hwVideoFrame->best_effort_timestamp
+                                                 : swVideoFrame->best_effort_timestamp;
 
-                    _processVideoFrame(width, height);
+                const auto timestampMicros = frameTimestampMicros == AV_NOPTS_VALUE ? 0 : av_rescale_q(
+                        frameTimestampMicros,
+                        videoStream->time_base,
+                        AVRational{1, 1'000'000}
+                );
 
-                    const auto frameTimestampMicros = swVideoFrame->best_effort_timestamp;
+                return Frame{Frame::Type::VIDEO, timestampMicros, videoBuffer};
+            }
 
-                    const auto timestampMicros = frameTimestampMicros == AV_NOPTS_VALUE ? 0 : av_rescale_q(
-                            frameTimestampMicros,
-                            videoStream->time_base,
-                            AVRational{1, 1'000'000}
-                    );
-
-                    return Frame{Frame::Type::VIDEO, timestampMicros, videoBuffer};
-                }
-
-                if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-                    throw DecoderException("Error while receiving video frame");
-                }
+            if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                throw DecoderException("Error while receiving video frame");
             }
         }
 
@@ -653,7 +651,7 @@ void Decoder::reset() {
 
     if (hwVideoFrame) av_frame_unref(hwVideoFrame.get());
 
-    if (av_seek_frame(formatContext.get(), -1, -100, AVSEEK_FLAG_ANY) < 0) {
+    if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_ANY) < 0) {
         throw DecoderException("Error resetting stream");
     }
 

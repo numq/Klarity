@@ -34,14 +34,6 @@ extern jclass frameClass;
 
 extern jmethodID frameConstructor;
 
-extern void handleRuntimeException(JNIEnv *env, const std::string &errorMessage);
-
-extern void handleDecoderException(JNIEnv *env, const std::string &errorMessage);
-
-extern void handleHardwareAccelerationException(JNIEnv *env, const std::string &errorMessage);
-
-extern void handleSamplerException(JNIEnv *env, const std::string &errorMessage);
-
 extern Decoder *getDecoderPointer(jlong handle);
 
 extern Sampler *getSamplerPointer(jlong handle);
@@ -49,5 +41,44 @@ extern Sampler *getSamplerPointer(jlong handle);
 extern void deleteDecoderPointer(jlong handle);
 
 extern void deleteSamplerPointer(jlong handle);
+
+inline void handleException(JNIEnv *env, const std::function<void()> &call) {
+    try {
+        call();
+    } catch (const SamplerException &e) {
+        env->ThrowNew(samplerExceptionClass, e.what());
+    } catch (const DecoderException &e) {
+        env->ThrowNew(decoderExceptionClass, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        env->ThrowNew(hardwareAccelerationExceptionClass, e.what());
+    } catch (const std::bad_alloc &e) {
+        env->ThrowNew(runtimeExceptionClass, "Memory allocation failed");
+    } catch (const std::exception &e) {
+        env->ThrowNew(runtimeExceptionClass, e.what());
+    } catch (...) {
+        env->ThrowNew(runtimeExceptionClass, "Unexpected native exception");
+    }
+}
+
+template<typename T>
+inline T handleException(JNIEnv *env, const std::function<T()> &call, T defaultValue) {
+    try {
+        return call();
+    } catch (const SamplerException &e) {
+        env->ThrowNew(samplerExceptionClass, e.what());
+    } catch (const DecoderException &e) {
+        env->ThrowNew(decoderExceptionClass, e.what());
+    } catch (const HardwareAccelerationException &e) {
+        env->ThrowNew(hardwareAccelerationExceptionClass, e.what());
+    } catch (const std::bad_alloc &e) {
+        env->ThrowNew(runtimeExceptionClass, "Memory allocation failed");
+    } catch (const std::exception &e) {
+        env->ThrowNew(runtimeExceptionClass, e.what());
+    } catch (...) {
+        env->ThrowNew(runtimeExceptionClass, "Unexpected native exception");
+    }
+
+    return defaultValue;
+}
 
 #endif // KLARITY_COMMON_H
