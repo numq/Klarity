@@ -277,16 +277,6 @@ void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
     }
 }
 
-void Decoder::_transferFrameData() {
-    if (!swVideoFrame || !hwVideoFrame) {
-        throw HardwareAccelerationException("Invalid transfer frames");
-    }
-
-    if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
-        throw HardwareAccelerationException("Error transferring frame to system memory");
-    }
-}
-
 Decoder::Decoder(
         const std::string &location,
         const bool findAudioStream,
@@ -444,6 +434,10 @@ Decoder::Decoder(
             format.height = videoCodecContext->height;
 
             format.frameRate = av_q2d(videoStream->avg_frame_rate);
+
+            if (!audioStream && videoStream->nb_frames <= 1) {
+                format.durationMicros = 0;
+            }
         }
     }
 
@@ -527,7 +521,9 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                     _isHardwareAccelerated() ? hwVideoFrame.get() : swVideoFrame.get()
             )) == 0) {
                 if (_isHardwareAccelerated()) {
-                    _transferFrameData();
+                    if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
+                        throw DecoderException("Error transferring frame to system memory");
+                    }
                 }
 
                 _processVideoFrame(width, height);

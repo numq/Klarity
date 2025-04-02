@@ -136,8 +136,6 @@ private:
 
     void _processVideoFrame(uint32_t dstWidth, uint32_t dstHeight);
 
-    void _transferFrameData();
-
 public:
     Format format;
 
