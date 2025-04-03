@@ -320,9 +320,9 @@ internal class DefaultPlayerController(
                         height = format.height,
                         frameRate = format.frameRate,
                         preview = with(decoder) {
-                            val frame = decode(null, null).getOrNull() as? Frame.Video.Content
-
-                            reset()
+                            val frame = decode(null, null).onSuccess {
+                                reset().getOrDefault(Unit)
+                            }.getOrNull() as? Frame.Video.Content
 
                             frame
                         })
@@ -365,9 +365,9 @@ internal class DefaultPlayerController(
                         height = videoFormat.height,
                         frameRate = videoFormat.frameRate,
                         preview = with(videoDecoder) {
-                            val frame = decode(null, null).getOrNull() as? Frame.Video.Content
-
-                            reset()
+                            val frame = decode(null, null).onSuccess {
+                                reset().getOrDefault(Unit)
+                            }.getOrNull() as? Frame.Video.Content
 
                             frame
                         })
@@ -417,9 +417,11 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
-        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
-            handlePlaybackCompletion()
-        }).getOrThrow()
+        playbackLoop.start(
+            onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
+                handlePlaybackCompletion()
+            }
+        ).getOrThrow()
 
         bufferLoop.start(
             onTimestamp = ::handleBufferTimestamp,
@@ -457,9 +459,11 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
-        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
-            handlePlaybackCompletion()
-        }).getOrThrow()
+        playbackLoop.start(
+            onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
+                handlePlaybackCompletion()
+            }
+        ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
@@ -546,9 +550,11 @@ internal class DefaultPlayerController(
 
         currentCoroutineContext().ensureActive()
 
-        bufferLoop.start(onTimestamp = ::handleBufferTimestamp,
+        bufferLoop.start(
+            onTimestamp = ::handleBufferTimestamp,
             onWaiting = ::handleBufferWaiting,
-            endOfMedia = { handleBufferCompletion() }).getOrThrow()
+            endOfMedia = { handleBufferCompletion() }
+        ).getOrThrow()
 
         currentCoroutineContext().ensureActive()
 
