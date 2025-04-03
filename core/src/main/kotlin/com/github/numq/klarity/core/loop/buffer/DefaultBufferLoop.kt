@@ -1,7 +1,6 @@
 package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
@@ -18,7 +17,7 @@ internal class DefaultBufferLoop(
 ) : BufferLoop {
     private val mutex = Mutex()
 
-    private val coroutineContext = Dispatchers.Default + Job()
+    private val coroutineContext = Dispatchers.Default + SupervisorJob()
 
     private val coroutineScope = CoroutineScope(coroutineContext)
 
@@ -37,7 +36,7 @@ internal class DefaultBufferLoop(
         isWaiting.set(true)
 
         while (isActive && isBuffering.get()) {
-            when (val frame = decoder.nextFrame(null, null).getOrNull()) {
+            when (val frame = decoder.decode(null, null).getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
@@ -80,7 +79,7 @@ internal class DefaultBufferLoop(
         isWaiting.set(true)
 
         while (isActive && isBuffering.get()) {
-            when (val frame = decoder.nextFrame(null, null).getOrNull()) {
+            when (val frame = decoder.decode(null, null).getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
@@ -124,10 +123,10 @@ internal class DefaultBufferLoop(
 
             require(job == null) { "Unable to start buffer loop" }
 
+            isBuffering.set(true)
+
             job = coroutineScope.launch {
                 try {
-                    isBuffering.set(true)
-
                     when (pipeline) {
                         is Pipeline.AudioVideo -> {
                             val audioTimestamps = MutableSharedFlow<Timestamp>()
@@ -203,29 +202,19 @@ internal class DefaultBufferLoop(
     }
 
     override suspend fun stop() = mutex.withLock {
-        isBuffering.set(false)
-
-        isWaiting.set(false)
-
         runCatching {
-            job?.cancelAndJoin()
+            job?.cancel()
             job = null
 
-            when (pipeline) {
-                is Pipeline.AudioVideo -> {
-                    pipeline.audioBuffer.flush().getOrThrow()
+            isWaiting.set(false)
 
-                    pipeline.videoBuffer.flush().getOrThrow()
-                }
-
-                is Pipeline.Audio -> pipeline.buffer.flush().getOrThrow()
-
-                is Pipeline.Video -> pipeline.buffer.flush().getOrThrow()
-            }
+            isBuffering.set(false)
         }
     }
 
-    override suspend fun close() = mutex.withLock {
-        coroutineContext.cancelChildrenAndJoin()
+    override suspend fun close() = runCatching {
+        stop().getOrThrow()
+
+        coroutineScope.cancel()
     }
 }

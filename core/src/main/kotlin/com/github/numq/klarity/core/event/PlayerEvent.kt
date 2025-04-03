@@ -4,7 +4,6 @@ package com.github.numq.klarity.core.event
  * Sealed interface representing various events that can occur in the player.
  */
 sealed interface PlayerEvent {
-
     /**
      * Represents an error event containing the exception that occurred.
      *

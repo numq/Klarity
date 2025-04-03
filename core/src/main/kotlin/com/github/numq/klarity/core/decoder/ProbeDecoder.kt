@@ -1,6 +1,7 @@
 package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -11,7 +12,10 @@ internal class ProbeDecoder(
 ) : Decoder<Media, Frame.Probe> {
     private val mutex = Mutex()
 
-    override suspend fun nextFrame(width: Int?, height: Int?) = mutex.withLock {
+    override val hardwareAcceleration =
+        HardwareAcceleration.fromNative(decoder.hardwareAcceleration) ?: HardwareAcceleration.None
+
+    override suspend fun decode(width: Int?, height: Int?) = mutex.withLock {
         Result.success(Frame.Probe)
     }
 
@@ -24,6 +28,8 @@ internal class ProbeDecoder(
     }
 
     override suspend fun close() = mutex.withLock {
-        decoder.close()
+        runCatching {
+            decoder.close()
+        }
     }
 }

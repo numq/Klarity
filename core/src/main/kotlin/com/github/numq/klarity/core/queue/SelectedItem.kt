@@ -6,7 +6,6 @@ package com.github.numq.klarity.core.queue
  * @param <Item> The type of the selected media item.
  */
 sealed interface SelectedItem<out Item> {
-
     /**
      * Indicates that no item is currently selected in the queue.
      */

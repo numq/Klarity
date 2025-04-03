@@ -13,7 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
@@ -57,9 +57,7 @@ fun TimelinePreview(
                         minOf(format.width.toFloat(), format.height.toFloat())
                     ).let { (scaledWidth, scaledHeight) ->
                         preview(
-                            hoveredTimestamp.millis,
-                            scaledWidth.toInt(),
-                            scaledHeight.toInt()
+                            hoveredTimestamp.millis, scaledWidth.toInt(), scaledHeight.toInt()
                         )?.let { frame ->
                             TimelinePreviewItem(
                                 offset = Offset(hoveredTimestamp.offset.x, 0f),
@@ -89,7 +87,7 @@ fun TimelinePreview(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.CenterVertically)
                 ) {
-                    Renderer(modifier = Modifier.size(width = width.dp, height = height.dp),
+                    RendererComponent(modifier = Modifier.size(width = width.dp, height = height.dp),
                         foreground = Foreground.Frame(frame = preview.frame, scale = ImageScale.Crop),
                         placeholder = { Icon(Icons.Default.BrokenImage, null) })
                     Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {

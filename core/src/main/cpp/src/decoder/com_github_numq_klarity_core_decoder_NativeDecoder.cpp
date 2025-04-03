@@ -27,8 +27,12 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jclass thisClass,
         jstring location,
         jboolean findAudioStream,
+        jboolean prepareAudioStream,
         jboolean findVideoStream,
-        jint hardwareAcceleration
+        jboolean prepareVideoStream,
+        jint hardwareAcceleration,
+        jintArray hardwareAccelerationFallbackCandidates,
+        jboolean useSoftwareAccelerationFallback
 ) {
     return handleException<jlong>(env, [&] {
         std::unique_lock<std::shared_mutex> lock(decoderMutex);
@@ -43,11 +47,30 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
 
         env->ReleaseStringUTFChars(location, locationChars);
 
+        auto intArray = env->GetIntArrayElements(hardwareAccelerationFallbackCandidates, nullptr);
+
+        if (!intArray) {
+            throw std::runtime_error("Could not get int array elements");
+        }
+
+        auto size = env->GetArrayLength(hardwareAccelerationFallbackCandidates);
+
+        std::vector<uint32_t> hwDeviceTypeCandidates(
+                intArray,
+                intArray + size
+        );
+
+        env->ReleaseIntArrayElements(hardwareAccelerationFallbackCandidates, intArray, 0);
+
         auto decoder = std::make_unique<Decoder>(
                 locationStr,
                 findAudioStream,
+                prepareAudioStream,
                 findVideoStream,
-                hardwareAcceleration
+                prepareVideoStream,
+                hardwareAcceleration,
+                hwDeviceTypeCandidates,
+                useSoftwareAccelerationFallback
         );
 
         auto handle = reinterpret_cast<jlong>(decoder.get());
@@ -94,6 +117,20 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
     }, nullptr);
 }
 
+JNIEXPORT jint JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getHardwareAccelerationNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+) {
+    return handleException<jint>(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
+
+        auto decoder = getDecoderPointer(handle);
+
+        return decoder->hwDeviceType;
+    }, 0);
+}
+
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
         JNIEnv *env,
         jclass thisClass,
@@ -123,6 +160,10 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                     size,
                     reinterpret_cast<const jbyte *>(frame->bytes.data())
             );
+
+            frame->bytes.clear();
+
+            frame->bytes.shrink_to_fit();
 
             auto javaObject = env->NewObject(
                     frameClass,

@@ -3,14 +3,17 @@ package com.github.numq.klarity.core.controller
 import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
-import com.github.numq.klarity.core.closeable.use
 import com.github.numq.klarity.core.command.Command
-import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
-import com.github.numq.klarity.core.decoder.*
+import com.github.numq.klarity.core.decoder.AudioDecoderFactory
+import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
+import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoop
@@ -26,7 +29,8 @@ import com.github.numq.klarity.core.state.InternalPlayerState
 import com.github.numq.klarity.core.state.PlayerState
 import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicReference
@@ -77,29 +81,13 @@ internal class DefaultPlayerController(
     private suspend fun applySettings(pipeline: Pipeline, settings: PlayerSettings) = runCatching {
         when (pipeline) {
             is Pipeline.AudioVideo -> {
-                if (pipeline.audioBuffer.capacity != settings.audioBufferSize) {
-                    pipeline.audioBuffer.resize(newCapacity = settings.audioBufferSize).getOrDefault(Unit)
-                }
-                if (pipeline.videoBuffer.capacity != settings.videoBufferSize) {
-                    pipeline.videoBuffer.resize(newCapacity = settings.videoBufferSize).getOrDefault(Unit)
-                }
                 pipeline.sampler.applySettings(settings)
                 pipeline.renderer.applySettings(settings)
             }
 
-            is Pipeline.Audio -> {
-                if (pipeline.buffer.capacity != settings.audioBufferSize) {
-                    pipeline.buffer.resize(newCapacity = settings.audioBufferSize).getOrDefault(Unit)
-                }
-                pipeline.sampler.applySettings(settings)
-            }
+            is Pipeline.Audio -> pipeline.sampler.applySettings(settings)
 
-            is Pipeline.Video -> {
-                if (pipeline.buffer.capacity != settings.videoBufferSize) {
-                    pipeline.buffer.resize(newCapacity = settings.videoBufferSize).getOrDefault(Unit)
-                }
-                pipeline.renderer.applySettings(settings)
-            }
+            is Pipeline.Video -> pipeline.renderer.applySettings(settings)
         }
     }
 
@@ -276,94 +264,126 @@ internal class DefaultPlayerController(
         audioBufferSize: Int,
         videoBufferSize: Int,
         hardwareAcceleration: HardwareAcceleration,
+        hardwareAccelerationFallback: HardwareAccelerationFallback,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
-        val media = probeDecoderFactory.create(
+        val probeDecoder = probeDecoderFactory.create(
             ProbeDecoderFactory.Parameters(
                 location = location,
                 findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
                 findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE,
-                hardwareAcceleration = hardwareAcceleration
+                hardwareAcceleration = hardwareAcceleration,
+                hardwareAccelerationFallback = hardwareAccelerationFallback
             )
-        ).getOrThrow().use(Decoder<Media, Frame.Probe>::media)
+        ).getOrThrow()
 
-        val audioPipeline = when (media) {
-            is Media.AudioVideo -> media.audioFormat
-
-            is Media.Audio -> media.format
-
-            is Media.Video -> null
-        }?.run {
-            val decoder = audioDecoderFactory.create(
-                parameters = AudioDecoderFactory.Parameters(location = location)
-            ).getOrThrow()
-
-            val buffer = audioBufferFactory.create(
-                parameters = AudioBufferFactory.Parameters(capacity = audioBufferSize)
-            ).getOrThrow()
-
-            val sampler = samplerFactory.create(
-                parameters = SamplerFactory.Parameters(sampleRate = sampleRate, channels = channels)
-            ).getOrThrow()
-
-            Pipeline.Audio(media = media, decoder = decoder, buffer = buffer, sampler = sampler)
+        val media = try {
+            probeDecoder.media
+        } finally {
+            probeDecoder.close().getOrThrow()
         }
 
-        val videoPipeline = when (media) {
-            is Media.AudioVideo -> media.videoFormat
+        val pipeline = when (media) {
+            is Media.Audio -> with(media) {
+                val decoder = audioDecoderFactory.create(
+                    parameters = AudioDecoderFactory.Parameters(location = location)
+                ).getOrThrow()
 
-            is Media.Audio -> null
+                val buffer = audioBufferFactory.create(
+                    parameters = AudioBufferFactory.Parameters(capacity = audioBufferSize)
+                ).getOrThrow()
 
-            is Media.Video -> media.format
-        }?.run {
-            val decoder = videoDecoderFactory.create(
-                parameters = VideoDecoderFactory.Parameters(
-                    location = location,
-                    hardwareAcceleration = hardwareAcceleration
+                val sampler = samplerFactory.create(
+                    parameters = SamplerFactory.Parameters(sampleRate = format.sampleRate, channels = format.channels)
+                ).getOrThrow()
+
+                Pipeline.Audio(media = media, decoder = decoder, buffer = buffer, sampler = sampler)
+            }
+
+            is Media.Video -> with(media) {
+                val decoder = videoDecoderFactory.create(
+                    parameters = VideoDecoderFactory.Parameters(
+                        location = location,
+                        hardwareAcceleration = hardwareAcceleration,
+                        hardwareAccelerationFallback = hardwareAccelerationFallback
+                    )
+                ).getOrThrow()
+
+                val buffer = videoBufferFactory.create(
+                    parameters = VideoBufferFactory.Parameters(capacity = videoBufferSize)
+                ).getOrThrow()
+
+                val renderer = rendererFactory.create(
+                    parameters = RendererFactory.Parameters(
+                        width = format.width,
+                        height = format.height,
+                        frameRate = format.frameRate,
+                        preview = with(decoder) {
+                            val frame = decode(null, null).getOrNull() as? Frame.Video.Content
+
+                            reset()
+
+                            frame
+                        })
+                ).getOrThrow()
+
+                Pipeline.Video(media = media, decoder = decoder, buffer = buffer, renderer = renderer)
+            }
+
+            is Media.AudioVideo -> with(media) {
+                val audioDecoder = audioDecoderFactory.create(
+                    parameters = AudioDecoderFactory.Parameters(location = location)
+                ).getOrThrow()
+
+                val audioBuffer = audioBufferFactory.create(
+                    parameters = AudioBufferFactory.Parameters(capacity = audioBufferSize)
+                ).getOrThrow()
+
+                val sampler = samplerFactory.create(
+                    parameters = SamplerFactory.Parameters(
+                        sampleRate = audioFormat.sampleRate,
+                        channels = audioFormat.channels
+                    )
+                ).getOrThrow()
+
+                val videoDecoder = videoDecoderFactory.create(
+                    parameters = VideoDecoderFactory.Parameters(
+                        location = location,
+                        hardwareAcceleration = hardwareAcceleration,
+                        hardwareAccelerationFallback = hardwareAccelerationFallback
+                    )
+                ).getOrThrow()
+
+                val videoBuffer = videoBufferFactory.create(
+                    parameters = VideoBufferFactory.Parameters(capacity = videoBufferSize)
+                ).getOrThrow()
+
+                val renderer = rendererFactory.create(
+                    parameters = RendererFactory.Parameters(
+                        width = videoFormat.width,
+                        height = videoFormat.height,
+                        frameRate = videoFormat.frameRate,
+                        preview = with(videoDecoder) {
+                            val frame = decode(null, null).getOrNull() as? Frame.Video.Content
+
+                            reset()
+
+                            frame
+                        })
+                ).getOrThrow()
+
+                Pipeline.AudioVideo(
+                    media = media,
+                    audioDecoder = audioDecoder,
+                    videoDecoder = videoDecoder,
+                    audioBuffer = audioBuffer,
+                    videoBuffer = videoBuffer,
+                    sampler = sampler,
+                    renderer = renderer
                 )
-            ).getOrThrow()
-
-            val buffer = videoBufferFactory.create(
-                parameters = VideoBufferFactory.Parameters(capacity = videoBufferSize)
-            ).getOrThrow()
-
-            val renderer = rendererFactory.create(
-                parameters = RendererFactory.Parameters(
-                    width = width,
-                    height = height,
-                    frameRate = frameRate,
-                    preview = with(decoder) {
-                        val frame = nextFrame(null, null).getOrNull() as? Frame.Video.Content
-
-                        reset()
-
-                        frame
-                    })
-            ).getOrThrow()
-
-            Pipeline.Video(media = media, decoder = decoder, buffer = buffer, renderer = renderer)
+            }
         }
-
-        val pipeline = when {
-            audioPipeline != null && videoPipeline != null -> Pipeline.AudioVideo(
-                media = media,
-                audioDecoder = audioPipeline.decoder,
-                videoDecoder = videoPipeline.decoder,
-                audioBuffer = audioPipeline.buffer,
-                videoBuffer = videoPipeline.buffer,
-                sampler = audioPipeline.sampler,
-                renderer = videoPipeline.renderer
-            )
-
-            audioPipeline != null -> audioPipeline
-
-            videoPipeline != null -> videoPipeline
-
-            else -> null
-        }
-
-        checkNotNull(pipeline) { "Unsupported media" }
 
         applySettings(pipeline, settings.value)
 
@@ -397,15 +417,15 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
+        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
+            handlePlaybackCompletion()
+        }).getOrThrow()
+
         bufferLoop.start(
             onTimestamp = ::handleBufferTimestamp,
             onWaiting = ::handleBufferWaiting,
             endOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
-
-        playbackLoop.start(onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
-            handlePlaybackCompletion()
-        }).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
@@ -455,17 +475,21 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
                 renderer.reset().getOrThrow()
+                audioBuffer.flush().getOrThrow()
+                videoBuffer.flush().getOrThrow()
                 audioDecoder.reset().getOrThrow()
                 videoDecoder.reset().getOrThrow()
             }
 
             is Pipeline.Audio -> with(pipeline) {
                 sampler.stop().getOrThrow()
+                buffer.flush().getOrThrow()
                 decoder.reset().getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
                 renderer.reset().getOrThrow()
+                buffer.flush().getOrThrow()
                 decoder.reset().getOrThrow()
             }
         }
@@ -488,13 +512,9 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                currentCoroutineContext().ensureActive()
-
                 audioBuffer.flush().getOrThrow()
 
                 videoBuffer.flush().getOrThrow()
-
-                currentCoroutineContext().ensureActive()
 
                 audioDecoder.seekTo(
                     micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
@@ -508,11 +528,7 @@ internal class DefaultPlayerController(
             is Pipeline.Audio -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                currentCoroutineContext().ensureActive()
-
                 buffer.flush().getOrThrow()
-
-                currentCoroutineContext().ensureActive()
 
                 decoder.seekTo(
                     micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
@@ -520,11 +536,7 @@ internal class DefaultPlayerController(
             }
 
             is Pipeline.Video -> with(pipeline) {
-                currentCoroutineContext().ensureActive()
-
                 buffer.flush().getOrThrow()
-
-                currentCoroutineContext().ensureActive()
 
                 decoder.seekTo(
                     micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = false
@@ -550,9 +562,9 @@ internal class DefaultPlayerController(
             updateState(currentInternalState.updateStatus(status = InternalPlayerState.Ready.Status.RELEASING))
 
             with(currentInternalState) {
-                bufferLoop.close()
-                playbackLoop.close()
-                pipeline.close()
+                playbackLoop.close().getOrThrow()
+                bufferLoop.close().getOrThrow()
+                pipeline.close().getOrThrow()
             }
 
             bufferTimestamp.emit(Timestamp.ZERO)
@@ -571,15 +583,15 @@ internal class DefaultPlayerController(
         }
 
         settings.emit(newSettings)
-    }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+    }
 
     override suspend fun resetSettings() = runCatching {
         val newSettings = initialSettings ?: defaultSettings
 
         settings.emit(newSettings)
-    }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+    }
 
-    override suspend fun execute(command: Command) {
+    override suspend fun execute(command: Command) = runCatching {
         val currentInternalState = internalState.get()
 
         val status = (currentInternalState as? InternalPlayerState.Ready)?.status
@@ -592,7 +604,8 @@ internal class DefaultPlayerController(
                             location = location,
                             audioBufferSize = audioBufferSize,
                             videoBufferSize = videoBufferSize,
-                            hardwareAcceleration = hardwareAcceleration
+                            hardwareAcceleration = hardwareAcceleration,
+                            hardwareAccelerationFallback = hardwareAccelerationFallback
                         )
                     }.also(executionJob::set).join()
                 }
@@ -642,8 +655,8 @@ internal class DefaultPlayerController(
         }
     }
 
-    override suspend fun close() {
-        executionContext.cancelChildrenAndJoin()
+    override suspend fun close() = runCatching {
+        executionScope.cancel()
 
         when (val currentState = internalState.get()) {
             is InternalPlayerState.Empty,
@@ -651,9 +664,9 @@ internal class DefaultPlayerController(
                 -> Unit
 
             is InternalPlayerState.Ready -> with(currentState) {
-                bufferLoop.close()
-                playbackLoop.close()
-                pipeline.close()
+                playbackLoop.close().getOrDefault(Unit)
+                bufferLoop.close().getOrDefault(Unit)
+                pipeline.close().getOrDefault(Unit)
             }
         }
     }

@@ -23,7 +23,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Location
@@ -91,8 +91,11 @@ fun UploadedHubItem(
         }.launchIn(coroutineScope)
 
         onDispose {
+            previewJob?.cancel()
+            previewJob = null
+
             coroutineScope.launch {
-                player.close()
+                player.close().getOrThrow()
             }
         }
     }
@@ -111,8 +114,16 @@ fun UploadedHubItem(
                     )
                 }
 
-                if (currentState is PlayerState.Ready.Completed) {
-                    player.stop()
+                when (currentState) {
+                    is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
+                        if (currentState is PlayerState.Ready.Completed) {
+                            player.stop()
+                        }
+
+                        hoverInteractionSource.tryEmit(HoverInteraction.Enter())
+                    }
+
+                    else -> Unit
                 }
             }
 
@@ -148,7 +159,6 @@ fun UploadedHubItem(
 
                                         is PlayerState.Ready.Playing -> {
                                             stop()
-                                            hoverInteractionSource.tryEmit(HoverInteraction.Enter())
                                         }
 
                                         is PlayerState.Ready.Stopped -> play()
@@ -185,7 +195,7 @@ fun UploadedHubItem(
                     is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
                     else -> when {
-                        state is PlayerState.Ready.Playing -> Renderer(
+                        state is PlayerState.Ready.Playing -> RendererComponent(
                             modifier = Modifier.fillMaxSize(),
                             foreground = renderer?.run renderer@{
                                 Foreground.Source(
@@ -198,7 +208,7 @@ fun UploadedHubItem(
                         }
 
                         else -> hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
-                            Renderer(
+                            RendererComponent(
                                 modifier = Modifier.fillMaxSize(),
                                 foreground = Foreground.Frame(frame = frame, scale = ImageScale.Crop)
                             ) {

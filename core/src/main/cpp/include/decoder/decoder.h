@@ -112,8 +112,6 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
-
     bool _hasAudio();
 
     bool _hasVideo();
@@ -122,7 +120,7 @@ private:
 
     bool _isHardwareAccelerated();
 
-    void _prepareHardwareAcceleration();
+    void _prepareHardwareAcceleration(uint32_t deviceType);
 
     void _prepareSwsContext(
             AVPixelFormat srcFormat,
@@ -137,13 +135,19 @@ private:
     void _processVideoFrame(uint32_t dstWidth, uint32_t dstHeight);
 
 public:
+    AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
+
     Format format;
 
     Decoder(
             const std::string &location,
             bool findAudioStream,
+            bool prepareAudioStream,
             bool findVideoStream,
-            uint32_t hwDeviceType
+            bool prepareVideoStream,
+            uint32_t hwDeviceType,
+            const std::vector<uint32_t> &hwDeviceTypeCandidates,
+            bool softwareAccelerationFallback
     );
 
     ~Decoder();

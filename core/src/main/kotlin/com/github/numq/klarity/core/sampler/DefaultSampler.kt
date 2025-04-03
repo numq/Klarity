@@ -68,6 +68,8 @@ internal class DefaultSampler(
     }
 
     override suspend fun close() = mutex.withLock {
-        sampler.close()
+        runCatching {
+            sampler.close()
+        }
     }
 }

@@ -6,7 +6,6 @@ import com.github.numq.klarity.core.media.Media
  * Sealed interface representing the possible states of the player.
  */
 sealed interface PlayerState {
-
     /**
      * Represents the state when no media is loaded or playing.
      */

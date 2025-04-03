@@ -1,47 +1,42 @@
 package com.github.numq.klarity.core.preview
 
-import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
-import com.github.numq.klarity.core.decoder.HardwareAcceleration
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPreviewManager(
     private val videoDecoderFactory: VideoDecoderFactory,
 ) : PreviewManager {
-    private val coroutineContext = Dispatchers.Default + SupervisorJob()
+    private val internalState = AtomicReference<InternalPreviewState>(InternalPreviewState.Empty)
 
-    private val coroutineScope = CoroutineScope(coroutineContext)
+    override val state = MutableStateFlow<PreviewState>(PreviewState.Empty)
 
-    private val internalState = MutableStateFlow<InternalPreviewState>(InternalPreviewState.Empty)
-
-    override val state = internalState.map { internalState ->
-        when (internalState) {
-            is InternalPreviewState.Empty -> PreviewState.Empty
-
-            is InternalPreviewState.Ready -> PreviewState.Ready(media = internalState.decoder.media)
-        }
-    }.stateIn(scope = coroutineScope, started = SharingStarted.Lazily, initialValue = PreviewState.Empty)
-
-    override suspend fun prepare(location: String, hardwareAcceleration: HardwareAcceleration) = runCatching {
-        val currentState = internalState.value
+    override suspend fun prepare(
+        location: String,
+        hardwareAcceleration: HardwareAcceleration,
+        hardwareAccelerationFallback: HardwareAccelerationFallback,
+    ) = runCatching {
+        val currentState = internalState.get()
 
         check(currentState is InternalPreviewState.Empty) { "Unable to load non-empty preview manager" }
 
         videoDecoderFactory.create(
             parameters = VideoDecoderFactory.Parameters(
-                location = location, hardwareAcceleration = hardwareAcceleration
+                location = location,
+                hardwareAcceleration = hardwareAcceleration,
+                hardwareAccelerationFallback = hardwareAccelerationFallback
             )
         ).mapCatching { decoder ->
-            internalState.emit(InternalPreviewState.Ready(decoder = decoder))
+            internalState.set(InternalPreviewState.Ready(decoder = decoder))
+
+            state.emit(PreviewState.Ready(media = decoder.media))
         }.getOrThrow()
+    }.recoverCatching { t ->
+        throw PreviewException(t)
     }
 
     override suspend fun preview(
@@ -50,7 +45,7 @@ internal class DefaultPreviewManager(
         height: Int?,
         keyframesOnly: Boolean,
     ): Result<Frame.Video.Content?> = runCatching {
-        val currentState = internalState.value
+        val currentState = internalState.get()
 
         check(currentState is InternalPreviewState.Ready) { "Unable to use empty preview manager" }
 
@@ -58,28 +53,32 @@ internal class DefaultPreviewManager(
             seekTo(
                 micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).map {
-                nextFrame(width, height).getOrNull() as? Frame.Video.Content
-            }.getOrThrow()
+                decode(width, height).getOrNull() as? Frame.Video.Content
+            }.getOrNull()
         }
+    }.recoverCatching { t ->
+        throw PreviewException(t)
     }
 
     override suspend fun release() = runCatching {
-        val currentState = internalState.value
+        val currentState = internalState.get()
 
         if (currentState is InternalPreviewState.Ready) {
-            currentState.decoder.close()
+            currentState.decoder.close().getOrThrow()
 
-            internalState.emit(InternalPreviewState.Empty)
+            internalState.set(InternalPreviewState.Empty)
+
+            state.emit(PreviewState.Empty)
         }
+    }.recoverCatching { t ->
+        throw PreviewException(t)
     }
 
-    override suspend fun close() {
-        coroutineContext.cancelChildrenAndJoin()
-
-        when (val internalState = internalState.value) {
+    override suspend fun close() = runCatching {
+        when (val internalState = internalState.get()) {
             is InternalPreviewState.Empty -> Unit
 
-            is InternalPreviewState.Ready -> internalState.decoder.close()
+            is InternalPreviewState.Ready -> internalState.decoder.close().getOrThrow()
         }
     }
 }

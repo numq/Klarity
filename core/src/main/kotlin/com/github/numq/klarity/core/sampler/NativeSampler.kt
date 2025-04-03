@@ -1,22 +1,21 @@
 package com.github.numq.klarity.core.sampler
 
-import java.lang.ref.Cleaner
+import com.github.numq.klarity.core.cleaner.NativeCleaner
 
 internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
-    private val nativeHandle = requireNotNull(
-        createNative(
-            sampleRate,
-            channels
-        ).takeIf { it != -1L }
-    ) { "Unable to instantiate native sampler" }
+    private val nativeHandle by lazy {
+        requireNotNull(createNative(
+            sampleRate = sampleRate, channels = channels
+        ).takeIf { it != -1L }) { "Could not instantiate native sampler" }
+    }
 
-    private val cleanable = cleaner.register(this) {
-        deleteNative(handle = nativeHandle)
+    private val cleanable by lazy {
+        NativeCleaner.cleaner.register(this) {
+            deleteNative(handle = nativeHandle)
+        }
     }
 
     companion object {
-        private val cleaner = Cleaner.create()
-
         @JvmStatic
         private external fun createNative(sampleRate: Int, channels: Int): Long
 
@@ -48,7 +47,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
 
     fun start() = startNative(handle = nativeHandle)
 
-    fun play(data: ByteArray, size: Int) = playNative(handle = nativeHandle, bytes = data, size = size)
+    fun play(bytes: ByteArray, size: Int) = playNative(handle = nativeHandle, bytes = bytes, size = size)
 
     fun pause() = pauseNative(handle = nativeHandle)
 

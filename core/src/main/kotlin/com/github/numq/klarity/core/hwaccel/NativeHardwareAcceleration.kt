@@ -1,6 +1,6 @@
-package com.github.numq.klarity.core.decoder
+package com.github.numq.klarity.core.hwaccel
 
-enum class HardwareAcceleration {
+internal enum class NativeHardwareAcceleration {
     NONE,
     VDPAU,
     CUDA,

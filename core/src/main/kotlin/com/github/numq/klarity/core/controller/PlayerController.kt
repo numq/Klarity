@@ -3,7 +3,6 @@ package com.github.numq.klarity.core.controller
 import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
-import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
@@ -28,16 +27,26 @@ import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
-interface PlayerController : SuspendAutoCloseable {
+interface PlayerController {
     val settings: StateFlow<PlayerSettings>
+
     val state: StateFlow<PlayerState>
+
     val bufferTimestamp: StateFlow<Timestamp>
+
     val playbackTimestamp: StateFlow<Timestamp>
+
     val renderer: StateFlow<Renderer?>
+
     val events: SharedFlow<PlayerEvent>
-    suspend fun changeSettings(newSettings: PlayerSettings)
-    suspend fun resetSettings()
-    suspend fun execute(command: Command)
+
+    suspend fun changeSettings(newSettings: PlayerSettings): Result<Unit>
+
+    suspend fun resetSettings(): Result<Unit>
+
+    suspend fun execute(command: Command): Result<Unit>
+
+    suspend fun close(): Result<Unit>
 
     companion object {
         internal fun create(

@@ -22,7 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Background
 import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
@@ -116,8 +116,7 @@ fun PlaylistScreenSuccess(
                 queue.add(pendingItem)
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = PlaylistItem.Uploaded(
-                        media = media,
-                        snapshot = SnapshotManager.snapshot(location = media.location.path) { 0L }.getOrThrow()
+                        media = media, snapshot = SnapshotManager.snapshot(location = media.location.path).getOrNull()
                     )
                     queue.replace(pendingItem, uploadedItem)
                 }.onFailure(::handleException).onFailure {
@@ -163,16 +162,14 @@ fun PlaylistScreenSuccess(
     LaunchedEffect(selectedItem) {
         when (selectedItem) {
             is SelectedItem.Absent -> {
-                previewManager.release().onFailure(::handleException).getOrDefault(Unit)
+                previewManager.release().getOrDefault(Unit)
                 player.release()
             }
 
             is SelectedItem.Present<*> -> ((selectedItem as? SelectedItem.Present<*>)?.item as? PlaylistItem.Uploaded)?.run {
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
-                        previewManager.prepare(
-                            location = media.location.path
-                        ).onFailure(::handleException).getOrDefault(Unit)
+                        previewManager.prepare(location = media.location.path).getOrDefault(Unit)
                         player.prepare(location = media.location.path, enableAudio = true, enableVideo = true)
                         player.play()
                     }
@@ -195,14 +192,11 @@ fun PlaylistScreenSuccess(
                             }
 
                             else -> {
-                                previewManager.release().onFailure(::handleException).getOrDefault(Unit)
-                                previewManager.prepare(location = media.location.path).onFailure(::handleException)
-                                    .getOrDefault(Unit)
+                                previewManager.release().getOrDefault(Unit)
+                                previewManager.prepare(location = media.location.path).getOrDefault(Unit)
                                 player.release()
                                 player.prepare(
-                                    location = media.location.path,
-                                    enableAudio = true,
-                                    enableVideo = true
+                                    location = media.location.path, enableAudio = true, enableVideo = true
                                 )
                                 player.play()
                             }
@@ -239,8 +233,7 @@ fun PlaylistScreenSuccess(
             when (playlistItem) {
                 is PlaylistItem.Pending -> queue.delete(playlistItem)
 
-                is PlaylistItem.Uploaded ->
-                    queue.delete(playlistItem)
+                is PlaylistItem.Uploaded -> queue.delete(playlistItem)
             }
         }
     }
@@ -298,186 +291,168 @@ fun PlaylistScreenSuccess(
                     Icon(Icons.Rounded.UploadFile, null)
                 }
             })
-            PlaylistDrawer(
-                modifier = Modifier.weight(1f),
-                isVisible = isPlaylistDrawerVisible,
-                onVisibilityChange = {
-                    isPlaylistDrawerVisible = it
-                },
-                listState = listState,
-                items = items,
-                selectedItem = selectedItem,
-                select = { item ->
-                    if (item is PlaylistItem.Uploaded) {
-                        selectPlaylistItem(item)
-                    }
-                },
-                delete = { item ->
-                    deletePlaylistItem(item)
-                },
-                content = {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        when (val currentState = state) {
-                            is PlayerState.Empty -> Box(modifier = Modifier.fillMaxSize())
+            PlaylistDrawer(modifier = Modifier.weight(1f), isVisible = isPlaylistDrawerVisible, onVisibilityChange = {
+                isPlaylistDrawerVisible = it
+            }, listState = listState, items = items, selectedItem = selectedItem, select = { item ->
+                if (item is PlaylistItem.Uploaded) {
+                    selectPlaylistItem(item)
+                }
+            }, delete = { item ->
+                deletePlaylistItem(item)
+            }, content = {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    when (val currentState = state) {
+                        is PlayerState.Empty -> Box(modifier = Modifier.fillMaxSize())
 
-                            is PlayerState.Ready -> {
-                                val hoveredTimestamps = remember { MutableSharedFlow<HoveredTimestamp?>() }
+                        is PlayerState.Ready -> {
+                            val hoveredTimestamps = remember { MutableSharedFlow<HoveredTimestamp?>() }
 
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Box(modifier = Modifier.weight(1f).pointerInput(state) {
-                                        detectTapGestures(onPress = {
-                                            awaitRelease()
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Box(modifier = Modifier.weight(1f).pointerInput(state) {
+                                    detectTapGestures(onPress = {
+                                        awaitRelease()
 
-                                            player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
-                                        }, onLongPress = { (x, y) ->
-                                            if (state is PlayerState.Ready.Playing) {
-                                                val playbackSpeedFactor = when {
-                                                    x in 0f..size.width / 2f && y in 0f..size.height.toFloat() -> 0.5f
-                                                    else -> 2f
-                                                }
+                                        player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
+                                    }, onLongPress = { (x, y) ->
+                                        if (state is PlayerState.Ready.Playing) {
+                                            val playbackSpeedFactor = when {
+                                                x in 0f..size.width / 2f && y in 0f..size.height.toFloat() -> 0.5f
+                                                else -> 2f
+                                            }
 
-                                                coroutineScope.launch {
-                                                    player.changeSettings(settings.copy(playbackSpeedFactor = playbackSpeedFactor))
+                                            coroutineScope.launch {
+                                                player.changeSettings(settings.copy(playbackSpeedFactor = playbackSpeedFactor))
+                                            }
+                                        }
+                                    })
+                                }, contentAlignment = Alignment.Center) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                            when (currentState.media) {
+                                                is Media.Audio -> Icon(Icons.Default.AudioFile, null)
+
+                                                else -> RendererComponent(modifier = Modifier.fillMaxSize(),
+                                                    background = Background.Blur(),
+                                                    foreground = renderer?.let { renderer ->
+                                                        Foreground.Source(renderer = renderer)
+                                                    } ?: Foreground.Empty) {
+                                                    Icon(Icons.Default.BrokenImage, null)
                                                 }
                                             }
-                                        })
-                                    }, contentAlignment = Alignment.Center) {
-                                        Column(
-                                            modifier = Modifier.fillMaxSize(),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                                when (currentState.media) {
-                                                    is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
-                                                    else -> Renderer(modifier = Modifier.fillMaxSize(),
-                                                        background = Background.Blur(),
-                                                        foreground = renderer?.let { renderer ->
-                                                            Foreground.Source(renderer = renderer)
-                                                        } ?: Foreground.Empty) {
-                                                        Icon(Icons.Default.BrokenImage, null)
-                                                    }
-                                                }
-
-                                                if (settings.playbackSpeedFactor != 1f) {
-                                                    Box(
-                                                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            "Playing on ${
-                                                                settings.playbackSpeedFactor.toString()
-                                                                    .replace(".0", "")
-                                                            }x speed", modifier = Modifier.drawBehind {
-                                                                drawRoundRect(
-                                                                    color = Color.Black.copy(alpha = .5f),
-                                                                    cornerRadius = CornerRadius(16f, 16f)
-                                                                )
-                                                            }.padding(8.dp),
-                                                            color = Color.White
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                BoxWithConstraints(
-                                                    modifier = Modifier.weight(1f),
-                                                    contentAlignment = Alignment.CenterStart
+                                            if (settings.playbackSpeedFactor != 1f) {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                                                    contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
-                                                        text = "${playbackTimestamp.millis.formatTimestamp()}/${currentState.media.durationMicros.microseconds.inWholeMilliseconds.formatTimestamp()}",
-                                                        modifier = Modifier.padding(8.dp),
-                                                        color = MaterialTheme.colors.primary
-                                                    )
-                                                }
-                                                PlaylistControls(
-                                                    modifier = Modifier.wrapContentSize(),
-                                                    color = MaterialTheme.colors.primary,
-                                                    state = state,
-                                                    playbackTimestamp = playbackTimestamp,
-                                                    isShuffled = isShuffled,
-                                                    shuffle = queue::shuffle,
-                                                    repeatMode = repeatMode,
-                                                    setRepeatMode = queue::setRepeatMode,
-                                                    hasPrevious = hasPrevious,
-                                                    hasNext = hasNext,
-                                                    previous = queue::previous,
-                                                    next = queue::next,
-                                                    play = player::play,
-                                                    pause = player::pause,
-                                                    resume = player::resume,
-                                                    stop = player::stop
-                                                )
-                                                Box(
-                                                    modifier = Modifier.weight(1f),
-                                                    contentAlignment = Alignment.CenterStart
-                                                ) {
-                                                    VolumeControls(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        volume = settings.volume,
-                                                        isMuted = settings.isMuted,
-                                                        toggleMute = {
-                                                            player.changeSettings(settings.copy(isMuted = !settings.isMuted))
-                                                        },
-                                                        changeVolume = { volume ->
-                                                            player.changeSettings(settings.copy(volume = volume))
-                                                        }
+                                                        "Playing on ${
+                                                            settings.playbackSpeedFactor.toString().replace(".0", "")
+                                                        }x speed", modifier = Modifier.drawBehind {
+                                                            drawRoundRect(
+                                                                color = Color.Black.copy(alpha = .5f),
+                                                                cornerRadius = CornerRadius(16f, 16f)
+                                                            )
+                                                        }.padding(8.dp), color = Color.White
                                                     )
                                                 }
                                             }
                                         }
-
-                                        videoFormat?.let { format ->
-                                            Box(
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.BottomStart
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            BoxWithConstraints(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.CenterStart
                                             ) {
-                                                TimelinePreview(
-                                                    width = 128f,
-                                                    height = 128f,
-                                                    format = format,
-                                                    hoveredTimestamps = hoveredTimestamps,
-                                                    preview = { timestampMillis, width, height ->
-                                                        previewManager.preview(
-                                                            timestampMillis = timestampMillis,
-                                                            width = width,
-                                                            height = height
-                                                        ).onFailure(::handleException).getOrNull()
-                                                    }
+                                                Text(
+                                                    text = "${playbackTimestamp.millis.formatTimestamp()}/${currentState.media.durationMicros.microseconds.inWholeMilliseconds.formatTimestamp()}",
+                                                    modifier = Modifier.padding(8.dp),
+                                                    color = MaterialTheme.colors.primary
                                                 )
+                                            }
+                                            PlaylistControls(
+                                                modifier = Modifier.wrapContentSize(),
+                                                color = MaterialTheme.colors.primary,
+                                                state = state,
+                                                playbackTimestamp = playbackTimestamp,
+                                                isShuffled = isShuffled,
+                                                shuffle = queue::shuffle,
+                                                repeatMode = repeatMode,
+                                                setRepeatMode = queue::setRepeatMode,
+                                                hasPrevious = hasPrevious,
+                                                hasNext = hasNext,
+                                                previous = queue::previous,
+                                                next = queue::next,
+                                                play = player::play,
+                                                pause = player::pause,
+                                                resume = player::resume,
+                                                stop = player::stop
+                                            )
+                                            Box(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                VolumeControls(modifier = Modifier.fillMaxWidth(),
+                                                    volume = settings.volume,
+                                                    isMuted = settings.isMuted,
+                                                    toggleMute = {
+                                                        player.changeSettings(settings.copy(isMuted = !settings.isMuted))
+                                                    },
+                                                    changeVolume = { volume ->
+                                                        player.changeSettings(settings.copy(volume = volume))
+                                                    })
                                             }
                                         }
                                     }
-                                    Timeline(
-                                        modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
-                                        bufferTimestampMillis = bufferTimestamp.millis,
-                                        playbackTimestampMillis = playbackTimestamp.millis,
-                                        durationTimestampMillis = currentState.media.durationMicros.microseconds.inWholeMilliseconds,
-                                        seekTo = { timestampMillis ->
-                                            player.seekTo(timestampMillis)
-                                            player.resume()
-                                        },
-                                        onHoveredTimestamp = { value ->
-                                            coroutineScope.launch {
-                                                hoveredTimestamps.emit(value)
-                                            }
+
+                                    videoFormat?.let { format ->
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.BottomStart
+                                        ) {
+                                            TimelinePreview(width = 128f,
+                                                height = 128f,
+                                                format = format,
+                                                hoveredTimestamps = hoveredTimestamps,
+                                                preview = { timestampMillis, width, height ->
+                                                    previewManager.preview(
+                                                        timestampMillis = timestampMillis,
+                                                        width = width,
+                                                        height = height
+                                                    ).onFailure(::handleException).getOrNull()
+                                                })
                                         }
-                                    )
+                                    }
                                 }
+                                Timeline(modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
+                                    bufferTimestampMillis = bufferTimestamp.millis,
+                                    playbackTimestampMillis = playbackTimestamp.millis,
+                                    durationTimestampMillis = currentState.media.durationMicros.microseconds.inWholeMilliseconds,
+                                    seekTo = { timestampMillis ->
+                                        player.seekTo(timestampMillis)
+                                        player.resume()
+                                    },
+                                    onHoveredTimestamp = { value ->
+                                        coroutineScope.launch {
+                                            hoveredTimestamps.emit(value)
+                                        }
+                                    })
                             }
                         }
                     }
                 }
-            )
+            })
         }
         if (isDragAndDrop) {
             LaunchedEffect(Unit) {

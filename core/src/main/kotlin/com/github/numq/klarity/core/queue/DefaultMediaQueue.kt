@@ -59,36 +59,38 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
     }
 
     override suspend fun shuffle() = mutex.withLock {
-        shuffleSeed = if (shuffleSeed == null) Random.nextLong() else null
+        runCatching {
+            shuffleSeed = if (shuffleSeed == null) Random.nextLong() else null
 
-        isShuffled.emit(shuffleSeed != null)
+            isShuffled.emit(shuffleSeed != null)
 
-        val shuffledItems = shuffleSeed?.let { seed -> _items.shuffled(Random(seed)) } ?: _items.toList()
+            val shuffledItems = shuffleSeed?.let { seed -> _items.shuffled(Random(seed)) } ?: _items.toList()
 
-        items.emit(shuffledItems)
+            items.emit(shuffledItems)
 
-        updateStates()
+            updateStates()
+        }
     }
 
-    override suspend fun setRepeatMode(repeatMode: RepeatMode) {
+    override suspend fun setRepeatMode(repeatMode: RepeatMode) = runCatching {
         this.repeatMode.emit(repeatMode)
 
         updateStates()
     }
 
-    override suspend fun previous() {
+    override suspend fun previous() = runCatching {
         updateSelection(-1)
 
         updateStates()
     }
 
-    override suspend fun next() {
+    override suspend fun next() = runCatching {
         updateSelection(1)
 
         updateStates()
     }
 
-    override suspend fun select(item: Item?) {
+    override suspend fun select(item: Item?) = runCatching {
         val newItem = item?.takeIf { it in items.value }?.let {
             SelectedItem.Present(it, System.nanoTime())
         } ?: SelectedItem.Absent
@@ -99,28 +101,8 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
     }
 
     override suspend fun add(item: Item) = mutex.withLock {
-        _items += item
-
-        items.emit(_items.toList())
-
-        updateStates()
-    }
-
-    override suspend fun delete(item: Item) = mutex.withLock {
-        if (item in _items) {
-            val currentSelectedItem = selectedItem.value
-
-            if (currentSelectedItem is SelectedItem.Present && currentSelectedItem.item == item) {
-                when {
-                    hasNext.value -> next()
-
-                    hasPrevious.value -> previous()
-
-                    else -> selectedItem.emit(SelectedItem.Absent)
-                }
-            }
-
-            _items -= item
+        runCatching {
+            _items += item
 
             items.emit(_items.toList())
 
@@ -128,15 +110,41 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
         }
     }
 
-    override suspend fun replace(from: Item, to: Item) = mutex.withLock {
-        if (from in _items) {
-            if (selectedItem.value is SelectedItem.Present && selectedItem.value == from) {
-                select(to)
+    override suspend fun delete(item: Item) = mutex.withLock {
+        runCatching {
+            if (item in _items) {
+                val currentSelectedItem = selectedItem.value
+
+                if (currentSelectedItem is SelectedItem.Present && currentSelectedItem.item == item) {
+                    when {
+                        hasNext.value -> next()
+
+                        hasPrevious.value -> previous()
+
+                        else -> selectedItem.emit(SelectedItem.Absent)
+                    }
+                }
+
+                _items -= item
+
+                items.emit(_items.toList())
+
+                updateStates()
             }
+        }
+    }
 
-            _items.replaceAll { if (it == from) to else it }
+    override suspend fun replace(from: Item, to: Item) = mutex.withLock {
+        runCatching {
+            if (from in _items) {
+                if (selectedItem.value is SelectedItem.Present && selectedItem.value == from) {
+                    select(to)
+                }
 
-            items.emit(_items.toList())
+                _items.replaceAll { if (it == from) to else it }
+
+                items.emit(_items.toList())
+            }
         }
     }
 }

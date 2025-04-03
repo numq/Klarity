@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.StateFlow
  * and rendering video content.
  */
 interface Renderer {
-
     /**
      * The width of the rendered frames in pixels.
      */
@@ -46,7 +45,8 @@ interface Renderer {
      * Sets the playback speed factor for the renderer.
      *
      * @param factor The new speed factor to set. Must be positive.
-     * @return A Result indicating success or failure of the operation.
+     *
+     * @return A [Result] indicating success or failure of the operation.
      */
     suspend fun setPlaybackSpeed(factor: Float): Result<Unit>
 
@@ -54,7 +54,8 @@ interface Renderer {
      * Draws the given frame content in the renderer.
      *
      * @param frame The video content frame to render.
-     * @return A Result indicating success or failure of the operation.
+     *
+     * @return A [Result] indicating success or failure of the operation.
      */
     suspend fun draw(frame: Frame.Video.Content): Result<Unit>
 
@@ -62,9 +63,16 @@ interface Renderer {
      * Resets the renderer to its initial state.
      * This typically includes restoring the preview frame.
      *
-     * @return A Result indicating success or failure of the operation.
+     * @return A [Result] indicating success or failure of the operation.
      */
     suspend fun reset(): Result<Unit>
+
+    /**
+     * Closes the renderer.
+     *
+     * @return A [Result] indicating success or failure of the operation.
+     */
+    suspend fun close(): Result<Unit>
 
     companion object {
         /**
@@ -74,7 +82,8 @@ interface Renderer {
          * @param height The height of the frames in pixels.
          * @param frameRate The frame rate at which to render the video.
          * @param preview An optional preview frame of the video content.
-         * @return A Result containing either a new Renderer instance or an error if creation fails.
+         *
+         * @return A [Result] containing either a new [Renderer] instance or an error if creation fails.
          */
         internal fun create(
             width: Int,

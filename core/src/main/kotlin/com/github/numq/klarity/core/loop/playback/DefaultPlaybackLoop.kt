@@ -1,7 +1,6 @@
 package com.github.numq.klarity.core.loop.playback
 
 import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.coroutine.cancelChildrenAndJoin
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.media.Media
@@ -206,10 +205,10 @@ internal class DefaultPlaybackLoop(
 
             require(job == null) { "Unable to start playback loop" }
 
+            isPlaying.set(true)
+
             job = coroutineScope.launch {
                 try {
-                    isPlaying.set(true)
-
                     with(pipeline) {
                         when (this) {
                             is Pipeline.AudioVideo -> {
@@ -266,15 +265,17 @@ internal class DefaultPlaybackLoop(
     }
 
     override suspend fun stop() = mutex.withLock {
-        isPlaying.set(false)
-
         runCatching {
-            job?.cancelAndJoin()
+            job?.cancel()
             job = null
+
+            isPlaying.set(false)
         }
     }
 
-    override suspend fun close() = mutex.withLock {
-        coroutineContext.cancelChildrenAndJoin()
+    override suspend fun close() = runCatching {
+        stop().getOrThrow()
+
+        coroutineScope.cancel()
     }
 }

@@ -42,8 +42,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jbyteArray bytes,
-        jint size
+        jbyteArray bytes
 );
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_pauseNative(

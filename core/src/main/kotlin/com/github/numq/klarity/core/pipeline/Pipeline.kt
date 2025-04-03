@@ -1,18 +1,19 @@
 package com.github.numq.klarity.core.pipeline
 
 import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.closeable.SuspendAutoCloseable
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 
-sealed interface Pipeline : SuspendAutoCloseable {
+sealed interface Pipeline {
     val media: Media
 
+    suspend fun close(): Result<Unit>
+
     data class AudioVideo(
-        override val media: Media,
+        override val media: Media.AudioVideo,
         val audioDecoder: Decoder<Media.Audio, Frame.Audio>,
         val videoDecoder: Decoder<Media.Video, Frame.Video>,
         val audioBuffer: Buffer<Frame.Audio>,
@@ -20,33 +21,39 @@ sealed interface Pipeline : SuspendAutoCloseable {
         val sampler: Sampler,
         val renderer: Renderer,
     ) : Pipeline {
-        override suspend fun close() {
-            sampler.close()
-            audioDecoder.close()
-            videoDecoder.close()
+        override suspend fun close() = runCatching {
+            sampler.close().getOrThrow()
+            renderer.close().getOrThrow()
+            audioBuffer.close().getOrThrow()
+            videoBuffer.close().getOrThrow()
+            audioDecoder.close().getOrThrow()
+            videoDecoder.close().getOrThrow()
         }
     }
 
     data class Audio(
-        override val media: Media,
+        override val media: Media.Audio,
         val decoder: Decoder<Media.Audio, Frame.Audio>,
         val buffer: Buffer<Frame.Audio>,
         val sampler: Sampler,
     ) : Pipeline {
-        override suspend fun close() {
-            sampler.close()
-            decoder.close()
+        override suspend fun close() = runCatching {
+            sampler.close().getOrThrow()
+            buffer.close().getOrThrow()
+            decoder.close().getOrThrow()
         }
     }
 
     data class Video(
-        override val media: Media,
+        override val media: Media.Video,
         val decoder: Decoder<Media.Video, Frame.Video>,
         val buffer: Buffer<Frame.Video>,
         val renderer: Renderer,
     ) : Pipeline {
-        override suspend fun close() {
-            decoder.close()
+        override suspend fun close() = runCatching {
+            renderer.close().getOrThrow()
+            buffer.close().getOrThrow()
+            decoder.close().getOrThrow()
         }
     }
 }

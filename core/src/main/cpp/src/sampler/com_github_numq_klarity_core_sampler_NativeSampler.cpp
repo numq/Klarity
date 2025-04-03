@@ -70,11 +70,16 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jbyteArray bytes,
-        jint size
+        jbyteArray bytes
 ) {
     return handleException(env, [&] {
         std::unique_lock<std::shared_mutex> lock(samplerMutex);
+
+        auto size = env->GetArrayLength(bytes);
+
+        if (size <= 0) {
+            return;
+        }
 
         auto byteArray = env->GetByteArrayElements(bytes, nullptr);
 

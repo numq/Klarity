@@ -5,12 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.preview.PreviewManager
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import notification.Notification
 import java.io.File
 
@@ -20,8 +19,6 @@ fun PlaylistScreen(
     upload: (List<String>) -> List<File>,
     notify: (Notification) -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
     val player = remember { KlarityPlayer.create() }
 
     val previewManager = remember { PreviewManager.create() }
@@ -32,9 +29,9 @@ fun PlaylistScreen(
         }.onSuccess { (player, previewManager) ->
             DisposableEffect(Unit) {
                 onDispose {
-                    coroutineScope.launch {
-                        player.close()
-                        previewManager.close()
+                    runBlocking {
+                        player.close().getOrThrow()
+                        previewManager.close().getOrThrow()
                     }
                 }
             }

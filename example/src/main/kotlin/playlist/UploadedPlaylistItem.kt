@@ -18,7 +18,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.Renderer
+import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -37,7 +37,7 @@ fun UploadedPlaylistItem(
         TooltipArea(tooltip = {
             Text(text = playlistItem.media.location.path)
         }, modifier = Modifier.weight(1f), content = {
-            Card(modifier = Modifier.alpha(if (isSelected) .5f else 1f)) {
+            Card(modifier = Modifier.fillMaxSize().alpha(if (isSelected) .5f else 1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable(onClick = select),
                     horizontalArrangement = Arrangement.spacedBy(
@@ -45,12 +45,12 @@ fun UploadedPlaylistItem(
                     ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Renderer(
-                        modifier = Modifier.aspectRatio(1f).clip(CircleShape),
-                        foreground = playlistItem.snapshot?.let { snapshot ->
-                            Foreground.Frame(frame = snapshot, scale = ImageScale.Crop)
-                        } ?: Foreground.Empty,
-                    )
+                    playlistItem.snapshot?.let { snapshot ->
+                        RendererComponent(
+                            modifier = Modifier.aspectRatio(1f).clip(CircleShape),
+                            foreground = Foreground.Frame(frame = snapshot, scale = ImageScale.Crop),
+                        )
+                    }
                     Text(
                         text = playlistItem.media.location.path,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),

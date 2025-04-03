@@ -23,11 +23,21 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jclass thisClass,
         jstring location,
         jboolean findAudioStream,
+        jboolean prepareAudioStream,
         jboolean findVideoStream,
-        jint hardwareAcceleration
+        jboolean prepareVideoStream,
+        jint hardwareAcceleration,
+        jintArray hardwareAccelerationFallbackCandidates,
+        jboolean useSoftwareAccelerationFallback
 );
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
+
+JNIEXPORT jint JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getHardwareAccelerationNative(
         JNIEnv *env,
         jclass thisClass,
         jlong handle

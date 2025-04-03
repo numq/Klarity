@@ -5,7 +5,9 @@ import com.github.numq.klarity.core.format.VideoFormat
 
 sealed interface Media {
     val id: Long
+
     val location: Location
+
     val durationMicros: Long
 
     data class AudioVideo(
