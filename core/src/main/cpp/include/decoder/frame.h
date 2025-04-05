@@ -1,6 +1,7 @@
 #ifndef KLARITY_DECODER_FRAME_H
 #define KLARITY_DECODER_FRAME_H
 
+#include <cstdint>
 #include <vector>
 
 struct Frame {

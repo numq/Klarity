@@ -2,8 +2,9 @@
 #define KLARITY_DECODER_DECODER_H
 
 #include <map>
+#include <mutex>
 #include <shared_mutex>
-#include <optional>
+#include <memory>
 #include <string>
 #include <functional>
 #include "exception.h"
@@ -152,7 +153,7 @@ public:
 
     ~Decoder();
 
-    std::optional<Frame> decode(uint32_t width, uint32_t height);
+    std::unique_ptr<Frame> decode(uint32_t width, uint32_t height);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 

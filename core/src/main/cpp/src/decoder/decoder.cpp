@@ -301,7 +301,7 @@ Decoder::Decoder(
         throw DecoderException("Could not find stream information");
     }
 
-    format = Format{
+    format = {
             location,
             formatContext->duration == AV_NOPTS_VALUE ? 0 : static_cast<uint64_t>(formatContext->duration)
     };
@@ -476,17 +476,9 @@ Decoder::~Decoder() {
 
         videoCodecContext->hw_device_ctx = nullptr;
     }
-
-    audioBuffer.clear();
-
-    videoBuffer.clear();
-
-    audioBuffer.shrink_to_fit();
-
-    videoBuffer.shrink_to_fit();
 }
 
-std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
+std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -494,17 +486,15 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
     }
 
     if (!_hasAudio() && !_hasVideo()) {
-        return std::nullopt;
+        return nullptr;
     }
 
-    try {
-        av_packet_unref(packet.get());
+    av_packet_unref(packet.get());
 
+    try {
         while (av_read_frame(formatContext.get(), packet.get()) == 0) {
             if (_hasAudio() && packet->stream_index == audioStream->index) {
                 if (avcodec_send_packet(audioCodecContext.get(), packet.get()) < 0) {
-                    av_packet_unref(packet.get());
-
                     continue;
                 }
 
@@ -523,11 +513,13 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
 
                     _processAudioFrame();
 
-                    auto frame = Frame{Frame::Type::AUDIO, timestampMicros, audioBuffer};
+                    av_frame_unref(audioFrame.get());
 
-                    audioBuffer.clear();
-
-                    return frame;
+                    return std::make_unique<Frame>(
+                            Frame::Type::AUDIO,
+                            timestampMicros,
+                            std::move(audioBuffer)
+                    );
                 }
 
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -535,8 +527,6 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                 }
             } else if (_hasVideo() && packet->stream_index == videoStream->index) {
                 if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
-                    av_packet_unref(packet.get());
-
                     continue;
                 }
 
@@ -547,6 +537,7 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                 av_frame_unref(swVideoFrame.get());
 
                 int ret;
+
                 while ((ret = avcodec_receive_frame(
                         videoCodecContext.get(),
                         _isHardwareAccelerated() ? hwVideoFrame.get() : swVideoFrame.get()
@@ -555,13 +546,17 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                         if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
                             throw DecoderException("Error transferring frame to system memory");
                         }
+
+                        swVideoFrame->best_effort_timestamp = hwVideoFrame->best_effort_timestamp;
+
+                        av_frame_unref(hwVideoFrame.get());
                     }
+
+                    const auto frameTimestampMicros = swVideoFrame->best_effort_timestamp;
 
                     _processVideoFrame(width, height);
 
-                    const auto frameTimestampMicros =
-                            _isHardwareAccelerated() ? hwVideoFrame->best_effort_timestamp
-                                                     : swVideoFrame->best_effort_timestamp;
+                    av_frame_unref(swVideoFrame.get());
 
                     const auto timestampMicros = frameTimestampMicros == AV_NOPTS_VALUE ? 0 : av_rescale_q(
                             frameTimestampMicros,
@@ -569,11 +564,11 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                             AVRational{1, 1'000'000}
                     );
 
-                    auto frame = Frame{Frame::Type::VIDEO, timestampMicros, videoBuffer};
-
-                    videoBuffer.clear();
-
-                    return frame;
+                    return std::make_unique<Frame>(
+                            Frame::Type::VIDEO,
+                            timestampMicros,
+                            std::move(videoBuffer)
+                    );
                 }
 
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -584,14 +579,26 @@ std::optional<Frame> Decoder::decode(uint32_t width, uint32_t height) {
             av_packet_unref(packet.get());
         }
     } catch (...) {
-        audioBuffer.clear();
+        if (packet) {
+            av_packet_unref(packet.get());
+        }
 
-        videoBuffer.clear();
+        if (audioFrame) {
+            av_frame_unref(audioFrame.get());
+        }
+
+        if (hwVideoFrame) {
+            av_frame_unref(hwVideoFrame.get());
+        }
+
+        if (swVideoFrame) {
+            av_frame_unref(swVideoFrame.get());
+        }
 
         throw;
     }
 
-    return std::nullopt;
+    return nullptr;
 }
 
 void Decoder::seekTo(long timestampMicros, bool keyframesOnly) {
@@ -707,6 +714,7 @@ void Decoder::reset() {
         audioBuffer.clear();
 
         audioBuffer.shrink_to_fit();
+
     }
 
     if (_hasVideo()) {
@@ -715,5 +723,6 @@ void Decoder::reset() {
         videoBuffer.clear();
 
         videoBuffer.shrink_to_fit();
+
     }
 }
