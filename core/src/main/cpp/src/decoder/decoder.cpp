@@ -517,6 +517,8 @@ std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
 
                     return std::make_unique<Frame>(
                             Frame::Type::AUDIO,
+                            width,
+                            height,
                             timestampMicros,
                             std::move(audioBuffer)
                     );
@@ -566,6 +568,8 @@ std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
 
                     return std::make_unique<Frame>(
                             Frame::Type::VIDEO,
+                            width,
+                            height,
                             timestampMicros,
                             std::move(videoBuffer)
                     );

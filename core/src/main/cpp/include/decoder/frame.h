@@ -10,6 +10,8 @@ struct Frame {
     };
 
     Type type;
+    uint32_t width;
+    uint32_t height;
     int64_t timestampMicros;
     std::vector<uint8_t> bytes;
 };
