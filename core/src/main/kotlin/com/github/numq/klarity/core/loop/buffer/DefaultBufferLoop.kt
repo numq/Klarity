@@ -32,11 +32,11 @@ internal class DefaultBufferLoop(
         buffer: Buffer<Frame.Audio>,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
-    ) = coroutineScope {
+    ) {
         isWaiting.set(true)
 
-        while (isActive && isBuffering.get()) {
-            when (val frame = decoder.decode(null, null).getOrNull()) {
+        while (currentCoroutineContext().isActive && isBuffering.get()) {
+            when (val frame = decoder.decode(width = null, height = null).getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
@@ -54,7 +54,7 @@ internal class DefaultBufferLoop(
                         is Frame.Audio.Content -> {
                             buffer.push(frame)
 
-                            ensureActive()
+                            currentCoroutineContext().ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
@@ -75,11 +75,11 @@ internal class DefaultBufferLoop(
         buffer: Buffer<Frame.Video>,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
-    ) = coroutineScope {
+    ) {
         isWaiting.set(true)
 
-        while (isActive && isBuffering.get()) {
-            when (val frame = decoder.decode(null, null).getOrNull()) {
+        while (currentCoroutineContext().isActive && isBuffering.get()) {
+            when (val frame = decoder.decode(width = null, height = null).getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
@@ -97,7 +97,7 @@ internal class DefaultBufferLoop(
                         is Frame.Video.Content -> {
                             buffer.push(frame)
 
-                            ensureActive()
+                            currentCoroutineContext().ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }

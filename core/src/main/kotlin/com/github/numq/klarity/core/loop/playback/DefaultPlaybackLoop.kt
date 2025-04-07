@@ -40,12 +40,12 @@ internal class DefaultPlaybackLoop(
         renderer: Renderer,
         onAudioTimestamp: suspend (Timestamp) -> Unit,
         onVideoTimestamp: suspend (Timestamp) -> Unit,
-    ) = coroutineScope {
+    ) {
         val latency = sampler.getLatency().getOrThrow()
 
         val lastAudioTimestamp = AtomicReference(Duration.INFINITE)
 
-        val audioJob = launch {
+        val audioJob = coroutineScope.launch {
             while (isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
                     yield()
@@ -69,7 +69,7 @@ internal class DefaultPlaybackLoop(
             }
         }
 
-        val videoJob = launch {
+        val videoJob = coroutineScope.launch {
             var lastFrameTimestamp = Duration.INFINITE
 
             while (isActive && isPlaying.get()) {
@@ -82,10 +82,7 @@ internal class DefaultPlaybackLoop(
                 when {
                     audioJob.isCompleted -> {
                         handleVideoPlayback(
-                            media = media,
-                            buffer = videoBuffer,
-                            renderer = renderer,
-                            onTimestamp = onVideoTimestamp
+                            media = media, buffer = videoBuffer, renderer = renderer, onTimestamp = onVideoTimestamp
                         )
 
                         break
@@ -133,13 +130,13 @@ internal class DefaultPlaybackLoop(
         buffer: Buffer<Frame.Audio>,
         sampler: Sampler,
         onTimestamp: suspend (Timestamp) -> Unit,
-    ) = coroutineScope {
-        while (isActive && isPlaying.get()) {
+    ) {
+        while (currentCoroutineContext().isActive && isPlaying.get()) {
             when (val frame = buffer.poll().getOrThrow()) {
                 is Frame.Audio.Content -> {
                     sampler.play(bytes = frame.bytes).getOrThrow()
 
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
                 }
@@ -154,10 +151,10 @@ internal class DefaultPlaybackLoop(
         buffer: Buffer<Frame.Video>,
         renderer: Renderer,
         onTimestamp: suspend (Timestamp) -> Unit,
-    ) = coroutineScope {
+    ) {
         var lastFrameTimestamp = Duration.INFINITE
 
-        while (isActive && isPlaying.get()) {
+        while (currentCoroutineContext().isActive && isPlaying.get()) {
             when (val frame = buffer.poll().getOrThrow()) {
                 is Frame.Video.Content -> {
                     if (lastFrameTimestamp.isInfinite()) {
@@ -166,19 +163,19 @@ internal class DefaultPlaybackLoop(
 
                     val startPlaybackTime = System.nanoTime().nanoseconds
 
-                    while (isActive && isPlaying.get()) {
+                    while (currentCoroutineContext().isActive && isPlaying.get()) {
                         if ((System.nanoTime().nanoseconds - startPlaybackTime) * renderer.playbackSpeedFactor.value.toDouble() > frame.timestampMicros.microseconds - lastFrameTimestamp) {
                             break
                         }
 
-                        ensureActive()
+                        currentCoroutineContext().ensureActive()
 
                         yield()
                     }
 
                     renderer.draw(frame).getOrThrow()
 
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
 
