@@ -26,21 +26,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-private fun scaleDimensions(
-    width: Float,
-    height: Float,
-    maxSide: Float,
-) = maxSide.div(maxOf(width, height)).let { scaleFactor ->
-    (width * scaleFactor to height * scaleFactor)
-}
-
 @Composable
 fun TimelinePreview(
     width: Float,
     height: Float,
     format: VideoFormat,
     hoveredTimestamps: SharedFlow<HoveredTimestamp?>,
-    preview: suspend (timestampMillis: Long, width: Int, height: Int) -> Frame.Video.Content?,
+    preview: suspend (timestampMillis: Long) -> Frame.Video.Content?,
 ) {
     var previewJob by remember { mutableStateOf<Job?>(null) }
 
@@ -51,20 +43,12 @@ fun TimelinePreview(
             previewJob?.cancelAndJoin()
             previewJob = launch(Dispatchers.Default) {
                 timelinePreview = hoveredTimestamp?.let {
-                    scaleDimensions(
-                        format.width.toFloat(),
-                        format.height.toFloat(),
-                        minOf(format.width.toFloat(), format.height.toFloat())
-                    ).let { (scaledWidth, scaledHeight) ->
-                        preview(
-                            hoveredTimestamp.millis, scaledWidth.toInt(), scaledHeight.toInt()
-                        )?.let { frame ->
-                            TimelinePreviewItem(
-                                offset = Offset(hoveredTimestamp.offset.x, 0f),
-                                millis = hoveredTimestamp.millis,
-                                frame = frame
-                            )
-                        }
+                    preview(hoveredTimestamp.millis)?.let { frame ->
+                        TimelinePreviewItem(
+                            offset = Offset(hoveredTimestamp.offset.x, 0f),
+                            millis = hoveredTimestamp.millis,
+                            frame = frame
+                        )
                     }
                 }
             }

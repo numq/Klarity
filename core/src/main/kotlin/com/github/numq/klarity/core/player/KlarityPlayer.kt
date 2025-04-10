@@ -7,14 +7,14 @@ import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.renderer.RendererFactory
 import com.github.numq.klarity.core.sampler.SamplerFactory
+import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
+import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.state.PlayerState
 import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.flow.SharedFlow
@@ -79,8 +79,8 @@ interface KlarityPlayer {
      * @param location The location of the media file to prepare.
      * @param enableAudio Whether to enable audio playback.
      * @param enableVideo Whether to enable video playback.
-     * @param hardwareAcceleration Specifies the type of hardware acceleration used for video decoding.
-     * @param hardwareAccelerationFallback Specifies the fallback strategy - which acceleration to use in case of failure - of the hardware acceleration used for video decoding.
+     * @property audioSettings Desired audio settings for decoding.
+     * @property videoSettings Desired video settings for decoding.
      *
      * @return A [Result] indicating success or failure of the operation.
      */
@@ -88,8 +88,8 @@ interface KlarityPlayer {
         location: String,
         enableAudio: Boolean,
         enableVideo: Boolean,
-        hardwareAcceleration: HardwareAcceleration = HardwareAcceleration.None,
-        hardwareAccelerationFallback: HardwareAccelerationFallback = HardwareAccelerationFallback(),
+        audioSettings: AudioSettings = AudioSettings(),
+        videoSettings: VideoSettings = VideoSettings(),
     ): Result<Unit>
 
     /**

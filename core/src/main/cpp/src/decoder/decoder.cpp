@@ -1,11 +1,11 @@
 #include "decoder.h"
 
 bool Decoder::_hasAudio() {
-    return audioCodecContext &&
-           audioStream &&
-           audioStream->codecpar &&
-           audioDecoder &&
-           audioFrame &&
+    if (!audioCodecContext || !audioStream || !audioDecoder || !audioFrame) {
+        return false;
+    }
+
+    return audioStream->codecpar &&
            audioCodecContext->sample_rate > 0 &&
            audioCodecContext->ch_layout.nb_channels > 0 &&
            format.sampleRate > 0 &&
@@ -17,42 +17,41 @@ bool Decoder::_hasVideo() {
         return false;
     }
 
-    const bool validDimensions = videoCodecContext->pix_fmt != AV_PIX_FMT_NONE &&
-                                 videoCodecContext->width > 0 &&
+    const bool validDimensions = videoCodecContext->width > 0 &&
                                  videoCodecContext->height > 0 &&
                                  format.width > 0 &&
                                  format.height > 0;
-
-    if (_isHardwareAccelerated()) {
-        return validDimensions &&
-               hwVideoFrame &&
-               videoCodecContext->hw_device_ctx &&
-               videoCodecContext->pix_fmt != AV_PIX_FMT_NONE;
-    }
 
     return validDimensions && videoCodecContext->pix_fmt != AV_PIX_FMT_NONE;
 }
 
 bool Decoder::_isValid() {
-    return formatContext && formatContext->pb && (_hasAudio() || _hasVideo());
+    return formatContext && (audioStream || videoStream);
 }
 
 bool Decoder::_isHardwareAccelerated() {
-    return hwDeviceType != AV_HWDEVICE_TYPE_NONE &&
-           videoCodecContext &&
-           videoCodecContext->hw_device_ctx &&
-           hwVideoFrame;
+    if (!videoCodecContext || !videoCodecContext->hw_device_ctx || !hwVideoFrame) {
+        return false;
+    }
+
+    return format.hwDeviceType != AV_HWDEVICE_TYPE_NONE;
 }
 
-void Decoder::_prepareHardwareAcceleration(uint32_t deviceType) {
+bool Decoder::_prepareHardwareAcceleration(uint32_t deviceType) {
+    if (deviceType == AVHWDeviceType::AV_HWDEVICE_TYPE_NONE) {
+        return false;
+    }
+
     const AVCodecHWConfig *config = nullptr;
 
     for (int i = 0; (config = avcodec_get_hw_config(videoDecoder, i)); i++) {
         if (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && config->device_type == deviceType) {
-            videoCodecContext->opaque = reinterpret_cast<void *>(static_cast<uintptr_t>(config->pix_fmt));
-
             break;
         }
+    }
+
+    if (!config) {
+        return false;
     }
 
     auto targetDeviceType = static_cast<AVHWDeviceType>(deviceType);
@@ -65,55 +64,25 @@ void Decoder::_prepareHardwareAcceleration(uint32_t deviceType) {
         throw HardwareAccelerationException("Memory allocation failed for hardware video frame");
     }
 
-    this->hwDeviceType = targetDeviceType;
+    format.hwDeviceType = targetDeviceType;
+
+    return true;
 }
 
-void Decoder::_prepareSwsContext(
-        AVPixelFormat srcFormat,
-        uint32_t srcWidth,
-        uint32_t srcHeight,
-        uint32_t dstWidth,
-        uint32_t dstHeight
-) {
-    if (swsPixelFormat != targetPixelFormat || swsWidth != dstWidth || swsHeight != dstHeight) {
-        swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
-                sws_getCachedContext(
-                        swsContext.release(),
-                        static_cast<int>(srcWidth), static_cast<int>(srcHeight), srcFormat,
-                        static_cast<int>(dstWidth), static_cast<int>(dstHeight), targetPixelFormat,
-                        swsFlags,
-                        nullptr, nullptr, nullptr
-                )
-        );
-
-        if (!swsContext) {
-            swsPixelFormat = AV_PIX_FMT_NONE;
-
-            swsWidth = -1;
-
-            swsHeight = -1;
-
-            throw DecoderException("Could not reallocate sws context");
-        }
-
-        swsPixelFormat = targetPixelFormat;
-
-        swsWidth = static_cast<int>(dstWidth);
-
-        swsHeight = static_cast<int>(dstHeight);
+void Decoder::_processAudioFrame(uint8_t *buffer, uint32_t bufferSize) {
+    if (format.audioBufferSize <= 0 || bufferSize < format.audioBufferSize) {
+        throw DecoderException("Invalid audio buffer size");
     }
-}
 
-void Decoder::_processAudioFrame() {
+    if (format.sampleRate <= 0 || format.channels <= 0) {
+        throw DecoderException("Invalid audio format");
+    }
+
     if (!audioFrame) {
         throw DecoderException("Invalid audio frame");
     }
 
     auto src = audioFrame.get();
-
-    if (format.sampleRate <= 0 || format.channels <= 0) {
-        throw DecoderException("Invalid audio format");
-    }
 
     const auto nbSamples = av_rescale_rnd(
             swr_get_delay(swrContext.get(), src->sample_rate) + src->nb_samples,
@@ -121,22 +90,6 @@ void Decoder::_processAudioFrame() {
             src->sample_rate,
             AV_ROUND_UP
     );
-
-    int bufferSize;
-
-    if ((bufferSize = av_samples_get_buffer_size(
-            nullptr,
-            src->ch_layout.nb_channels,
-            static_cast<int>(nbSamples),
-            targetSampleFormat,
-            1
-    )) < 0) {
-        throw DecoderException("Could not get buffer size, error: " + std::to_string(bufferSize));
-    }
-
-    if (audioBuffer.size() != bufferSize) {
-        audioBuffer.resize(bufferSize);
-    }
 
     if (src->format != targetSampleFormat) {
         uint8_t *outPlanes[AV_NUM_DATA_POINTERS] = {nullptr};
@@ -146,7 +99,7 @@ void Decoder::_processAudioFrame() {
         if ((filledSize = av_samples_fill_arrays(
                 outPlanes,
                 nullptr,
-                audioBuffer.data(),
+                buffer,
                 src->ch_layout.nb_channels,
                 static_cast<int>(nbSamples),
                 targetSampleFormat,
@@ -173,15 +126,23 @@ void Decoder::_processAudioFrame() {
                     throw DecoderException("Could not get per-channel buffer size");
                 }
 
-                memcpy(audioBuffer.data() + ch * channel_size, src->data[ch], channel_size);
+                memcpy(buffer + ch * channel_size, src->data[ch], channel_size);
             }
         } else {
-            memcpy(audioBuffer.data(), src->data[0], bufferSize);
+            memcpy(buffer, src->data[0], bufferSize);
         }
     }
 }
 
-void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
+void Decoder::_processVideoFrame(uint8_t *buffer, uint32_t bufferSize) {
+    if (format.videoBufferSize <= 0 || bufferSize < format.videoBufferSize) {
+        throw DecoderException("Invalid video buffer size");
+    }
+
+    if (format.width <= 0 || format.height <= 0) {
+        throw DecoderException("Invalid video format");
+    }
+
     if (!swVideoFrame) {
         throw DecoderException("Invalid video frame");
     }
@@ -192,62 +153,16 @@ void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
         throw DecoderException("Invalid pixel format");
     }
 
-    if (format.width <= 0 || format.height <= 0) {
-        throw DecoderException("Invalid video format");
-    }
+    const auto dstWidth = static_cast<int>(format.width);
 
-    if (dstWidth <= 0 || dstHeight <= 0) {
-        throw DecoderException("Invalid destination dimensions");
-    }
-
-    auto srcFormat = static_cast<AVPixelFormat>(src->format);
-
-    switch (src->format) {
-        case AV_PIX_FMT_YUVJ420P:
-            srcFormat = AV_PIX_FMT_YUV420P;
-            break;
-
-        case AV_PIX_FMT_YUVJ422P:
-            srcFormat = AV_PIX_FMT_YUV422P;
-            break;
-
-        case AV_PIX_FMT_YUVJ444P:
-            srcFormat = AV_PIX_FMT_YUV444P;
-            break;
-
-        default:
-            break;
-    }
-
-    const auto srcWidth = src->width;
-
-    const auto srcHeight = src->height;
-
-    _prepareSwsContext(srcFormat, srcWidth, srcHeight, dstWidth, dstHeight);
-
-    int bufferSize;
-
-    if ((bufferSize = av_image_get_buffer_size(
-            static_cast<AVPixelFormat>(swsPixelFormat),
-            swsWidth,
-            swsHeight,
-            1
-    )) < 0) {
-        throw DecoderException("Could not get buffer size, error: " + std::to_string(bufferSize));
-    }
-
-    bufferSize += AV_INPUT_BUFFER_PADDING_SIZE;
-
-    if (videoBuffer.size() != bufferSize) {
-        videoBuffer.resize(bufferSize);
-    }
+    const auto dstHeight = static_cast<int>(format.height);
 
     std::vector<int> dstLineSize(AV_NUM_DATA_POINTERS, 0);
 
     if (av_image_fill_linesizes(
             dstLineSize.data(),
-            static_cast<AVPixelFormat>(swsPixelFormat),
-            swsWidth
+            targetPixelFormat,
+            dstWidth
     ) < 0) {
         throw DecoderException("Could not fill line sizes");
     }
@@ -256,9 +171,9 @@ void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
 
     if (av_image_fill_pointers(
             dst.data(),
-            static_cast<AVPixelFormat>(swsPixelFormat),
-            swsHeight,
-            videoBuffer.data(),
+            targetPixelFormat,
+            dstHeight,
+            buffer,
             dstLineSize.data()
     ) < 0) {
         throw DecoderException("Could not fill pointers");
@@ -269,7 +184,7 @@ void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
             src->data,
             src->linesize,
             0,
-            srcHeight,
+            src->height,
             dst.data(),
             dstLineSize.data()
     ) < 0) {
@@ -279,13 +194,8 @@ void Decoder::_processVideoFrame(uint32_t dstWidth, uint32_t dstHeight) {
 
 Decoder::Decoder(
         const std::string &location,
-        const bool findAudioStream,
-        const bool prepareAudioStream,
-        const bool findVideoStream,
-        const bool prepareVideoStream,
-        const uint32_t hwDeviceType,
-        const std::vector<uint32_t> &hwDeviceTypeCandidates,
-        const bool swAccelFallback
+        const std::optional<AudioParameters> &audioParameters,
+        const std::optional<VideoParameters> &videoParameters
 ) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
@@ -306,7 +216,7 @@ Decoder::Decoder(
             formatContext->duration == AV_NOPTS_VALUE ? 0 : static_cast<uint64_t>(formatContext->duration)
     };
 
-    if (findAudioStream) {
+    if (audioParameters.has_value()) {
         int streamIndex = av_find_best_stream(
                 formatContext.get(),
                 AVMediaType::AVMEDIA_TYPE_AUDIO,
@@ -316,7 +226,7 @@ Decoder::Decoder(
                 0
         );
 
-        if (audioDecoder) {
+        if (streamIndex >= 0 && audioDecoder) {
             if (!(audioStream = formatContext->streams[streamIndex])) {
                 throw DecoderException("Could not find audio stream");
             }
@@ -341,39 +251,83 @@ Decoder::Decoder(
 
             format.channels = audioCodecContext->ch_layout.nb_channels;
 
-            if (prepareAudioStream) {
-                audioFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
+            if (audioParameters->decodingParameters.has_value()) {
+                format.sampleRate = audioParameters->decodingParameters.value().sampleRate.value_or(
+                        audioCodecContext->sample_rate
+                );
 
-                if (!audioFrame) {
-                    throw DecoderException("Memory allocation failed for audio frame");
+                format.channels = audioParameters->decodingParameters.value().channels.value_or(
+                        audioCodecContext->ch_layout.nb_channels
+                );
+
+                int frameSize = audioCodecContext->frame_size;
+
+                if (frameSize <= 0) {
+                    frameSize = 1024;
                 }
 
-                SwrContext *rawSwrContext = nullptr;
+                AVChannelLayout channelLayout = {};
 
-                if (swr_alloc_set_opts2(
-                        &rawSwrContext,
-                        &audioCodecContext->ch_layout,
-                        targetSampleFormat,
-                        audioCodecContext->sample_rate,
-                        &audioCodecContext->ch_layout,
-                        audioCodecContext->sample_fmt,
-                        audioCodecContext->sample_rate,
-                        0,
-                        nullptr) < 0 || !rawSwrContext
-                        ) {
-                    throw DecoderException("Could not allocate swr context");
+                av_channel_layout_default(&channelLayout, static_cast<int>(format.channels));
+
+                try {
+                    SwrContext *rawSwrContext = nullptr;
+
+                    if (swr_alloc_set_opts2(
+                            &rawSwrContext,
+                            &channelLayout,
+                            targetSampleFormat,
+                            static_cast<int>(format.sampleRate),
+                            &audioCodecContext->ch_layout,
+                            audioCodecContext->sample_fmt,
+                            audioCodecContext->sample_rate,
+                            0,
+                            nullptr) < 0 || !rawSwrContext
+                            ) {
+                        throw DecoderException("Could not allocate swr context");
+                    }
+
+                    swrContext = std::unique_ptr<SwrContext, SwrContextDeleter>(rawSwrContext);
+
+                    if (swr_init(swrContext.get()) < 0) {
+                        throw DecoderException("Could not initialize swr context");
+                    }
+
+                    auto maxOutSamples = av_rescale_rnd(
+                            swr_get_delay(swrContext.get(), audioCodecContext->sample_rate) + frameSize,
+                            format.sampleRate,
+                            audioCodecContext->sample_rate,
+                            AV_ROUND_UP
+                    );
+
+                    if ((format.audioBufferSize = av_samples_get_buffer_size(
+                            nullptr,
+                            static_cast<int>(format.channels),
+                            static_cast<int>(maxOutSamples),
+                            targetSampleFormat,
+                            1)) <= 0) {
+                        throw DecoderException(
+                                "Could not get buffer size, error: " + std::to_string(format.audioBufferSize)
+                        );
+                    }
+
+                    audioFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
+
+                    if (!audioFrame) {
+                        throw DecoderException("Memory allocation failed for audio frame");
+                    }
+                } catch (...) {
+                    av_channel_layout_uninit(&channelLayout);
+
+                    throw;
                 }
 
-                swrContext = std::unique_ptr<SwrContext, SwrContextDeleter>(rawSwrContext);
-
-                if (swr_init(swrContext.get()) < 0) {
-                    throw DecoderException("Could not initialize swr context");
-                }
+                av_channel_layout_uninit(&channelLayout);
             }
         }
     }
 
-    if (findVideoStream) {
+    if (videoParameters.has_value()) {
         int streamIndex = av_find_best_stream(
                 formatContext.get(),
                 AVMediaType::AVMEDIA_TYPE_VIDEO,
@@ -383,7 +337,7 @@ Decoder::Decoder(
                 0
         );
 
-        if (videoDecoder) {
+        if (streamIndex >= 0 && videoDecoder) {
             if (!(videoStream = formatContext->streams[streamIndex])) {
                 throw DecoderException("Could not find video stream");
             }
@@ -400,18 +354,10 @@ Decoder::Decoder(
                 throw DecoderException("Could not copy parameters to video codec context");
             }
 
-            try {
-                _prepareHardwareAcceleration(hwDeviceType);
-            } catch (const HardwareAccelerationException &e) {
-                try {
-                    for (auto deviceType: hwDeviceTypeCandidates) {
-                        _prepareHardwareAcceleration(deviceType);
-
+            if (videoParameters->decodingParameters.has_value()) {
+                for (auto deviceType: videoParameters->decodingParameters->hardwareAccelerationCandidates) {
+                    if (_prepareHardwareAcceleration(deviceType)) {
                         break;
-                    }
-                } catch (const HardwareAccelerationException &e) {
-                    if (!swAccelFallback) {
-                        throw;
                     }
                 }
             }
@@ -430,19 +376,44 @@ Decoder::Decoder(
                 format.durationMicros = 0;
             }
 
-            if (prepareVideoStream) {
-                swVideoFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
+            if (videoParameters->decodingParameters.has_value()) {
+                format.width = videoParameters->decodingParameters->width.value_or(
+                        videoCodecContext->width
+                );
 
-                if (!swVideoFrame) {
-                    throw DecoderException("Memory allocation failed for software video frame");
+                format.height = videoParameters->decodingParameters->height.value_or(
+                        videoCodecContext->height
+                );
+
+                format.frameRate = videoParameters->decodingParameters->frameRate.value_or(
+                        av_q2d(videoStream->avg_frame_rate)
+                );
+
+                if ((format.videoBufferSize = av_image_get_buffer_size(
+                        targetPixelFormat,
+                        static_cast<int>(format.width),
+                        static_cast<int>(format.height),
+                        32
+                )) <= 0) {
+                    throw DecoderException(
+                            "Could not get buffer size, error: " + std::to_string(format.videoBufferSize)
+                    );
                 }
+
+                format.videoBufferSize += AV_INPUT_BUFFER_PADDING_SIZE;
 
                 swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
                         sws_getContext(
-                                videoCodecContext->width, videoCodecContext->height, videoCodecContext->pix_fmt,
-                                videoCodecContext->width, videoCodecContext->height, targetPixelFormat,
+                                videoCodecContext->width,
+                                videoCodecContext->height,
+                                videoCodecContext->pix_fmt,
+                                static_cast<int>(format.width),
+                                static_cast<int>(format.height),
+                                targetPixelFormat,
                                 swsFlags,
-                                nullptr, nullptr, nullptr
+                                nullptr,
+                                nullptr,
+                                nullptr
                         )
                 );
 
@@ -450,11 +421,11 @@ Decoder::Decoder(
                     throw DecoderException("Could not allocate sws context");
                 }
 
-                swsPixelFormat = videoCodecContext->pix_fmt;
+                swVideoFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
 
-                swsWidth = videoCodecContext->width;
-
-                swsHeight = videoCodecContext->height;
+                if (!swVideoFrame) {
+                    throw DecoderException("Memory allocation failed for software video frame");
+                }
             }
         }
     }
@@ -478,11 +449,19 @@ Decoder::~Decoder() {
     }
 }
 
-std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
+std::unique_ptr<Frame> Decoder::decode(uint8_t *buffer, uint32_t bufferSize) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
         throw DecoderException("Could not use uninitialized decoder");
+    }
+
+    if (_hasAudio() && bufferSize < format.audioBufferSize) {
+        throw DecoderException("Wrong audio buffer size");
+    }
+
+    if (_hasVideo() && bufferSize < format.videoBufferSize) {
+        throw DecoderException("Wrong video buffer size");
     }
 
     if (!_hasAudio() && !_hasVideo()) {
@@ -511,16 +490,13 @@ std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
                             AVRational{1, 1'000'000}
                     );
 
-                    _processAudioFrame();
+                    _processAudioFrame(buffer, bufferSize);
 
                     av_frame_unref(audioFrame.get());
 
                     return std::make_unique<Frame>(
                             Frame::Type::AUDIO,
-                            0,
-                            0,
-                            timestampMicros,
-                            std::move(audioBuffer)
+                            timestampMicros
                     );
                 }
 
@@ -556,7 +532,7 @@ std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
 
                     const auto frameTimestampMicros = swVideoFrame->best_effort_timestamp;
 
-                    _processVideoFrame(width, height);
+                    _processVideoFrame(buffer, bufferSize);
 
                     av_frame_unref(swVideoFrame.get());
 
@@ -568,10 +544,7 @@ std::unique_ptr<Frame> Decoder::decode(uint32_t width, uint32_t height) {
 
                     return std::make_unique<Frame>(
                             Frame::Type::VIDEO,
-                            width,
-                            height,
-                            timestampMicros,
-                            std::move(videoBuffer)
+                            timestampMicros
                     );
                 }
 
@@ -654,18 +627,10 @@ void Decoder::seekTo(long timestampMicros, bool keyframesOnly) {
 
     if (_hasAudio()) {
         avcodec_flush_buffers(audioCodecContext.get());
-
-        audioBuffer.clear();
-
-        audioBuffer.shrink_to_fit();
     }
 
     if (_hasVideo()) {
         avcodec_flush_buffers(videoCodecContext.get());
-
-        videoBuffer.clear();
-
-        videoBuffer.shrink_to_fit();
 
         if (!keyframesOnly) {
             while (av_read_frame(formatContext.get(), packet.get()) == 0) {
@@ -714,19 +679,9 @@ void Decoder::reset() {
 
     if (_hasAudio()) {
         avcodec_flush_buffers(audioCodecContext.get());
-
-        audioBuffer.clear();
-
-        audioBuffer.shrink_to_fit();
-
     }
 
     if (_hasVideo()) {
         avcodec_flush_buffers(videoCodecContext.get());
-
-        videoBuffer.clear();
-
-        videoBuffer.shrink_to_fit();
-
     }
 }

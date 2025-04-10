@@ -2,10 +2,10 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.frame.NativeFrame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.nio.ByteBuffer
 
 internal class VideoDecoder(
     private val decoder: NativeDecoder,
@@ -13,20 +13,26 @@ internal class VideoDecoder(
 ) : Decoder<Media.Video, Frame.Video> {
     private val mutex = Mutex()
 
-    override val hardwareAcceleration =
-        HardwareAcceleration.fromNative(decoder.hardwareAcceleration) ?: HardwareAcceleration.None
+    private var byteBuffer = ByteBuffer.allocateDirect(decoder.format.videoBufferSize)
 
-    override suspend fun decode(width: Int?, height: Int?) = mutex.withLock {
+    override suspend fun decode() = mutex.withLock {
         runCatching {
-            decoder.decode(width, height)?.run {
-                when (type) {
-                    NativeFrame.Type.VIDEO.ordinal -> Frame.Video.Content(
-                        timestampMicros = timestampMicros,
-                        bytes = bytes,
-                        width = width ?: decoder.format.width,
-                        height = height ?: decoder.format.height,
-                        frameRate = decoder.format.frameRate
-                    )
+            byteBuffer.clear()
+
+            decoder.decode(byteBuffer)?.let { nativeFrame ->
+                when (nativeFrame.type) {
+                    NativeFrame.Type.VIDEO.ordinal -> {
+                        val bytes = ByteArray(byteBuffer.remaining())
+
+                        byteBuffer.get(bytes)
+
+                        Frame.Video.Content(
+                            timestampMicros = nativeFrame.timestampMicros,
+                            bytes = bytes,
+                            width = decoder.format.width,
+                            height = decoder.format.height
+                        )
+                    }
 
                     else -> null
                 }
@@ -36,13 +42,17 @@ internal class VideoDecoder(
 
     override suspend fun seekTo(micros: Long, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
-            decoder.seekTo(micros, keyframesOnly)
+            decoder.seekTo(micros, keyframesOnly).also {
+                byteBuffer.clear()
+            }
         }
     }
 
     override suspend fun reset() = mutex.withLock {
         runCatching {
-            decoder.reset()
+            decoder.reset().also {
+                byteBuffer.clear()
+            }
         }
     }
 

@@ -1,12 +1,11 @@
 package com.github.numq.klarity.core.renderer
 
+import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
 import kotlinx.coroutines.flow.MutableStateFlow
 
 internal class DefaultRenderer(
-    override val width: Int,
-    override val height: Int,
-    override val frameRate: Double,
+    override val format: VideoFormat,
     override val preview: Frame.Video.Content?,
 ) : Renderer {
     override val frame = MutableStateFlow(value = preview)

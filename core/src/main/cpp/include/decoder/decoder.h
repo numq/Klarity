@@ -7,10 +7,12 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <optional>
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
 #include "hwaccel.h"
+#include "parameters.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -77,10 +79,6 @@ private:
 
     const int swsFlags = SWS_BILINEAR;
 
-    std::vector<uint8_t> audioBuffer;
-
-    std::vector<uint8_t> videoBuffer;
-
     std::unique_ptr<AVFormatContext, AVFormatContextDeleter> formatContext;
 
     std::unique_ptr<AVCodecContext, AVCodecContextDeleter> audioCodecContext;
@@ -99,12 +97,6 @@ private:
 
     std::unique_ptr<SwsContext, SwsContextDeleter> swsContext;
 
-    int swsPixelFormat = AV_PIX_FMT_NONE;
-
-    int swsWidth = -1;
-
-    int swsHeight = -1;
-
     std::unique_ptr<AVPacket, AVPacketDeleter> packet;
 
     std::unique_ptr<AVFrame, AVFrameDeleter> audioFrame;
@@ -121,39 +113,24 @@ private:
 
     bool _isHardwareAccelerated();
 
-    void _prepareHardwareAcceleration(uint32_t deviceType);
+    bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _prepareSwsContext(
-            AVPixelFormat srcFormat,
-            uint32_t width,
-            uint32_t height,
-            uint32_t dstWidth,
-            uint32_t dstHeight
-    );
+    void _processAudioFrame(uint8_t *buffer, uint32_t bufferSize);
 
-    void _processAudioFrame();
-
-    void _processVideoFrame(uint32_t dstWidth, uint32_t dstHeight);
+    void _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
 
 public:
-    AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
-
     Format format;
 
     Decoder(
             const std::string &location,
-            bool findAudioStream,
-            bool prepareAudioStream,
-            bool findVideoStream,
-            bool prepareVideoStream,
-            uint32_t hwDeviceType,
-            const std::vector<uint32_t> &hwDeviceTypeCandidates,
-            bool softwareAccelerationFallback
+            const std::optional<AudioParameters> &audioParameters,
+            const std::optional<VideoParameters> &videoParameters
     );
 
     ~Decoder();
 
-    std::unique_ptr<Frame> decode(uint32_t width, uint32_t height);
+    std::unique_ptr<Frame> decode(uint8_t *buffer, uint32_t capacity);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 

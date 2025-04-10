@@ -2,9 +2,9 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
+import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
+import com.github.numq.klarity.core.settings.VideoSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -35,16 +35,20 @@ internal class DefaultKlarityPlayer(
         location: String,
         enableAudio: Boolean,
         enableVideo: Boolean,
-        hardwareAcceleration: HardwareAcceleration,
-        hardwareAccelerationFallback: HardwareAccelerationFallback,
+        audioSettings: AudioSettings,
+        videoSettings: VideoSettings,
     ) = withContext(coroutineContext) {
         playerController.execute(
             Command.Prepare(
                 location = location,
                 audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
                 videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0,
-                hardwareAcceleration = hardwareAcceleration,
-                hardwareAccelerationFallback = hardwareAccelerationFallback
+                sampleRate = audioSettings.sampleRate,
+                channels = audioSettings.channels,
+                width = videoSettings.width,
+                height = videoSettings.height,
+                frameRate = videoSettings.frameRate,
+                hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates
             )
         )
     }

@@ -4,7 +4,6 @@ import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import java.io.File
@@ -13,9 +12,7 @@ import java.net.URI
 interface Decoder<Media, Frame> {
     val media: Media
 
-    val hardwareAcceleration: HardwareAcceleration
-
-    suspend fun decode(width: Int?, height: Int?): Result<Frame>
+    suspend fun decode(): Result<Frame>
 
     suspend fun seekTo(micros: Long, keyframesOnly: Boolean): Result<Unit>
 
@@ -28,7 +25,6 @@ interface Decoder<Media, Frame> {
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
-            hardwareAcceleration: HardwareAcceleration,
         ): Result<Media> = runCatching {
             val mediaLocation = File(location).takeIf(File::exists)?.run {
                 Location.Local(path = absolutePath, name = name)
@@ -41,36 +37,33 @@ interface Decoder<Media, Frame> {
             NativeDecoder(
                 location = location,
                 findAudioStream = findAudioStream,
-                prepareAudioStream = false,
                 findVideoStream = findVideoStream,
-                prepareVideoStream = false,
-                hardwareAcceleration = hardwareAcceleration.native.ordinal,
-                hardwareAccelerationFallbackCandidates = intArrayOf(),
-                useSoftwareAccelerationFallback = true
+                decodeAudioStream = false,
+                decodeVideoStream = false,
+                sampleRate = 0,
+                channels = 0,
+                width = 0,
+                height = 0,
+                frameRate = .0,
+                hardwareAccelerationCandidates = intArrayOf()
             ).use { decoder ->
                 val format = decoder.format
 
                 val audioFormat = runCatching {
-                    if (findAudioStream) {
-                        check(format.sampleRate > 0 && format.channels > 0) { "Audio decoding is not supported by media" }
+                    check(findAudioStream && format.sampleRate > 0 && format.channels > 0)
 
-                        AudioFormat(
-                            sampleRate = format.sampleRate,
-                            channels = format.channels
-                        )
-                    } else null
+                    AudioFormat(sampleRate = format.sampleRate, channels = format.channels)
                 }.getOrNull()
 
                 val videoFormat = runCatching {
-                    if (findVideoStream) {
-                        check(format.width > 0 && format.height > 0 && format.frameRate >= 0) { "Video decoding is not supported by media" }
+                    check(findVideoStream && format.width > 0 && format.height > 0)
 
-                        VideoFormat(
-                            width = format.width,
-                            height = format.height,
-                            frameRate = format.frameRate
-                        )
-                    } else null
+                    VideoFormat(
+                        width = format.width,
+                        height = format.height,
+                        frameRate = format.frameRate,
+                        hardwareAcceleration = HardwareAcceleration.fromNative(format.hwDeviceType)
+                    )
                 }.getOrNull()
 
                 when {
@@ -105,64 +98,68 @@ interface Decoder<Media, Frame> {
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
-            hardwareAcceleration: HardwareAcceleration,
-            hardwareAccelerationFallback: HardwareAccelerationFallback,
         ): Result<Decoder<Media, Frame.Probe>> = probe(
             location = location,
             findAudioStream = findAudioStream,
-            findVideoStream = findVideoStream,
-            hardwareAcceleration = hardwareAcceleration
+            findVideoStream = findVideoStream
         ).mapCatching { media ->
             ProbeDecoder(
                 decoder = NativeDecoder(
                     location = location,
                     findAudioStream = findAudioStream,
-                    prepareAudioStream = false,
                     findVideoStream = findVideoStream,
-                    prepareVideoStream = false,
-                    hardwareAcceleration = hardwareAcceleration.native.ordinal,
-                    hardwareAccelerationFallbackCandidates = hardwareAccelerationFallback.candidates.map { candidate ->
-                        candidate.native.ordinal
-                    }.toIntArray(),
-                    useSoftwareAccelerationFallback = hardwareAccelerationFallback.useSoftwareAcceleration
-                ),
-                media = media
+                    decodeAudioStream = false,
+                    decodeVideoStream = false,
+                    sampleRate = 0,
+                    channels = 0,
+                    width = 0,
+                    height = 0,
+                    frameRate = .0,
+                    hardwareAccelerationCandidates = intArrayOf()
+                ), media = media
             )
         }
 
-        internal fun createAudioDecoder(location: String): Result<Decoder<Media.Audio, Frame.Audio>> = probe(
+        internal fun createAudioDecoder(
+            location: String,
+            sampleRate: Int?,
+            channels: Int?,
+        ): Result<Decoder<Media.Audio, Frame.Audio>> = probe(
             location = location,
             findAudioStream = true,
-            findVideoStream = false,
-            hardwareAcceleration = HardwareAcceleration.None
+            findVideoStream = false
         ).mapCatching<Decoder<Media.Audio, Frame.Audio>, Media> { media ->
             when (media) {
                 is Media.AudioVideo -> AudioDecoder(
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = true,
-                        prepareAudioStream = true,
                         findVideoStream = false,
-                        prepareVideoStream = false,
-                        hardwareAcceleration = HardwareAcceleration.None.native.ordinal,
-                        hardwareAccelerationFallbackCandidates = intArrayOf(),
-                        useSoftwareAccelerationFallback = false
-                    ),
-                    media = media.toAudio()
+                        decodeAudioStream = true,
+                        decodeVideoStream = false,
+                        sampleRate = sampleRate ?: 0,
+                        channels = channels ?: 0,
+                        width = 0,
+                        height = 0,
+                        frameRate = .0,
+                        hardwareAccelerationCandidates = intArrayOf()
+                    ), media = media.toAudio()
                 )
 
                 is Media.Audio -> AudioDecoder(
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = true,
-                        prepareAudioStream = true,
                         findVideoStream = false,
-                        prepareVideoStream = false,
-                        hardwareAcceleration = HardwareAcceleration.None.native.ordinal,
-                        hardwareAccelerationFallbackCandidates = intArrayOf(),
-                        useSoftwareAccelerationFallback = false
-                    ),
-                    media = media
+                        decodeAudioStream = true,
+                        decodeVideoStream = false,
+                        sampleRate = sampleRate ?: 0,
+                        channels = channels ?: 0,
+                        width = 0,
+                        height = 0,
+                        frameRate = .0,
+                        hardwareAccelerationCandidates = intArrayOf()
+                    ), media = media
                 )
 
                 is Media.Video -> throw Exception("Unable to create audio decoder")
@@ -171,29 +168,32 @@ interface Decoder<Media, Frame> {
 
         internal fun createVideoDecoder(
             location: String,
-            hardwareAcceleration: HardwareAcceleration,
-            hardwareAccelerationFallback: HardwareAccelerationFallback,
+            width: Int?,
+            height: Int?,
+            frameRate: Double?,
+            hardwareAccelerationCandidates: List<HardwareAcceleration>,
         ): Result<Decoder<Media.Video, Frame.Video>> = probe(
             location = location,
             findAudioStream = false,
-            findVideoStream = true,
-            hardwareAcceleration = hardwareAcceleration
+            findVideoStream = true
         ).mapCatching { media ->
             when (media) {
                 is Media.AudioVideo -> VideoDecoder(
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = false,
-                        prepareAudioStream = false,
                         findVideoStream = true,
-                        prepareVideoStream = true,
-                        hardwareAcceleration = hardwareAcceleration.native.ordinal,
-                        hardwareAccelerationFallbackCandidates = hardwareAccelerationFallback.candidates.map { candidate ->
+                        decodeAudioStream = false,
+                        decodeVideoStream = true,
+                        sampleRate = 0,
+                        channels = 0,
+                        width = width ?: 0,
+                        height = height ?: 0,
+                        frameRate = frameRate ?: .0,
+                        hardwareAccelerationCandidates = hardwareAccelerationCandidates.map { candidate ->
                             candidate.native.ordinal
-                        }.toIntArray(),
-                        useSoftwareAccelerationFallback = hardwareAccelerationFallback.useSoftwareAcceleration
-                    ),
-                    media = media.toVideo()
+                        }.toIntArray()
+                    ), media = media.toVideo()
                 )
 
                 is Media.Audio -> throw Exception("Unable to create video decoder")
@@ -202,16 +202,18 @@ interface Decoder<Media, Frame> {
                     decoder = NativeDecoder(
                         location = location,
                         findAudioStream = false,
-                        prepareAudioStream = false,
                         findVideoStream = true,
-                        prepareVideoStream = true,
-                        hardwareAcceleration = hardwareAcceleration.native.ordinal,
-                        hardwareAccelerationFallbackCandidates = hardwareAccelerationFallback.candidates.map { candidate ->
+                        decodeAudioStream = false,
+                        decodeVideoStream = true,
+                        sampleRate = 0,
+                        channels = 0,
+                        width = width ?: 0,
+                        height = height ?: 0,
+                        frameRate = frameRate ?: .0,
+                        hardwareAccelerationCandidates = hardwareAccelerationCandidates.map { candidate ->
                             candidate.native.ordinal
-                        }.toIntArray(),
-                        useSoftwareAccelerationFallback = hardwareAccelerationFallback.useSoftwareAcceleration
-                    ),
-                    media = media
+                        }.toIntArray()
+                    ), media = media
                 )
             }
         }

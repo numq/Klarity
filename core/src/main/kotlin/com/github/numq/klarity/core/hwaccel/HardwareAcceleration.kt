@@ -39,7 +39,7 @@ sealed class HardwareAcceleration private constructor(internal val native: Nativ
         internal fun fromNative(nativeHardwareAcceleration: Int) =
             NativeHardwareAcceleration.entries.getOrNull(nativeHardwareAcceleration)?.let { native ->
                 values.find { it.native == native }
-            }
+            } ?: None
 
         /**
          * Retrieves a list of available hardware acceleration methods for video decoding.

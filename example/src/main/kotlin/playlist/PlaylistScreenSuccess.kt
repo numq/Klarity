@@ -425,11 +425,9 @@ fun PlaylistScreenSuccess(
                                                 height = 128f,
                                                 format = format,
                                                 hoveredTimestamps = hoveredTimestamps,
-                                                preview = { timestampMillis, width, height ->
+                                                preview = { timestampMillis ->
                                                     previewManager.preview(
-                                                        timestampMillis = timestampMillis,
-                                                        width = width,
-                                                        height = height
+                                                        timestampMillis = timestampMillis
                                                     ).onFailure(::handleException).getOrNull()
                                                 })
                                         }

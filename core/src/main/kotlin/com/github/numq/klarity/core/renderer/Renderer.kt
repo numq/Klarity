@@ -1,5 +1,6 @@
 package com.github.numq.klarity.core.renderer
 
+import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
 import kotlinx.coroutines.flow.StateFlow
 
@@ -10,19 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface Renderer {
     /**
-     * The width of the rendered frames in pixels.
+     * The video format used.
      */
-    val width: Int
-
-    /**
-     * The height of the rendered frames in pixels.
-     */
-    val height: Int
-
-    /**
-     * The frame rate at which the video is rendered.
-     */
-    val frameRate: Double
+    val format: VideoFormat
 
     /**
      * An optional preview frame of the video content.
@@ -78,20 +69,13 @@ interface Renderer {
         /**
          * Creates a new instance of a Renderer.
          *
-         * @param width The width of the frames in pixels.
-         * @param height The height of the frames in pixels.
-         * @param frameRate The frame rate at which to render the video.
+         * @param format The video format used.
          * @param preview An optional preview frame of the video content.
          *
          * @return A [Result] containing either a new [Renderer] instance or an error if creation fails.
          */
-        internal fun create(
-            width: Int,
-            height: Int,
-            frameRate: Double,
-            preview: Frame.Video.Content?,
-        ): Result<Renderer> = runCatching {
-            DefaultRenderer(width = width, height = height, frameRate = frameRate, preview = preview)
+        internal fun create(format: VideoFormat, preview: Frame.Video.Content?): Result<Renderer> = runCatching {
+            DefaultRenderer(format = format, preview = preview)
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.github.numq.klarity.core.settings
 
 /**
- * Data class representing the settings for the media player.
+ * A data class representing the settings for the media player.
  *
  * @property playbackSpeedFactor Factor by which to speed up or slow down playback.
  * @property isMuted Indicates whether the audio is muted.
@@ -16,5 +16,5 @@ data class PlayerSettings(
     val volume: Float,
     val audioBufferSize: Int,
     val videoBufferSize: Int,
-    val seekOnlyKeyframes: Boolean
+    val seekOnlyKeyframes: Boolean,
 )

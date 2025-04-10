@@ -13,7 +13,6 @@ import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoop
@@ -263,8 +262,12 @@ internal class DefaultPlayerController(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
-        hardwareAcceleration: HardwareAcceleration,
-        hardwareAccelerationFallback: HardwareAccelerationFallback,
+        sampleRate: Int?,
+        channels: Int?,
+        width: Int?,
+        height: Int?,
+        frameRate: Double?,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
@@ -272,9 +275,7 @@ internal class DefaultPlayerController(
             ProbeDecoderFactory.Parameters(
                 location = location,
                 findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
-                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE,
-                hardwareAcceleration = hardwareAcceleration,
-                hardwareAccelerationFallback = hardwareAccelerationFallback
+                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
             )
         ).getOrThrow()
 
@@ -287,7 +288,11 @@ internal class DefaultPlayerController(
         val pipeline = when (media) {
             is Media.Audio -> with(media) {
                 val decoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(location = location)
+                    parameters = AudioDecoderFactory.Parameters(
+                        location = location,
+                        sampleRate = sampleRate,
+                        channels = channels
+                    )
                 ).getOrThrow()
 
                 val buffer = audioBufferFactory.create(
@@ -305,8 +310,10 @@ internal class DefaultPlayerController(
                 val decoder = videoDecoderFactory.create(
                     parameters = VideoDecoderFactory.Parameters(
                         location = location,
-                        hardwareAcceleration = hardwareAcceleration,
-                        hardwareAccelerationFallback = hardwareAccelerationFallback
+                        width = width,
+                        height = height,
+                        frameRate = frameRate,
+                        hardwareAccelerationCandidates = hardwareAccelerationCandidates
                     )
                 ).getOrThrow()
 
@@ -316,11 +323,9 @@ internal class DefaultPlayerController(
 
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
-                        width = format.width,
-                        height = format.height,
-                        frameRate = format.frameRate,
+                        format = format,
                         preview = with(decoder) {
-                            val frame = decode(null, null).onSuccess {
+                            val frame = decode().onSuccess {
                                 reset().getOrDefault(Unit)
                             }.getOrNull() as? Frame.Video.Content
 
@@ -333,7 +338,11 @@ internal class DefaultPlayerController(
 
             is Media.AudioVideo -> with(media) {
                 val audioDecoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(location = location)
+                    parameters = AudioDecoderFactory.Parameters(
+                        location = location,
+                        sampleRate = sampleRate,
+                        channels = channels
+                    )
                 ).getOrThrow()
 
                 val audioBuffer = audioBufferFactory.create(
@@ -350,8 +359,10 @@ internal class DefaultPlayerController(
                 val videoDecoder = videoDecoderFactory.create(
                     parameters = VideoDecoderFactory.Parameters(
                         location = location,
-                        hardwareAcceleration = hardwareAcceleration,
-                        hardwareAccelerationFallback = hardwareAccelerationFallback
+                        width = width,
+                        height = height,
+                        frameRate = frameRate,
+                        hardwareAccelerationCandidates = hardwareAccelerationCandidates
                     )
                 ).getOrThrow()
 
@@ -361,11 +372,9 @@ internal class DefaultPlayerController(
 
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
-                        width = videoFormat.width,
-                        height = videoFormat.height,
-                        frameRate = videoFormat.frameRate,
+                        format = videoFormat,
                         preview = with(videoDecoder) {
-                            val frame = decode(null, null).onSuccess {
+                            val frame = decode().onSuccess {
                                 reset().getOrDefault(Unit)
                             }.getOrNull() as? Frame.Video.Content
 
@@ -610,8 +619,12 @@ internal class DefaultPlayerController(
                             location = location,
                             audioBufferSize = audioBufferSize,
                             videoBufferSize = videoBufferSize,
-                            hardwareAcceleration = hardwareAcceleration,
-                            hardwareAccelerationFallback = hardwareAccelerationFallback
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            width = width,
+                            height = height,
+                            frameRate = frameRate,
+                            hardwareAccelerationCandidates = hardwareAccelerationCandidates
                         )
                     }.also(executionJob::set).join()
                 }

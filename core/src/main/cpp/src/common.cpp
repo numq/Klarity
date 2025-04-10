@@ -26,17 +26,21 @@ jmethodID frameConstructor = nullptr;
 
 Decoder *getDecoderPointer(jlong handle) {
     auto it = decoderPointers.find(handle);
+
     if (it == decoderPointers.end()) {
         throw std::runtime_error("Invalid handle");
     }
+
     return it->second.get();
 }
 
 Sampler *getSamplerPointer(jlong handle) {
     auto it = samplerPointers.find(handle);
+
     if (it == samplerPointers.end()) {
         throw std::runtime_error("Invalid handle");
     }
+
     return it->second.get();
 }
 
@@ -76,6 +80,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     runtimeExceptionClass = reinterpret_cast<jclass>(
             env->NewGlobalRef(env->FindClass("java/lang/RuntimeException"))
     );
+
     if (runtimeExceptionClass == nullptr) {
         return JNI_ERR;
     }
@@ -83,6 +88,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     decoderExceptionClass = reinterpret_cast<jclass>(
             env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/decoder/DecoderException"))
     );
+
     if (decoderExceptionClass == nullptr) {
         return JNI_ERR;
     }
@@ -90,6 +96,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     hardwareAccelerationExceptionClass = reinterpret_cast<jclass>(
             env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/hwaccel/HardwareAccelerationException"))
     );
+
     if (hardwareAccelerationExceptionClass == nullptr) {
         return JNI_ERR;
     }
@@ -97,28 +104,35 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     samplerExceptionClass = reinterpret_cast<jclass>(
             env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/sampler/SamplerException"))
     );
+
     if (samplerExceptionClass == nullptr) {
         return JNI_ERR;
     }
 
-    formatClass = reinterpret_cast<jclass>(env->NewGlobalRef(
-            env->FindClass("com/github/numq/klarity/core/format/NativeFormat")));
+    formatClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/format/NativeFormat"))
+    );
+
     if (formatClass == nullptr) {
         return JNI_ERR;
     }
 
-    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIID)V");
+    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIIDIII)V");
+
     if (formatConstructor == nullptr) {
         return JNI_ERR;
     }
 
-    frameClass = reinterpret_cast<jclass>(env->NewGlobalRef(
-            env->FindClass("com/github/numq/klarity/core/frame/NativeFrame")));
+    frameClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeFrame"))
+    );
+
     if (frameClass == nullptr) {
         return JNI_ERR;
     }
 
-    frameConstructor = env->GetMethodID(frameClass, "<init>", "(IJ[B)V");
+    frameConstructor = env->GetMethodID(frameClass, "<init>", "(IJ)V");
+
     if (frameConstructor == nullptr) {
         return JNI_ERR;
     }
@@ -155,31 +169,37 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     if (runtimeExceptionClass) {
         env->DeleteGlobalRef(runtimeExceptionClass);
+
         runtimeExceptionClass = nullptr;
     }
 
     if (decoderExceptionClass) {
         env->DeleteGlobalRef(decoderExceptionClass);
+
         decoderExceptionClass = nullptr;
     }
 
     if (hardwareAccelerationExceptionClass) {
         env->DeleteGlobalRef(hardwareAccelerationExceptionClass);
+
         hardwareAccelerationExceptionClass = nullptr;
     }
 
     if (samplerExceptionClass) {
         env->DeleteGlobalRef(samplerExceptionClass);
+
         samplerExceptionClass = nullptr;
     }
 
     if (formatClass) {
         env->DeleteGlobalRef(formatClass);
+
         formatClass = nullptr;
     }
 
     if (frameClass) {
         env->DeleteGlobalRef(frameClass);
+
         frameClass = nullptr;
     }
 }

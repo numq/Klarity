@@ -36,7 +36,7 @@ internal class DefaultBufferLoop(
         isWaiting.set(true)
 
         while (currentCoroutineContext().isActive && isBuffering.get()) {
-            when (val frame = decoder.decode(width = null, height = null).getOrNull()) {
+            when (val frame = decoder.decode().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 
@@ -79,7 +79,7 @@ internal class DefaultBufferLoop(
         isWaiting.set(true)
 
         while (currentCoroutineContext().isActive && isBuffering.get()) {
-            when (val frame = decoder.decode(width = null, height = null).getOrNull()) {
+            when (val frame = decoder.decode().getOrNull()) {
                 null -> {
                     isWaiting.set(true)
 

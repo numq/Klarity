@@ -1,6 +1,7 @@
 #include <jni.h>
-#include <string>
+#include <optional>
 #include <shared_mutex>
+#include <string>
 #include "common.h"
 #include "exception.h"
 #include "decoder.h"
@@ -23,21 +24,18 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jclass thisClass,
         jstring location,
         jboolean findAudioStream,
-        jboolean prepareAudioStream,
         jboolean findVideoStream,
-        jboolean prepareVideoStream,
-        jint hardwareAcceleration,
-        jintArray hardwareAccelerationFallbackCandidates,
-        jboolean useSoftwareAccelerationFallback
+        jboolean decodeAudioStream,
+        jboolean decodeVideoStream,
+        jint sampleRate,
+        jint channels,
+        jint width,
+        jint height,
+        jdouble frameRate,
+        jintArray hardwareAccelerationCandidates
 );
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong handle
-);
-
-JNIEXPORT jint JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getHardwareAccelerationNative(
         JNIEnv *env,
         jclass thisClass,
         jlong handle
@@ -47,8 +45,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jint width,
-        jint height
+        jobject buffer
 );
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(

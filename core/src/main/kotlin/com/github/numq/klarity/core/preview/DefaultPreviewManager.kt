@@ -3,7 +3,6 @@ package com.github.numq.klarity.core.preview
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
@@ -17,8 +16,9 @@ internal class DefaultPreviewManager(
 
     override suspend fun prepare(
         location: String,
-        hardwareAcceleration: HardwareAcceleration,
-        hardwareAccelerationFallback: HardwareAccelerationFallback,
+        width: Int?,
+        height: Int?,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>,
     ) = runCatching {
         val currentState = internalState.get()
 
@@ -27,8 +27,10 @@ internal class DefaultPreviewManager(
         videoDecoderFactory.create(
             parameters = VideoDecoderFactory.Parameters(
                 location = location,
-                hardwareAcceleration = hardwareAcceleration,
-                hardwareAccelerationFallback = hardwareAccelerationFallback
+                width = width,
+                height = height,
+                frameRate = null,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates
             )
         ).mapCatching { decoder ->
             internalState.set(InternalPreviewState.Ready(decoder = decoder))
@@ -41,8 +43,6 @@ internal class DefaultPreviewManager(
 
     override suspend fun preview(
         timestampMillis: Long,
-        width: Int?,
-        height: Int?,
         keyframesOnly: Boolean,
     ): Result<Frame.Video.Content?> = runCatching {
         val currentState = internalState.get()
@@ -53,7 +53,7 @@ internal class DefaultPreviewManager(
             seekTo(
                 micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).map {
-                decode(width, height).getOrNull() as? Frame.Video.Content
+                decode().getOrNull() as? Frame.Video.Content
             }.getOrNull()
         }
     }.recoverCatching { t ->

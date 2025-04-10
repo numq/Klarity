@@ -1,7 +1,6 @@
 package com.github.numq.klarity.core.command
 
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import com.github.numq.klarity.core.hwaccel.HardwareAccelerationFallback
 
 sealed interface Command {
     enum class Descriptor {
@@ -14,8 +13,12 @@ sealed interface Command {
         val location: String,
         val audioBufferSize: Int,
         val videoBufferSize: Int,
-        val hardwareAcceleration: HardwareAcceleration,
-        val hardwareAccelerationFallback: HardwareAccelerationFallback,
+        val sampleRate: Int?,
+        val channels: Int?,
+        val width: Int?,
+        val height: Int?,
+        val frameRate: Double?,
+        val hardwareAccelerationCandidates: List<HardwareAcceleration>,
     ) : Command {
         override val descriptor = Descriptor.PREPARE
     }
