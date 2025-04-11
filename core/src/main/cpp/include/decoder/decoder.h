@@ -7,12 +7,10 @@
 #include <memory>
 #include <string>
 #include <functional>
-#include <optional>
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
 #include "hwaccel.h"
-#include "parameters.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -105,6 +103,11 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
+    static AVPixelFormat _getHardwareAccelerationFormat(
+            AVCodecContext *codecContext,
+            const AVPixelFormat *pixelFormats
+    );
+
     bool _hasAudio();
 
     bool _hasVideo();
@@ -115,17 +118,25 @@ private:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _processAudioFrame(uint8_t *buffer, uint32_t bufferSize);
+    uint32_t _processAudioFrame(uint8_t *buffer, uint32_t bufferSize);
 
-    void _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
+    uint32_t _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
 
 public:
     Format format;
 
     Decoder(
             const std::string &location,
-            const std::optional<AudioParameters> &audioParameters,
-            const std::optional<VideoParameters> &videoParameters
+            bool findAudioStream,
+            bool findVideoStream,
+            bool decodeAudioStream,
+            bool decodeVideoStream,
+            uint32_t sampleRate,
+            uint32_t channels,
+            uint32_t width,
+            uint32_t height,
+            double frameRate,
+            const std::vector<uint32_t> &hardwareAccelerationCandidates
     );
 
     ~Decoder();

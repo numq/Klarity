@@ -1,5 +1,4 @@
 #include <jni.h>
-#include <optional>
 #include <shared_mutex>
 #include <string>
 #include "common.h"

@@ -50,59 +50,33 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
 
         env->ReleaseStringUTFChars(location, locationChars);
 
-        std::optional<AudioParameters> audioParameters = std::nullopt;
+        auto hardwareAccelerationCandidatesSize = env->GetArrayLength(hardwareAccelerationCandidates);
 
-        if (findAudioStream) {
-            audioParameters = AudioParameters{};
+        auto intArray = env->GetIntArrayElements(hardwareAccelerationCandidates, nullptr);
 
-            if (decodeAudioStream) {
-                audioParameters->decodingParameters = AudioParameters::DecodingParameters{};
-
-                audioParameters->decodingParameters->sampleRate =
-                        sampleRate > 0 ? std::make_optional(sampleRate) : std::nullopt;
-
-                audioParameters->decodingParameters->channels =
-                        channels > 0 ? std::make_optional(channels) : std::nullopt;
-            }
+        if (!intArray) {
+            throw std::runtime_error("Unable to get hardware acceleration candidates");
         }
 
-        std::optional<VideoParameters> videoParameters = std::nullopt;
+        auto candidates = std::vector<uint32_t>(
+                intArray,
+                intArray + hardwareAccelerationCandidatesSize
+        );
 
-        if (findVideoStream) {
-            videoParameters = VideoParameters{};
-
-            if (decodeVideoStream) {
-                videoParameters->decodingParameters = VideoParameters::DecodingParameters{};
-
-                videoParameters->decodingParameters->width = width > 0 ? std::make_optional(width) : std::nullopt;
-
-                videoParameters->decodingParameters->height = height > 0 ? std::make_optional(height) : std::nullopt;
-
-                auto hardwareAccelerationCandidatesSize = env->GetArrayLength(hardwareAccelerationCandidates);
-
-                if (hardwareAccelerationCandidatesSize > 0) {
-                    auto intArray = env->GetIntArrayElements(hardwareAccelerationCandidates, nullptr);
-
-                    if (!intArray) {
-                        throw std::runtime_error("Unable to get hardware acceleration candidates");
-                    }
-
-                    auto candidates = std::vector<uint32_t>(
-                            intArray,
-                            intArray + hardwareAccelerationCandidatesSize
-                    );
-
-                    env->ReleaseIntArrayElements(hardwareAccelerationCandidates, intArray, JNI_ABORT);
-
-                    videoParameters->decodingParameters->hardwareAccelerationCandidates = candidates;
-                }
-            }
-        }
+        env->ReleaseIntArrayElements(hardwareAccelerationCandidates, intArray, JNI_ABORT);
 
         auto decoder = std::make_unique<Decoder>(
                 locationStr,
-                audioParameters,
-                videoParameters
+                findAudioStream,
+                findVideoStream,
+                decodeAudioStream,
+                decodeVideoStream,
+                sampleRate,
+                channels,
+                width,
+                height,
+                frameRate,
+                candidates
         );
 
         auto handle = reinterpret_cast<jlong>(decoder.get());
@@ -189,7 +163,8 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 frameClass,
                 frameConstructor,
                 static_cast<jint>(frame->type),
-                static_cast<jlong>(frame->timestampMicros)
+                static_cast<jlong>(frame->timestampMicros),
+                static_cast<jint>(frame->writtenBytes)
         );
     }, nullptr);
 }

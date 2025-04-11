@@ -11,6 +11,7 @@ struct Frame {
 
     Type type;
     int64_t timestampMicros;
+    uint32_t writtenBytes;
 };
 
 #endif //KLARITY_DECODER_FRAME_H
