@@ -26,17 +26,14 @@ import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
+import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.state.PlayerState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import notification.Notification
 import kotlin.time.Duration.Companion.microseconds
 
@@ -94,30 +91,21 @@ fun UploadedHubItem(
             previewJob?.cancel()
             previewJob = null
 
-            coroutineScope.launch {
+            runBlocking {
                 player.close().getOrThrow()
             }
         }
     }
 
     LaunchedEffect(state) {
-        player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
+        player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
-                if (currentState.media.location is Location.Remote) {
-                    player.changeSettings(
-                        settings = player.settings.value.copy(
-                            audioBufferSize = 100,
-                            videoBufferSize = 100
-                        )
-                    )
-                }
-
                 when (currentState) {
                     is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
                         if (currentState is PlayerState.Ready.Completed) {
-                            player.stop()
+                            player.stop().getOrDefault(Unit)
                         }
 
                         hoverInteractionSource.tryEmit(HoverInteraction.Enter())
@@ -150,22 +138,21 @@ fun UploadedHubItem(
                                     when (state) {
                                         is PlayerState.Empty -> {
                                             player.prepare(
-                                                location = hubItem.media.location.path,
+                                                location = hubItem.media.location,
                                                 enableAudio = true,
-                                                enableVideo = true
-                                            )
-                                            play()
+                                                enableVideo = true,
+                                                videoSettings = VideoSettings(skipPreview = false)
+                                            ).getOrDefault(Unit)
+                                            play().getOrDefault(Unit)
                                         }
 
-                                        is PlayerState.Ready.Playing -> {
-                                            stop()
-                                        }
+                                        is PlayerState.Ready.Playing -> stop().getOrDefault(Unit)
 
-                                        is PlayerState.Ready.Stopped -> play()
+                                        is PlayerState.Ready.Stopped -> play().getOrDefault(Unit)
 
                                         is PlayerState.Ready.Completed -> {
-                                            stop()
-                                            play()
+                                            stop().getOrDefault(Unit)
+                                            play().getOrDefault(Unit)
                                         }
 
                                         else -> Unit
@@ -175,7 +162,7 @@ fun UploadedHubItem(
                         },
                         onPress = {
                             awaitRelease()
-                            player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
+                            player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
                         },
                         onLongPress = { (x, y) ->
                             if (state is PlayerState.Ready.Playing) {
@@ -183,6 +170,7 @@ fun UploadedHubItem(
                                     if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) 0.5f else 2f
                                 coroutineScope.launch {
                                     player.changeSettings(settings.copy(playbackSpeedFactor = playbackSpeedFactor))
+                                        .getOrDefault(Unit)
                                 }
                             } else {
                                 delete()
@@ -200,7 +188,7 @@ fun UploadedHubItem(
                             foreground = renderer?.run renderer@{
                                 Foreground.Source(
                                     renderer = this@renderer,
-                                    scale = ImageScale.Crop
+                                    imageScale = ImageScale.Crop
                                 )
                             } ?: Foreground.Empty
                         ) {
@@ -210,7 +198,7 @@ fun UploadedHubItem(
                         else -> hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
                             RendererComponent(
                                 modifier = Modifier.fillMaxSize(),
-                                foreground = Foreground.Frame(frame = frame, scale = ImageScale.Crop)
+                                foreground = Foreground.Frame(frame = frame, imageScale = ImageScale.Crop)
                             ) {
                                 Icon(Icons.Default.BrokenImage, null)
                             }

@@ -4,14 +4,13 @@
 #include <cstdint>
 #include <vector>
 
-struct Frame {
-    enum Type {
-        AUDIO, VIDEO
-    };
-
-    Type type;
+struct AudioFrame {
     int64_t timestampMicros;
-    uint32_t writtenBytes;
+    std::vector<uint8_t> audioBytes;
+};
+
+struct VideoFrame {
+    int64_t timestampMicros;
 };
 
 #endif //KLARITY_DECODER_FRAME_H

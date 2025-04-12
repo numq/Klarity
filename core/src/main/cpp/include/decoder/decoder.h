@@ -1,12 +1,13 @@
 #ifndef KLARITY_DECODER_DECODER_H
 #define KLARITY_DECODER_DECODER_H
 
-#include <map>
-#include <mutex>
-#include <shared_mutex>
-#include <memory>
-#include <string>
 #include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
+#include <string>
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
@@ -103,6 +104,8 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
+    std::vector<uint8_t> audioBuffer;
+
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
@@ -118,9 +121,9 @@ private:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    uint32_t _processAudioFrame(uint8_t *buffer, uint32_t bufferSize);
+    void _processAudioFrame();
 
-    uint32_t _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
+    void _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
 
 public:
     Format format;
@@ -141,7 +144,9 @@ public:
 
     ~Decoder();
 
-    std::unique_ptr<Frame> decode(uint8_t *buffer, uint32_t capacity);
+    std::unique_ptr<AudioFrame> decodeAudio();
+
+    std::unique_ptr<VideoFrame> decodeVideo(uint8_t *buffer, uint32_t capacity);
 
     void seekTo(long timestampMicros, bool keyframesOnly);
 

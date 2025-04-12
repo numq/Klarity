@@ -40,11 +40,17 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jlong handle
 );
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeAudioNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
+
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeVideoNative(
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jobject buffer
+        jobject byteBuffer
 );
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(

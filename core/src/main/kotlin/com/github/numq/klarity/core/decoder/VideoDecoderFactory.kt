@@ -11,7 +11,7 @@ class VideoDecoderFactory : SuspendFactory<VideoDecoderFactory.Parameters, Decod
         val width: Int?,
         val height: Int?,
         val frameRate: Double?,
-        val hardwareAccelerationCandidates: List<HardwareAcceleration>,
+        val hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     )
 
     override suspend fun create(parameters: Parameters) = with(parameters) {

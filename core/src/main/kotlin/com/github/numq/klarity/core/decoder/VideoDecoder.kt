@@ -1,7 +1,6 @@
 package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -19,23 +18,17 @@ internal class VideoDecoder(
         runCatching {
             byteBuffer.clear()
 
-            decoder.decode(byteBuffer)?.let { nativeFrame ->
-                when (nativeFrame.type) {
-                    NativeFrame.Type.VIDEO.ordinal -> {
-                        val bytes = ByteArray(byteBuffer.remaining())
+            decoder.decodeVideo(byteBuffer)?.run {
+                val bytes = ByteArray(byteBuffer.remaining())
 
-                        byteBuffer.get(bytes)
+                byteBuffer.get(bytes)
 
-                        Frame.Video.Content(
-                            timestampMicros = nativeFrame.timestampMicros,
-                            bytes = bytes,
-                            width = decoder.format.width,
-                            height = decoder.format.height
-                        )
-                    }
-
-                    else -> null
-                }
+                Frame.Video.Content(
+                    timestampMicros = timestampMicros,
+                    bytes = bytes,
+                    width = decoder.format.width,
+                    height = decoder.format.height
+                )
             } ?: Frame.Video.EndOfStream
         }
     }

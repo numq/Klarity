@@ -5,7 +5,6 @@ import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.factory.SuspendFactory
@@ -24,7 +23,6 @@ import com.github.numq.klarity.core.settings.PlayerSettings
 class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
         val initialSettings: PlayerSettings?,
-        val probeDecoderFactory: SuspendFactory<ProbeDecoderFactory.Parameters, Decoder<Media, Frame.Probe>>,
         val audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
         val videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
         val audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
@@ -38,7 +36,6 @@ class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, Play
     override fun create(parameters: Parameters) = with(parameters) {
         PlayerController.create(
             initialSettings = initialSettings,
-            probeDecoderFactory = probeDecoderFactory,
             audioDecoderFactory = audioDecoderFactory,
             videoDecoderFactory = videoDecoderFactory,
             audioBufferFactory = audioBufferFactory,

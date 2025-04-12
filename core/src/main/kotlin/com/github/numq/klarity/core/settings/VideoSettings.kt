@@ -9,10 +9,12 @@ import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
  * @property height Desired height.
  * @property frameRate Desired frame rate.
  * @property hardwareAccelerationCandidates Hardware acceleration candidates.
+ * @property skipPreview Skip decoding and storing the first video frame in the renderer to use as a preview.
  */
 data class VideoSettings(
     val width: Int? = null,
     val height: Int? = null,
     val frameRate: Double? = null,
-    val hardwareAccelerationCandidates: List<HardwareAcceleration> = emptyList(),
+    val hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
+    val skipPreview: Boolean = false,
 )

@@ -10,6 +10,7 @@ interface BufferLoop {
     val isWaiting: AtomicBoolean
 
     suspend fun start(
+        onException: suspend (BufferLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
         endOfMedia: suspend () -> Unit,

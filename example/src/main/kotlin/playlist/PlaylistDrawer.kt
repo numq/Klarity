@@ -100,13 +100,7 @@ fun PlaylistDrawer(
                         verticalArrangement = Arrangement.spacedBy(space = 8.dp, alignment = Alignment.Top),
                         state = listState
                     ) {
-                        items(items, key = { item ->
-                            when (item) {
-                                is PlaylistItem.Pending -> item.id
-
-                                is PlaylistItem.Uploaded -> item.media.id
-                            }
-                        }) { item ->
+                        items(items, key = (PlaylistItem::id)) { item ->
                             Box(
                                 modifier = Modifier.fillMaxSize().animateItemPlacement(
                                     animationSpec = tween(easing = LinearEasing)

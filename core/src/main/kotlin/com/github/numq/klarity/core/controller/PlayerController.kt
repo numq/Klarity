@@ -6,7 +6,6 @@ import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
@@ -51,7 +50,6 @@ interface PlayerController {
     companion object {
         internal fun create(
             initialSettings: PlayerSettings?,
-            probeDecoderFactory: SuspendFactory<ProbeDecoderFactory.Parameters, Decoder<Media, Frame.Probe>>,
             audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
             videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
             audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
@@ -63,7 +61,6 @@ interface PlayerController {
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,
-                probeDecoderFactory = probeDecoderFactory,
                 audioDecoderFactory = audioDecoderFactory,
                 videoDecoderFactory = videoDecoderFactory,
                 audioBufferFactory = audioBufferFactory,

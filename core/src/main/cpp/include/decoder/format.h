@@ -16,7 +16,6 @@ struct Format {
     uint32_t height = 0;
     double frameRate = 0.0;
     AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
-    uint32_t audioBufferSize = 0;
     uint32_t videoBufferSize = 0;
 };
 

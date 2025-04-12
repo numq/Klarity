@@ -20,9 +20,13 @@ jclass formatClass = nullptr;
 
 jmethodID formatConstructor = nullptr;
 
-jclass frameClass = nullptr;
+jclass audioFrameClass = nullptr;
 
-jmethodID frameConstructor = nullptr;
+jmethodID audioFrameConstructor = nullptr;
+
+jclass videoFrameClass = nullptr;
+
+jmethodID videoFrameConstructor = nullptr;
 
 Decoder *getDecoderPointer(jlong handle) {
     auto it = decoderPointers.find(handle);
@@ -117,23 +121,37 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIIDIII)V");
+    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIIDII)V");
 
     if (formatConstructor == nullptr) {
         return JNI_ERR;
     }
 
-    frameClass = reinterpret_cast<jclass>(
-            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeFrame"))
+    audioFrameClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeAudioFrame"))
     );
 
-    if (frameClass == nullptr) {
+    if (audioFrameClass == nullptr) {
         return JNI_ERR;
     }
 
-    frameConstructor = env->GetMethodID(frameClass, "<init>", "(IJI)V");
+    audioFrameConstructor = env->GetMethodID(audioFrameClass, "<init>", "(J[B)V");
 
-    if (frameConstructor == nullptr) {
+    if (audioFrameConstructor == nullptr) {
+        return JNI_ERR;
+    }
+
+    videoFrameClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/frame/NativeVideoFrame"))
+    );
+
+    if (videoFrameClass == nullptr) {
+        return JNI_ERR;
+    }
+
+    videoFrameConstructor = env->GetMethodID(videoFrameClass, "<init>", "(J)V");
+
+    if (videoFrameConstructor == nullptr) {
         return JNI_ERR;
     }
 
@@ -197,9 +215,15 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
         formatClass = nullptr;
     }
 
-    if (frameClass) {
-        env->DeleteGlobalRef(frameClass);
+    if (audioFrameClass) {
+        env->DeleteGlobalRef(audioFrameClass);
 
-        frameClass = nullptr;
+        audioFrameClass = nullptr;
+    }
+
+    if (videoFrameClass) {
+        env->DeleteGlobalRef(videoFrameClass);
+
+        videoFrameClass = nullptr;
     }
 }

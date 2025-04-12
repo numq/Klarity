@@ -18,7 +18,7 @@ internal class DefaultPreviewManager(
         location: String,
         width: Int?,
         height: Int?,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     ) = runCatching {
         val currentState = internalState.get()
 

@@ -30,7 +30,7 @@ import notification.Notification
 import remote.RemoteUploadingDialog
 import slider.StepSlider
 import java.io.File
-import kotlin.random.Random
+
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -59,10 +59,13 @@ fun HubScreen(
                     val uploadedItem = HubItem.Uploaded(
                         media = media,
                         snapshots = SnapshotManager.snapshots(
-                            location = media.location.path
+                            location = media.location
                         ) { durationMillis ->
                             val n = 10
-                            (1..<n).map { i -> durationMillis.div(n - i) }
+
+                            (0 until n).map { i ->
+                                (durationMillis * i) / (n - 1)
+                            }
                         }.getOrNull() ?: emptyList()
                     )
                     hubItems = hubItems.map { if (it == pendingItem) uploadedItem else it }
@@ -80,7 +83,7 @@ fun HubScreen(
     }
 
     fun addLocation(location: String) {
-        val pendingItem = HubItem.Pending(id = Random.nextLong(), location = location)
+        val pendingItem = HubItem.Pending(location = location)
         coroutineScope.launch {
             pendingChannel.send(pendingItem)
         }
@@ -149,13 +152,7 @@ fun HubScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalArrangement = Arrangement.Top,
             ) {
-                items(hubItems, key = { item ->
-                    when (item) {
-                        is HubItem.Pending -> item.id
-
-                        is HubItem.Uploaded -> item.media.id
-                    }
-                }) { hubItem ->
+                items(hubItems, key = (HubItem::id)) { hubItem ->
                     Box(
                         modifier = Modifier.fillMaxSize().animateItemPlacement(
                             animationSpec = tween(easing = LinearEasing)

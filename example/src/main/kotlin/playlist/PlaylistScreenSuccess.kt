@@ -24,7 +24,6 @@ import com.github.numq.klarity.compose.renderer.Background
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.media.Location
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.preview.PreviewManager
@@ -32,6 +31,7 @@ import com.github.numq.klarity.core.preview.PreviewState
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.queue.MediaQueue
 import com.github.numq.klarity.core.queue.SelectedItem
+import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.snapshot.SnapshotManager
 import com.github.numq.klarity.core.state.PlayerState
 import controls.HoveredTimestamp
@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 import notification.Notification
 import remote.RemoteUploadingDialog
 import java.io.File
-import kotlin.random.Random
 import kotlin.time.Duration.Companion.microseconds
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -112,11 +111,11 @@ fun PlaylistScreenSuccess(
 
     DisposableEffect(Unit) {
         uploadingJob = pendingChannel.consumeAsFlow().onEach { pendingItem ->
-            coroutineScope.launch(Dispatchers.Default + Job()) {
+            coroutineScope.launch(Dispatchers.Default) {
                 queue.add(pendingItem)
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = PlaylistItem.Uploaded(
-                        media = media, snapshot = SnapshotManager.snapshot(location = media.location.path).getOrNull()
+                        media = media, snapshot = SnapshotManager.snapshot(location = media.location).getOrNull()
                     )
                     queue.replace(pendingItem, uploadedItem)
                 }.onFailure(::handleException).onFailure {
@@ -132,18 +131,10 @@ fun PlaylistScreenSuccess(
     }
 
     LaunchedEffect(state) {
-        player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
+        player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
-                if (currentState.media.location is Location.Remote) {
-                    player.changeSettings(
-                        settings = player.settings.value.copy(
-                            audioBufferSize = 100, videoBufferSize = 100
-                        )
-                    )
-                }
-
                 if (currentState is PlayerState.Ready.Completed) {
                     if (queue.hasNext.value) queue.next()
                 }
@@ -163,42 +154,50 @@ fun PlaylistScreenSuccess(
         when (selectedItem) {
             is SelectedItem.Absent -> {
                 previewManager.release().getOrDefault(Unit)
-                player.release()
+                player.release().getOrDefault(Unit)
             }
 
             is SelectedItem.Present<*> -> ((selectedItem as? SelectedItem.Present<*>)?.item as? PlaylistItem.Uploaded)?.run {
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
-                        previewManager.prepare(location = media.location.path).getOrDefault(Unit)
-                        player.prepare(location = media.location.path, enableAudio = true, enableVideo = true)
-                        player.play()
+                        previewManager.prepare(location = media.location).getOrDefault(Unit)
+                        player.prepare(
+                            location = media.location,
+                            enableAudio = true,
+                            enableVideo = true,
+                            videoSettings = VideoSettings(skipPreview = false)
+                        ).getOrDefault(Unit)
+                        player.play().getOrDefault(Unit)
                     }
 
                     is PlayerState.Ready -> {
-                        when (media.location.path) {
-                            currentState.media.location.path -> when (state) {
+                        when (media.location) {
+                            currentState.media.location -> when (state) {
                                 is PlayerState.Ready.Playing,
                                 is PlayerState.Ready.Paused,
                                 is PlayerState.Ready.Completed,
                                 is PlayerState.Ready.Seeking,
                                     -> {
-                                    player.stop()
-                                    player.play()
+                                    player.stop().getOrDefault(Unit)
+                                    player.play().getOrDefault(Unit)
                                 }
 
-                                is PlayerState.Ready.Stopped -> player.play()
+                                is PlayerState.Ready.Stopped -> player.play().getOrDefault(Unit)
 
                                 else -> Unit
                             }
 
                             else -> {
                                 previewManager.release().getOrDefault(Unit)
-                                previewManager.prepare(location = media.location.path).getOrDefault(Unit)
-                                player.release()
+                                previewManager.prepare(location = media.location).getOrDefault(Unit)
+                                player.release().getOrDefault(Unit)
                                 player.prepare(
-                                    location = media.location.path, enableAudio = true, enableVideo = true
-                                )
-                                player.play()
+                                    location = media.location,
+                                    enableAudio = true,
+                                    enableVideo = true,
+                                    videoSettings = VideoSettings(skipPreview = false)
+                                ).getOrDefault(Unit)
+                                player.play().getOrDefault(Unit)
                             }
                         }
                     }
@@ -208,7 +207,7 @@ fun PlaylistScreenSuccess(
     }
 
     fun addLocationToPlaylist(location: String) {
-        val pendingItem = PlaylistItem.Pending(id = Random.nextLong(), location = location)
+        val pendingItem = PlaylistItem.Pending(location = location)
         coroutineScope.launch {
             pendingChannel.send(pendingItem)
         }
@@ -256,11 +255,9 @@ fun PlaylistScreenSuccess(
             TopAppBar(title = {
                 (state as? PlayerState.Ready)?.media?.run {
                     Text(
-                        text = when (val location = location) {
-                            is Location.Local -> location.name
-
-                            is Location.Remote -> location.path
-                        }, modifier = Modifier.padding(8.dp), maxLines = 1
+                        text = File(location).takeIf(File::exists)?.name ?: location,
+                        modifier = Modifier.padding(8.dp),
+                        maxLines = 1
                     )
                 }
             }, navigationIcon = {
@@ -317,6 +314,7 @@ fun PlaylistScreenSuccess(
                                         awaitRelease()
 
                                         player.changeSettings(settings.copy(playbackSpeedFactor = 1f))
+                                            .getOrDefault(Unit)
                                     }, onLongPress = { (x, y) ->
                                         if (state is PlayerState.Ready.Playing) {
                                             val playbackSpeedFactor = when {
@@ -326,6 +324,7 @@ fun PlaylistScreenSuccess(
 
                                             coroutineScope.launch {
                                                 player.changeSettings(settings.copy(playbackSpeedFactor = playbackSpeedFactor))
+                                                    .getOrDefault(Unit)
                                             }
                                         }
                                     })
@@ -387,17 +386,33 @@ fun PlaylistScreenSuccess(
                                                 state = state,
                                                 playbackTimestamp = playbackTimestamp,
                                                 isShuffled = isShuffled,
-                                                shuffle = queue::shuffle,
+                                                shuffle = {
+                                                    queue.shuffle().getOrDefault(Unit)
+                                                },
                                                 repeatMode = repeatMode,
-                                                setRepeatMode = queue::setRepeatMode,
+                                                setRepeatMode = {
+                                                    queue.setRepeatMode(it).getOrDefault(Unit)
+                                                },
                                                 hasPrevious = hasPrevious,
                                                 hasNext = hasNext,
-                                                previous = queue::previous,
-                                                next = queue::next,
-                                                play = player::play,
-                                                pause = player::pause,
-                                                resume = player::resume,
-                                                stop = player::stop
+                                                previous = {
+                                                    queue.previous().getOrDefault(Unit)
+                                                },
+                                                next = {
+                                                    queue.next().getOrDefault(Unit)
+                                                },
+                                                play = {
+                                                    player.play().getOrDefault(Unit)
+                                                },
+                                                pause = {
+                                                    player.pause().getOrDefault(Unit)
+                                                },
+                                                resume = {
+                                                    player.resume().getOrDefault(Unit)
+                                                },
+                                                stop = {
+                                                    player.stop().getOrDefault(Unit)
+                                                }
                                             )
                                             Box(
                                                 modifier = Modifier.weight(1f),
@@ -408,9 +423,11 @@ fun PlaylistScreenSuccess(
                                                     isMuted = settings.isMuted,
                                                     toggleMute = {
                                                         player.changeSettings(settings.copy(isMuted = !settings.isMuted))
+                                                            .getOrDefault(Unit)
                                                     },
                                                     changeVolume = { volume ->
                                                         player.changeSettings(settings.copy(volume = volume))
+                                                            .getOrDefault(Unit)
                                                     })
                                             }
                                         }
@@ -438,8 +455,8 @@ fun PlaylistScreenSuccess(
                                     playbackTimestampMillis = playbackTimestamp.millis,
                                     durationTimestampMillis = currentState.media.durationMicros.microseconds.inWholeMilliseconds,
                                     seekTo = { timestampMillis ->
-                                        player.seekTo(timestampMillis)
-                                        player.resume()
+                                        player.seekTo(timestampMillis).getOrDefault(Unit)
+                                        player.resume().getOrDefault(Unit)
                                     },
                                     onHoveredTimestamp = { value ->
                                         coroutineScope.launch {

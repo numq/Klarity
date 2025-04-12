@@ -24,9 +24,7 @@ internal class DefaultPlaybackLoop(
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
-    private val coroutineContext = Dispatchers.Default + Job()
-
-    private val coroutineScope = CoroutineScope(coroutineContext)
+    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     private var job: Job? = null
 
@@ -48,7 +46,7 @@ internal class DefaultPlaybackLoop(
         val audioJob = coroutineScope.launch {
             while (isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
-                    yield()
+                    delay(1L)
 
                     continue
                 }
@@ -58,8 +56,6 @@ internal class DefaultPlaybackLoop(
                         onAudioTimestamp(Timestamp(micros = frame.timestampMicros - latency))
 
                         lastAudioTimestamp.set((frame.timestampMicros - latency).microseconds)
-
-                        ensureActive()
 
                         sampler.play(bytes = frame.bytes).getOrThrow()
                     }
@@ -74,7 +70,7 @@ internal class DefaultPlaybackLoop(
 
             while (isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
-                    yield()
+                    delay(1L)
 
                     continue
                 }
@@ -82,7 +78,10 @@ internal class DefaultPlaybackLoop(
                 when {
                     audioJob.isCompleted -> {
                         handleVideoPlayback(
-                            media = media, buffer = videoBuffer, renderer = renderer, onTimestamp = onVideoTimestamp
+                            media = media,
+                            buffer = videoBuffer,
+                            renderer = renderer,
+                            onTimestamp = onVideoTimestamp
                         )
 
                         break
@@ -97,14 +96,12 @@ internal class DefaultPlaybackLoop(
                                     break
                                 }
 
-                                ensureActive()
-
-                                yield()
+                                delay(1L)
                             }
 
-                            renderer.draw(frame).getOrThrow()
+                            currentCoroutineContext().ensureActive()
 
-                            ensureActive()
+                            renderer.draw(frame).getOrThrow()
 
                             onVideoTimestamp(Timestamp(micros = frame.timestampMicros))
 
@@ -136,8 +133,6 @@ internal class DefaultPlaybackLoop(
                 is Frame.Audio.Content -> {
                     sampler.play(bytes = frame.bytes).getOrThrow()
 
-                    currentCoroutineContext().ensureActive()
-
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
                 }
 
@@ -168,14 +163,12 @@ internal class DefaultPlaybackLoop(
                             break
                         }
 
-                        currentCoroutineContext().ensureActive()
-
-                        yield()
+                        delay(1L)
                     }
 
-                    renderer.draw(frame).getOrThrow()
-
                     currentCoroutineContext().ensureActive()
+
+                    renderer.draw(frame).getOrThrow()
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
 
@@ -194,6 +187,7 @@ internal class DefaultPlaybackLoop(
     }
 
     override suspend fun start(
+        onException: suspend (PlaybackLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
         endOfMedia: suspend () -> Unit,
     ) = mutex.withLock {
@@ -204,12 +198,19 @@ internal class DefaultPlaybackLoop(
 
             isPlaying.set(true)
 
-            job = coroutineScope.launch {
+            val coroutineExceptionHandler = CoroutineExceptionHandler { _, exception ->
+                coroutineScope.launch {
+                    onException(PlaybackLoopException(exception))
+                }
+            }
+
+            job = coroutineScope.launch(context = coroutineExceptionHandler) {
                 try {
                     with(pipeline) {
                         when (this) {
                             is Pipeline.AudioVideo -> {
                                 val audioTimestamps = MutableSharedFlow<Timestamp>()
+
                                 val videoTimestamps = MutableSharedFlow<Timestamp>()
 
                                 val timestampJob = when {
@@ -249,7 +250,7 @@ internal class DefaultPlaybackLoop(
                         }
                     }
 
-                    ensureActive()
+                    currentCoroutineContext().ensureActive()
 
                     endOfMedia()
                 } catch (t: Throwable) {

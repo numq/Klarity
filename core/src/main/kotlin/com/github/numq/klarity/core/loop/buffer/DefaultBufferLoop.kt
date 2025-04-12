@@ -17,9 +17,7 @@ internal class DefaultBufferLoop(
 ) : BufferLoop {
     private val mutex = Mutex()
 
-    private val coroutineContext = Dispatchers.Default + SupervisorJob()
-
-    private val coroutineScope = CoroutineScope(coroutineContext)
+    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     private var job: Job? = null
 
@@ -42,7 +40,7 @@ internal class DefaultBufferLoop(
 
                     onWaiting()
 
-                    yield()
+                    delay(1L)
 
                     continue
                 }
@@ -53,8 +51,6 @@ internal class DefaultBufferLoop(
                     when (frame) {
                         is Frame.Audio.Content -> {
                             buffer.push(frame)
-
-                            currentCoroutineContext().ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
@@ -85,7 +81,7 @@ internal class DefaultBufferLoop(
 
                     onWaiting()
 
-                    yield()
+                    delay(1L)
 
                     continue
                 }
@@ -96,8 +92,6 @@ internal class DefaultBufferLoop(
                     when (frame) {
                         is Frame.Video.Content -> {
                             buffer.push(frame)
-
-                            currentCoroutineContext().ensureActive()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
@@ -114,6 +108,7 @@ internal class DefaultBufferLoop(
     }
 
     override suspend fun start(
+        onException: suspend (BufferLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
         onWaiting: suspend () -> Unit,
         endOfMedia: suspend () -> Unit,
@@ -125,11 +120,18 @@ internal class DefaultBufferLoop(
 
             isBuffering.set(true)
 
-            job = coroutineScope.launch {
+            val coroutineExceptionHandler = CoroutineExceptionHandler { _, exception ->
+                coroutineScope.launch {
+                    onException(BufferLoopException(exception))
+                }
+            }
+
+            job = coroutineScope.launch(context = coroutineExceptionHandler) {
                 try {
                     when (pipeline) {
                         is Pipeline.AudioVideo -> {
                             val audioTimestamps = MutableSharedFlow<Timestamp>()
+
                             val videoTimestamps = MutableSharedFlow<Timestamp>()
 
                             val timestampJob = when {
@@ -188,8 +190,6 @@ internal class DefaultBufferLoop(
                             )
                         }
                     }
-
-                    ensureActive()
 
                     endOfMedia()
                 } catch (t: Throwable) {

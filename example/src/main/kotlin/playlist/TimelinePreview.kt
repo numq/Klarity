@@ -72,7 +72,7 @@ fun TimelinePreview(
                     verticalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.CenterVertically)
                 ) {
                     RendererComponent(modifier = Modifier.size(width = width.dp, height = height.dp),
-                        foreground = Foreground.Frame(frame = preview.frame, scale = ImageScale.Crop),
+                        foreground = Foreground.Frame(frame = preview.frame, imageScale = ImageScale.Crop),
                         placeholder = { Icon(Icons.Default.BrokenImage, null) })
                     Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
                         Text(text = preview.millis.formatTimestamp(), modifier = Modifier.padding(4.dp))

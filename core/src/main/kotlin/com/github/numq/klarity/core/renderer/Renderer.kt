@@ -6,8 +6,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Interface representing a renderer for video frames.
- * The renderer is responsible for managing frame dimensions, frame rate,
- * and rendering video content.
  */
 interface Renderer {
     /**

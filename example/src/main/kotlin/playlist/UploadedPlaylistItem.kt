@@ -35,7 +35,7 @@ fun UploadedPlaylistItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         TooltipArea(tooltip = {
-            Text(text = playlistItem.media.location.path)
+            Text(text = playlistItem.media.location)
         }, modifier = Modifier.weight(1f), content = {
             Card(modifier = Modifier.fillMaxSize().alpha(if (isSelected) .5f else 1f)) {
                 Row(
@@ -48,11 +48,11 @@ fun UploadedPlaylistItem(
                     playlistItem.snapshot?.let { snapshot ->
                         RendererComponent(
                             modifier = Modifier.aspectRatio(1f).clip(CircleShape),
-                            foreground = Foreground.Frame(frame = snapshot, scale = ImageScale.Crop),
+                            foreground = Foreground.Frame(frame = snapshot, imageScale = ImageScale.Crop),
                         )
                     }
                     Text(
-                        text = playlistItem.media.location.path,
+                        text = playlistItem.media.location,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                         maxLines = 1,
                         softWrap = false,

@@ -11,40 +11,42 @@ object SnapshotManager {
         location: String,
         width: Int? = null,
         height: Int? = null,
-        hardwareAccelerationCandidates: List<HardwareAcceleration> = emptyList(),
+        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestampsMillis: (durationMillis: Long) -> (List<Long>) = { listOf(0L) },
-    ) = VideoDecoderFactory().create(
-        parameters = VideoDecoderFactory.Parameters(
-            location = location,
-            width = width,
-            height = height,
-            frameRate = null,
-            hardwareAccelerationCandidates = hardwareAccelerationCandidates
-        )
-    ).mapCatching { decoder ->
-        try {
-            timestampsMillis(decoder.media.durationMicros.microseconds.inWholeMilliseconds).filter {
-                it in 0L..decoder.media.durationMicros
-            }.map { timestampMillis ->
-                timestampMillis.milliseconds.inWholeMicroseconds
-            }.mapNotNull { timestampMicros ->
-                decoder.seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrNull()
+    ) = runCatching {
+        VideoDecoderFactory().create(
+            parameters = VideoDecoderFactory.Parameters(
+                location = location,
+                width = width,
+                height = height,
+                frameRate = null,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates
+            )
+        ).mapCatching { decoder ->
+            try {
+                timestampsMillis(decoder.media.durationMicros.microseconds.inWholeMilliseconds).filter {
+                    it in 0L..decoder.media.durationMicros
+                }.map { timestampMillis ->
+                    timestampMillis.milliseconds.inWholeMicroseconds
+                }.mapNotNull { timestampMicros ->
+                    decoder.seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrNull()
 
-                decoder.decode().getOrNull() as? Frame.Video.Content
+                    decoder.decode().getOrNull() as? Frame.Video.Content
+                }
+            } finally {
+                decoder.close().getOrThrow()
             }
-        } finally {
-            decoder.close().getOrThrow()
-        }
-    }.recoverCatching { t ->
-        throw SnapshotException(t)
+        }.recoverCatching { t ->
+            throw SnapshotException(t)
+        }.getOrThrow()
     }
 
     suspend fun snapshot(
         location: String,
         width: Int? = null,
         height: Int? = null,
-        hardwareAccelerationCandidates: List<HardwareAcceleration> = emptyList(),
+        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestampMillis: (durationMillis: Long) -> (Long) = { 0L },
     ) = snapshots(location = location,

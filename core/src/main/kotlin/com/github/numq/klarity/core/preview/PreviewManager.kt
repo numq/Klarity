@@ -12,7 +12,7 @@ interface PreviewManager {
         location: String,
         width: Int? = null,
         height: Int? = null,
-        hardwareAccelerationCandidates: List<HardwareAcceleration> = emptyList(),
+        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
     ): Result<Unit>
 
     suspend fun release(): Result<Unit>

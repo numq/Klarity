@@ -6,7 +6,6 @@ import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
@@ -37,7 +36,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
-    private val probeDecoderFactory: SuspendFactory<ProbeDecoderFactory.Parameters, Decoder<Media, Frame.Probe>>,
     private val audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
     private val videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
     private val audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
@@ -184,11 +182,7 @@ internal class DefaultPlayerController(
      * Events
      */
 
-    private suspend fun handleMediaError(throwable: Throwable) {
-        events.emit(PlayerEvent.Error((throwable as? Exception) ?: Exception(throwable)))
-    }
-
-    private suspend fun handlePlaybackError(throwable: Throwable) {
+    private suspend fun handleException(throwable: Throwable) {
         events.emit(PlayerEvent.Error((throwable as? Exception) ?: Exception(throwable)))
 
         handleRelease()
@@ -230,32 +224,26 @@ internal class DefaultPlayerController(
 
     private val executionMutex = Mutex()
 
-    private val executionContext = Dispatchers.Default + Job()
-
-    private val executionScope = CoroutineScope(executionContext)
+    private val executionScope = CoroutineScope(Dispatchers.Default)
 
     private var executionJob = AtomicReference<Job?>()
 
     private suspend fun executeMediaCommand(
         command: suspend () -> Unit,
     ) = executionMutex.withLock {
-        runCatching { command() }.onFailure { t -> handleMediaError(t) }.getOrDefault(Unit)
+        command()
     }
 
     private suspend fun executePlaybackCommand(
         command: suspend InternalPlayerState.Ready.() -> Unit,
     ) = executionMutex.withLock {
-        runCatching {
-            val currentInternalState = internalState.get()
+        val currentInternalState = internalState.get()
 
-            check(currentInternalState is InternalPlayerState.Ready) { "Unable to execute playback command" }
+        check(currentInternalState is InternalPlayerState.Ready) { "Unable to execute playback command" }
 
-            if (currentInternalState.media.durationMicros > 0L) {
-                command(currentInternalState)
-            }
-        }.onFailure { t ->
-            handlePlaybackError(t)
-        }.getOrDefault(Unit)
+        if (currentInternalState.media.durationMicros > 0L) {
+            command(currentInternalState)
+        }
     }
 
     private suspend fun handlePrepare(
@@ -267,23 +255,16 @@ internal class DefaultPlayerController(
         width: Int?,
         height: Int?,
         frameRate: Double?,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
+        skipPreview: Boolean,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
-        val probeDecoder = probeDecoderFactory.create(
-            ProbeDecoderFactory.Parameters(
-                location = location,
-                findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
-                findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
-            )
+        val media = Decoder.probe(
+            location = location,
+            findAudioStream = audioBufferSize >= MIN_AUDIO_BUFFER_SIZE,
+            findVideoStream = videoBufferSize >= MIN_VIDEO_BUFFER_SIZE
         ).getOrThrow()
-
-        val media = try {
-            probeDecoder.media
-        } finally {
-            probeDecoder.close().getOrThrow()
-        }
 
         val pipeline = when (media) {
             is Media.Audio -> with(media) {
@@ -324,13 +305,12 @@ internal class DefaultPlayerController(
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
                         format = format,
-                        preview = with(decoder) {
-                            val frame = decode().onSuccess {
-                                reset().getOrDefault(Unit)
+                        preview = if (skipPreview) null else with(decoder) {
+                            decode().onSuccess {
+                                reset().getOrThrow()
                             }.getOrNull() as? Frame.Video.Content
-
-                            frame
-                        })
+                        }
+                    )
                 ).getOrThrow()
 
                 Pipeline.Video(media = media, decoder = decoder, buffer = buffer, renderer = renderer)
@@ -373,13 +353,12 @@ internal class DefaultPlayerController(
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
                         format = videoFormat,
-                        preview = with(videoDecoder) {
-                            val frame = decode().onSuccess {
-                                reset().getOrDefault(Unit)
+                        preview = if (skipPreview) null else with(videoDecoder) {
+                            decode().onSuccess {
+                                reset().getOrThrow()
                             }.getOrNull() as? Frame.Video.Content
-
-                            frame
-                        })
+                        }
+                    )
                 ).getOrThrow()
 
                 Pipeline.AudioVideo(
@@ -427,12 +406,13 @@ internal class DefaultPlayerController(
         }
 
         playbackLoop.start(
-            onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
-                handlePlaybackCompletion()
-            }
+            onException = ::handleException,
+            onTimestamp = ::handlePlaybackTimestamp,
+            endOfMedia = { handlePlaybackCompletion() }
         ).getOrThrow()
 
         bufferLoop.start(
+            onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
             onWaiting = ::handleBufferWaiting,
             endOfMedia = { handleBufferCompletion() }
@@ -469,9 +449,9 @@ internal class DefaultPlayerController(
         }
 
         playbackLoop.start(
-            onTimestamp = ::handlePlaybackTimestamp, endOfMedia = {
-                handlePlaybackCompletion()
-            }
+            onException = ::handleException,
+            onTimestamp = ::handlePlaybackTimestamp,
+            endOfMedia = { handlePlaybackCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
@@ -560,6 +540,7 @@ internal class DefaultPlayerController(
         currentCoroutineContext().ensureActive()
 
         bufferLoop.start(
+            onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
             onWaiting = ::handleBufferWaiting,
             endOfMedia = { handleBufferCompletion() }
@@ -624,7 +605,8 @@ internal class DefaultPlayerController(
                             width = width,
                             height = height,
                             frameRate = frameRate,
-                            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+                            hardwareAccelerationCandidates = hardwareAccelerationCandidates,
+                            skipPreview = skipPreview
                         )
                     }.also(executionJob::set).join()
                 }

@@ -6,6 +6,7 @@ import com.github.numq.klarity.core.timestamp.Timestamp
 
 interface PlaybackLoop {
     suspend fun start(
+        onException: suspend (PlaybackLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
         endOfMedia: suspend () -> Unit,
     ): Result<Unit>

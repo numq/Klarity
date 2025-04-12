@@ -2,7 +2,8 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.cleaner.NativeCleaner
 import com.github.numq.klarity.core.format.NativeFormat
-import com.github.numq.klarity.core.frame.NativeFrame
+import com.github.numq.klarity.core.frame.NativeAudioFrame
+import com.github.numq.klarity.core.frame.NativeVideoFrame
 import java.io.Closeable
 import java.nio.ByteBuffer
 
@@ -12,33 +13,31 @@ internal class NativeDecoder(
     findVideoStream: Boolean,
     decodeAudioStream: Boolean,
     decodeVideoStream: Boolean,
-    sampleRate: Int,
-    channels: Int,
-    width: Int,
-    height: Int,
-    frameRate: Double,
-    hardwareAccelerationCandidates: IntArray,
+    sampleRate: Int? = null,
+    channels: Int? = null,
+    width: Int? = null,
+    height: Int? = null,
+    frameRate: Double? = null,
+    hardwareAccelerationCandidates: IntArray? = null,
 ) : Closeable {
-    private val nativeHandle by lazy {
+    internal val nativeHandle by lazy {
         requireNotNull(createNative(
             location = location,
             findAudioStream = findAudioStream,
             findVideoStream = findVideoStream,
             decodeAudioStream = decodeAudioStream,
             decodeVideoStream = decodeVideoStream,
-            sampleRate = sampleRate,
-            channels = channels,
-            width = width,
-            height = height,
-            frameRate = frameRate,
-            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+            sampleRate = sampleRate ?: 0,
+            channels = channels ?: 0,
+            width = width ?: 0,
+            height = height ?: 0,
+            frameRate = frameRate ?: .0,
+            hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
         ).takeIf { it != -1L }) { "Could not instantiate native decoder" }
     }
 
-    private val cleanable by lazy {
-        NativeCleaner.cleaner.register(this) {
-            deleteNative(handle = nativeHandle)
-        }
+    private val cleanable = NativeCleaner.cleaner.register(this) {
+        deleteNative(handle = nativeHandle)
     }
 
     companion object {
@@ -66,7 +65,10 @@ internal class NativeDecoder(
         private external fun getFormatNative(handle: Long): NativeFormat
 
         @JvmStatic
-        private external fun decodeNative(handle: Long, byteBuffer: ByteBuffer): NativeFrame?
+        private external fun decodeAudioNative(handle: Long): NativeAudioFrame?
+
+        @JvmStatic
+        private external fun decodeVideoNative(handle: Long, byteBuffer: ByteBuffer): NativeVideoFrame?
 
         @JvmStatic
         private external fun seekToNative(handle: Long, timestampMicros: Long, keyframesOnly: Boolean)
@@ -78,9 +80,11 @@ internal class NativeDecoder(
         private external fun deleteNative(handle: Long)
     }
 
-    val format by lazy { getFormatNative(handle = nativeHandle) }
+    val format = getFormatNative(handle = nativeHandle)
 
-    fun decode(byteBuffer: ByteBuffer) = decodeNative(handle = nativeHandle, byteBuffer = byteBuffer)
+    fun decodeAudio() = decodeAudioNative(handle = nativeHandle)
+
+    fun decodeVideo(byteBuffer: ByteBuffer) = decodeVideoNative(handle = nativeHandle, byteBuffer = byteBuffer)
 
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = seekToNative(
         handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly

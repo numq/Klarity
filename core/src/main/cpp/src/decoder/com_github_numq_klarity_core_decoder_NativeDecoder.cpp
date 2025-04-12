@@ -116,7 +116,6 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 static_cast<jint>(format.height),
                 static_cast<jdouble>(format.frameRate),
                 static_cast<jint>(format.hwDeviceType),
-                static_cast<jint>(format.audioBufferSize),
                 static_cast<jint>(format.videoBufferSize)
         );
 
@@ -126,7 +125,44 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
     }, nullptr);
 }
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeAudioNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+) {
+    return handleException<jobject>(env, [&] {
+        std::unique_lock<std::shared_mutex> lock(decoderMutex);
+
+        auto decoder = getDecoderPointer(handle);
+
+        auto frame = decoder->decodeAudio();
+
+        if (!frame) {
+            return static_cast<jobject>(nullptr);
+        }
+
+        auto audioBytesSize = static_cast<jsize>(frame->audioBytes.size());
+
+        auto audioBytesBuf = reinterpret_cast<jbyte *>(frame->audioBytes.data());
+
+        auto byteArray = env->NewByteArray(audioBytesSize);
+
+        env->SetByteArrayRegion(byteArray, 0, audioBytesSize, audioBytesBuf);
+
+        auto frameObject = env->NewObject(
+                audioFrameClass,
+                audioFrameConstructor,
+                static_cast<jlong>(frame->timestampMicros),
+                byteArray
+        );
+
+        env->DeleteLocalRef(byteArray);
+
+        return frameObject;
+    }, nullptr);
+}
+
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeVideoNative(
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
@@ -153,18 +189,16 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 
         auto decoder = getDecoderPointer(handle);
 
-        auto frame = decoder->decode(static_cast<uint8_t *>(buffer), size);
+        auto frame = decoder->decodeVideo(static_cast<uint8_t *>(buffer), size);
 
         if (!frame) {
             return static_cast<jobject>(nullptr);
         }
 
         return env->NewObject(
-                frameClass,
-                frameConstructor,
-                static_cast<jint>(frame->type),
-                static_cast<jlong>(frame->timestampMicros),
-                static_cast<jint>(frame->writtenBytes)
+                videoFrameClass,
+                videoFrameConstructor,
+                static_cast<jlong>(frame->timestampMicros)
         );
     }, nullptr);
 }

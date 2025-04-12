@@ -4,7 +4,6 @@ import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.VideoBufferFactory
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
-import com.github.numq.klarity.core.decoder.ProbeDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
@@ -201,7 +200,6 @@ interface KlarityPlayer {
             PlayerControllerFactory().create(
                 parameters = PlayerControllerFactory.Parameters(
                     initialSettings = null,
-                    probeDecoderFactory = ProbeDecoderFactory(),
                     audioDecoderFactory = AudioDecoderFactory(),
                     videoDecoderFactory = VideoDecoderFactory(),
                     audioBufferFactory = AudioBufferFactory(),

@@ -9,7 +9,7 @@ class AudioDecoderFactory : SuspendFactory<AudioDecoderFactory.Parameters, Decod
 
     override suspend fun create(parameters: Parameters) = with(parameters) {
         Decoder.createAudioDecoder(
-            location = parameters.location,
+            location = location,
             sampleRate = sampleRate,
             channels = channels
         )
