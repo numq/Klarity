@@ -10,14 +10,14 @@ sealed interface Background {
     /**
      * Defines the scaling method for the background.
      */
-    val scale: ImageScale
+    val imageScale: ImageScale
 
     /**
      * Represents a transparent background.
      * The background is fully transparent with no scaling.
      */
     data object Transparent : Background {
-        override val scale: ImageScale = ImageScale.None
+        override val imageScale: ImageScale = ImageScale.None
     }
 
     /**
@@ -29,17 +29,17 @@ sealed interface Background {
      * @property b Blue channel value (0-255).
      */
     data class Color(val a: Int, val r: Int, val g: Int, val b: Int) : Background {
-        override val scale: ImageScale = ImageScale.None
+        override val imageScale: ImageScale = ImageScale.None
     }
 
     /**
      * Represents a blurred background.
      *
      * @property sigma The blur intensity applied to the background.
-     * @property scale Specifies how the blurred image should be scaled.
+     * @property imageScale The video frame scaling method (default is [ImageScale.Crop]).
      */
     data class Blur(
         val sigma: Float = 2f,
-        override val scale: ImageScale = ImageScale.Crop,
+        override val imageScale: ImageScale = ImageScale.Crop,
     ) : Background
 }
