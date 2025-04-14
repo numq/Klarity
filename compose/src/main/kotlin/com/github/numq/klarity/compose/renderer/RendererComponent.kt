@@ -1,7 +1,6 @@
 package com.github.numq.klarity.compose.renderer
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +15,13 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.withSave
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterNotNull
-import org.jetbrains.skia.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import org.jetbrains.skia.FilterBlurMode
+import org.jetbrains.skia.MaskFilter
+import org.jetbrains.skia.Paint
+import org.jetbrains.skia.Surface
 
 @Composable
 fun RendererComponent(
@@ -27,139 +30,100 @@ fun RendererComponent(
     background: Background = Background.Transparent,
     placeholder: @Composable (BoxWithConstraintsScope.() -> Unit)? = null,
 ) {
-    when (foreground) {
-        is Foreground.Empty -> Box(modifier = modifier)
+    Surface(modifier = modifier) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            when (foreground) {
+                is Foreground.Empty -> placeholder?.invoke(this)
 
-        else -> {
-            val imageInfo = remember(foreground) {
-                ImageInfo(
-                    width = when (foreground) {
-                        is Foreground.Source -> foreground.renderer.format.width
+                else -> {
+                    var renderJob by remember { mutableStateOf<Job?>(null) }
 
-                        is Foreground.Frame -> foreground.frame.width
+                    val rendererContext = remember(foreground) { RendererContext.create(foreground) }
 
-                        is Foreground.Image -> foreground.width
+                    var generationId by remember { mutableStateOf(0) }
 
-                        else -> 0
-                    }, height = when (foreground) {
-                        is Foreground.Source -> foreground.renderer.format.height
+                    LaunchedEffect(rendererContext) {
+                        renderJob?.cancelAndJoin()
+                        renderJob = launch {
+                            when (foreground) {
+                                is Foreground.Source -> foreground.renderer.frame.collect { frame ->
+                                    rendererContext.draw(frame.bytes) {
+                                        generationId = it
+                                    }
+                                }
 
-                        is Foreground.Frame -> foreground.frame.height
+                                is Foreground.Frame -> rendererContext.draw(foreground.frame.bytes) {
+                                    generationId = it
+                                }
 
-                        is Foreground.Image -> foreground.height
+                                is Foreground.Image -> rendererContext.draw(foreground.bytes) {
+                                    generationId = it
+                                }
 
-                        else -> 0
-                    }, colorType = ColorType.RGBA_8888, alphaType = ColorAlphaType.UNPREMUL
-                )
-            }
-
-            val bitmap = remember(imageInfo) {
-                Bitmap().apply {
-                    if (!allocPixels(imageInfo)) {
-                        close()
-                        error("Could not allocate bitmap pixels")
-                    }
-                }
-            }
-
-            val surface = remember(imageInfo) {
-                Surface.makeRaster(imageInfo)
-            }
-
-            var generationId by remember {
-                mutableStateOf(0)
-            }
-
-            LaunchedEffect(foreground) {
-                when (foreground) {
-                    is Foreground.Source -> {
-                        foreground.renderer.frame.filterNotNull().collectLatest { frame ->
-                            if (bitmap.installPixels(frame.bytes)) {
-                                surface.canvas.writePixels(bitmap, 0, 0)
-
-                                generationId = bitmap.generationId
+                                else -> return@launch
                             }
                         }
                     }
 
-                    else -> Unit
-                }
-            }
+                    DisposableEffect(rendererContext) {
+                        onDispose {
+                            renderJob?.cancel()
 
-            DisposableEffect(foreground) {
-                when (foreground) {
-                    is Foreground.Source -> if (bitmap.installPixels(foreground.renderer.preview?.bytes)) {
-                        surface.canvas.writePixels(bitmap, 0, 0)
+                            renderJob = null
 
-                        generationId = bitmap.generationId
+                            rendererContext.close()
+
+                            generationId = 0
+                        }
                     }
 
-                    is Foreground.Frame -> if (bitmap.installPixels(foreground.frame.bytes)) {
-                        surface.canvas.writePixels(bitmap, 0, 0)
-
-                        generationId = bitmap.generationId
-                    }
-
-                    is Foreground.Image -> if (bitmap.installPixels(foreground.bytes)) {
-                        surface.canvas.writePixels(bitmap, 0, 0)
-
-                        generationId = bitmap.generationId
-                    }
-
-                    else -> Unit
-                }
-
-                onDispose {
-                    generationId = 0
-                }
-            }
-
-            DisposableEffect(imageInfo) {
-                onDispose {
-                    if (!surface.isClosed) {
-                        surface.close()
-                    }
-
-                    if (!bitmap.isClosed) {
-                        bitmap.close()
-                    }
-                }
-            }
-
-            Surface(modifier = modifier) {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     val size = remember(maxWidth, maxHeight) {
                         Size(maxWidth.value, maxHeight.value)
                     }
 
-                    val foregroundSize = remember(foreground, size) {
-                        calculateScaledSize(foreground, size)
-                    }
-
-                    val foregroundOffset = remember(foregroundSize, size) {
-                        calculateOffset(foregroundSize, size)
-                    }
-
-                    val backgroundSize = remember(background, size, foreground) {
-                        calculateBackgroundSize(background, size, foreground)
-                    }
-
-                    val backgroundOffset = remember(backgroundSize, size) {
-                        calculateBackgroundOffset(backgroundSize, size)
-                    }
-
-                    key(backgroundSize, foregroundSize, generationId) {
-                        Canvas(modifier = modifier.fillMaxSize()) {
-                            drawIntoCanvas { canvas ->
-                                drawBackground(background, backgroundSize, backgroundOffset, surface, canvas)
-
-                                drawForeground(foregroundSize, foregroundOffset, surface, canvas)
-                            }
+                    val foregroundSize by remember(foreground, size) {
+                        derivedStateOf {
+                            calculateScaledSize(foreground, size)
                         }
                     }
 
-                    if (bitmap.drawsNothing()) {
-                        placeholder?.invoke(this)
+                    val foregroundOffset by remember(foregroundSize, size) {
+                        derivedStateOf {
+                            calculateOffset(foregroundSize, size)
+                        }
+                    }
+
+                    val backgroundSize by remember(background, size, foreground) {
+                        derivedStateOf {
+                            calculateBackgroundSize(background, size, foreground)
+                        }
+                    }
+
+                    val backgroundOffset by remember(backgroundSize, size) {
+                        derivedStateOf {
+                            calculateBackgroundOffset(backgroundSize, size)
+                        }
+                    }
+
+                    key(generationId) {
+                        Canvas(modifier = modifier.fillMaxSize()) {
+                            drawIntoCanvas { canvas ->
+                                drawBackground(
+                                    background = background,
+                                    backgroundSize = backgroundSize,
+                                    backgroundOffset = backgroundOffset,
+                                    surface = rendererContext.surface,
+                                    canvas = canvas
+                                )
+
+                                drawForeground(
+                                    foregroundSize = foregroundSize,
+                                    foregroundOffset = foregroundOffset,
+                                    surface = rendererContext.surface,
+                                    canvas = canvas
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -241,13 +205,15 @@ private fun DrawScope.drawBackground(
             is Background.Blur -> {
                 canvas.translate(backgroundOffset.x, backgroundOffset.y)
 
-                canvas.scale(backgroundSize.width / surface.width, backgroundSize.height / surface.height)
+                if (!surface.isClosed) {
+                    canvas.scale(backgroundSize.width / surface.width, backgroundSize.height / surface.height)
 
-                surface.draw(canvas.nativeCanvas, 0, 0, Paint().apply {
-                    maskFilter = MaskFilter.makeBlur(
-                        mode = FilterBlurMode.NORMAL, sigma = background.sigma
-                    )
-                })
+                    surface.draw(canvas.nativeCanvas, 0, 0, Paint().apply {
+                        maskFilter = MaskFilter.makeBlur(
+                            mode = FilterBlurMode.NORMAL, sigma = background.sigma
+                        )
+                    })
+                }
             }
         }
     }
@@ -262,8 +228,10 @@ private fun drawForeground(
     canvas.withSave {
         canvas.translate(foregroundOffset.x, foregroundOffset.y)
 
-        canvas.scale(foregroundSize.width / surface.width, foregroundSize.height / surface.height)
+        if (!surface.isClosed) {
+            canvas.scale(foregroundSize.width / surface.width, foregroundSize.height / surface.height)
 
-        surface.draw(canvas.nativeCanvas, 0, 0, null)
+            surface.draw(canvas.nativeCanvas, 0, 0, null)
+        }
     }
 }
