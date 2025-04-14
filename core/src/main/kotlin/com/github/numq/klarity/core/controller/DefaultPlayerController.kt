@@ -256,7 +256,7 @@ internal class DefaultPlayerController(
         height: Int?,
         frameRate: Double?,
         hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-        skipPreview: Boolean,
+        loadPreview: Boolean,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
@@ -305,11 +305,17 @@ internal class DefaultPlayerController(
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
                         format = format,
-                        preview = if (skipPreview) null else with(decoder) {
-                            decode().onSuccess {
-                                reset().getOrThrow()
-                            }.getOrNull() as? Frame.Video.Content
-                        }
+                        preview = if (loadPreview) {
+                            with(decoder) {
+                                runCatching {
+                                    val frame = decode().getOrThrow()
+
+                                    reset().getOrThrow()
+
+                                    frame
+                                }.getOrNull() as? Frame.Video.Content
+                            }
+                        } else null
                     )
                 ).getOrThrow()
 
@@ -353,11 +359,17 @@ internal class DefaultPlayerController(
                 val renderer = rendererFactory.create(
                     parameters = RendererFactory.Parameters(
                         format = videoFormat,
-                        preview = if (skipPreview) null else with(videoDecoder) {
-                            decode().onSuccess {
-                                reset().getOrThrow()
-                            }.getOrNull() as? Frame.Video.Content
-                        }
+                        preview = if (loadPreview) {
+                            with(videoDecoder) {
+                                runCatching {
+                                    val frame = decode().getOrThrow()
+
+                                    reset().getOrThrow()
+
+                                    frame
+                                }.getOrNull() as? Frame.Video.Content
+                            }
+                        } else null
                     )
                 ).getOrThrow()
 
@@ -606,7 +618,7 @@ internal class DefaultPlayerController(
                             height = height,
                             frameRate = frameRate,
                             hardwareAccelerationCandidates = hardwareAccelerationCandidates,
-                            skipPreview = skipPreview
+                            loadPreview = loadPreview
                         )
                     }.also(executionJob::set).join()
                 }

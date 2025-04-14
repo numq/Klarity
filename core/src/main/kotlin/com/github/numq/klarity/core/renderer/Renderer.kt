@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.renderer
 
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -14,16 +15,9 @@ interface Renderer {
     val format: VideoFormat
 
     /**
-     * An optional preview frame of the video content.
-     * Can be null if no preview is set.
-     */
-    val preview: Frame.Video.Content?
-
-    /**
      * A flow that emits the current frame of the video being rendered.
-     * The frame can be null if no frame is currently available.
      */
-    val frame: StateFlow<Frame.Video.Content?>
+    val frame: SharedFlow<Frame.Video.Content>
 
     /**
      * A flow that emits the current playback speed factor.

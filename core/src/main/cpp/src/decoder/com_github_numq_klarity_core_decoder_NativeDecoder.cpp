@@ -105,7 +105,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
             throw std::runtime_error("Could not create location string");
         }
 
-        auto javaObject = env->NewObject(
+        auto formatObject = env->NewObject(
                 formatClass,
                 formatConstructor,
                 location,
@@ -121,7 +121,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 
         env->DeleteLocalRef(location);
 
-        return javaObject;
+        return formatObject;
     }, nullptr);
 }
 
@@ -135,7 +135,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 
         auto decoder = getDecoderPointer(handle);
 
-        auto frame = decoder->decodeAudio();
+        auto frame = decoder->decodeAudio().release();
 
         if (!frame) {
             return static_cast<jobject>(nullptr);

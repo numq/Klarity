@@ -432,6 +432,28 @@ Decoder::~Decoder() {
 
         videoCodecContext->hw_device_ctx = nullptr;
     }
+
+    audioBuffer.clear();
+
+    audioBuffer.shrink_to_fit();
+
+    hwVideoFrame.reset();
+
+    swVideoFrame.reset();
+
+    audioFrame.reset();
+
+    packet.reset();
+
+    swsContext.reset();
+
+    swrContext.reset();
+
+    videoCodecContext.reset();
+
+    audioCodecContext.reset();
+
+    formatContext.reset();
 }
 
 std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
@@ -454,7 +476,7 @@ std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
                     continue;
                 }
 
-                av_frame_unref(audioFrame.get());
+                av_packet_unref(packet.get());
 
                 int ret;
 
@@ -467,13 +489,7 @@ std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
                             AVRational{1, 1'000'000}
                     );
 
-                    try {
-                        _processAudioFrame();
-                    } catch (...) {
-                        av_frame_unref(audioFrame.get());
-
-                        throw;
-                    }
+                    _processAudioFrame();
 
                     av_frame_unref(audioFrame.get());
 
@@ -526,11 +542,7 @@ std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t
                     continue;
                 }
 
-                if (_isHardwareAccelerated()) {
-                    av_frame_unref(hwVideoFrame.get());
-                }
-
-                av_frame_unref(swVideoFrame.get());
+                av_packet_unref(packet.get());
 
                 int ret;
 
@@ -540,14 +552,10 @@ std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t
                 )) == 0) {
                     if (_isHardwareAccelerated()) {
                         if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
-                            av_frame_unref(hwVideoFrame.get());
-
                             throw DecoderException("Error transferring frame to system memory");
                         }
 
                         if (swVideoFrame->format == AV_PIX_FMT_NONE || !swVideoFrame->data[0]) {
-                            av_frame_unref(hwVideoFrame.get());
-
                             throw DecoderException("Failed to transfer frame data");
                         }
 
@@ -558,31 +566,25 @@ std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t
 
                     const auto frameTimestampMicros = swVideoFrame->best_effort_timestamp;
 
-                    try {
-                        if (swVideoFrame->width != videoCodecContext->width ||
-                            swVideoFrame->height != videoCodecContext->height ||
-                            swVideoFrame->format != videoCodecContext->pix_fmt) {
-                            swsContext.reset(sws_getCachedContext(
-                                    swsContext.release(),
-                                    swVideoFrame->width,
-                                    swVideoFrame->height,
-                                    static_cast<AVPixelFormat>(swVideoFrame->format),
-                                    static_cast<int>(format.width),
-                                    static_cast<int>(format.height),
-                                    targetPixelFormat,
-                                    swsFlags,
-                                    nullptr,
-                                    nullptr,
-                                    nullptr
-                            ));
-                        }
-
-                        _processVideoFrame(buffer, bufferSize);
-                    } catch (...) {
-                        av_frame_unref(swVideoFrame.get());
-
-                        throw;
+                    if (swVideoFrame->width != videoCodecContext->width ||
+                        swVideoFrame->height != videoCodecContext->height ||
+                        swVideoFrame->format != videoCodecContext->pix_fmt) {
+                        swsContext.reset(sws_getCachedContext(
+                                swsContext.release(),
+                                swVideoFrame->width,
+                                swVideoFrame->height,
+                                static_cast<AVPixelFormat>(swVideoFrame->format),
+                                static_cast<int>(format.width),
+                                static_cast<int>(format.height),
+                                targetPixelFormat,
+                                swsFlags,
+                                nullptr,
+                                nullptr,
+                                nullptr
+                        ));
                     }
+
+                    _processVideoFrame(buffer, bufferSize);
 
                     av_frame_unref(swVideoFrame.get());
 

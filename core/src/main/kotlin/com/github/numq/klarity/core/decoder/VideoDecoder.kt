@@ -12,16 +12,26 @@ internal class VideoDecoder(
 ) : Decoder<Media.Video, Frame.Video> {
     private val mutex = Mutex()
 
-    private var byteBuffer = ByteBuffer.allocateDirect(decoder.format.videoBufferSize)
+    private val videoBufferSize by lazy {
+        decoder.format.videoBufferSize
+    }
+
+    private val byteBuffer by lazy {
+        ByteBuffer.allocateDirect(videoBufferSize)
+    }
+
+    private val bytes by lazy {
+        ByteArray(videoBufferSize)
+    }
 
     override suspend fun decode() = mutex.withLock {
         runCatching {
             byteBuffer.clear()
 
             decoder.decodeVideo(byteBuffer)?.run {
-                val bytes = ByteArray(byteBuffer.remaining())
-
                 byteBuffer.get(bytes)
+
+                byteBuffer.clear()
 
                 Frame.Video.Content(
                     timestampMicros = timestampMicros,
@@ -35,17 +45,21 @@ internal class VideoDecoder(
 
     override suspend fun seekTo(micros: Long, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
-            decoder.seekTo(micros, keyframesOnly).also {
-                byteBuffer.clear()
-            }
+            decoder.seekTo(micros, keyframesOnly)
+        }.onSuccess {
+            bytes.fill(0)
+
+            byteBuffer.clear()
         }
     }
 
     override suspend fun reset() = mutex.withLock {
         runCatching {
-            decoder.reset().also {
-                byteBuffer.clear()
-            }
+            decoder.reset()
+        }.onSuccess {
+            bytes.fill(0)
+
+            byteBuffer.clear()
         }
     }
 

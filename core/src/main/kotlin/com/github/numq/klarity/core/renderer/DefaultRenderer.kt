@@ -2,28 +2,27 @@ package com.github.numq.klarity.core.renderer
 
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.onSubscription
 
 internal class DefaultRenderer(
     override val format: VideoFormat,
-    override val preview: Frame.Video.Content?,
+    private val preview: Frame.Video.Content?,
 ) : Renderer {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
-
-    private val _frame = Channel<Frame.Video.Content?>(Channel.CONFLATED)
-
-    override val frame = _frame.receiveAsFlow().stateIn(
-        scope = coroutineScope,
-        started = SharingStarted.Eagerly,
-        initialValue = preview
+    private val _frame = MutableSharedFlow<Frame.Video.Content>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
+
+    override val frame = _frame.asSharedFlow().onSubscription {
+        if (preview != null) {
+            emit(preview)
+        }
+    }
 
     override var playbackSpeedFactor = MutableStateFlow(1f)
 
@@ -34,18 +33,19 @@ internal class DefaultRenderer(
     }
 
     override suspend fun draw(frame: Frame.Video.Content) = runCatching {
-        _frame.send(frame)
+        _frame.tryEmit(frame)
+
+        Unit
     }
 
     override suspend fun reset() = runCatching {
-        _frame.send(preview)
-    }
-
-    override suspend fun close() = runCatching {
-        coroutineScope.cancel()
-
-        _frame.close()
+        preview?.let(_frame::tryEmit)
 
         Unit
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override suspend fun close() = runCatching {
+        _frame.resetReplayCache()
     }
 }

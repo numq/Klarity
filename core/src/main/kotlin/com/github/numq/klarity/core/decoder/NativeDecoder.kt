@@ -36,8 +36,10 @@ internal class NativeDecoder(
         ).takeIf { it != -1L }) { "Could not instantiate native decoder" }
     }
 
-    private val cleanable = NativeCleaner.cleaner.register(this) {
-        deleteNative(handle = nativeHandle)
+    private val cleanable by lazy {
+        NativeCleaner.cleaner.register(this) {
+            deleteNative(handle = nativeHandle)
+        }
     }
 
     companion object {
@@ -80,7 +82,9 @@ internal class NativeDecoder(
         private external fun deleteNative(handle: Long)
     }
 
-    val format = getFormatNative(handle = nativeHandle)
+    val format by lazy {
+        getFormatNative(handle = nativeHandle)
+    }
 
     fun decodeAudio() = decodeAudioNative(handle = nativeHandle)
 

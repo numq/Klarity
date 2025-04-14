@@ -49,7 +49,7 @@ internal class DefaultKlarityPlayer(
                 height = videoSettings.height,
                 frameRate = videoSettings.frameRate,
                 hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates,
-                skipPreview = videoSettings.skipPreview
+                loadPreview = videoSettings.loadPreview
             )
         )
     }

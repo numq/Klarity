@@ -50,13 +50,13 @@ internal class DefaultBufferLoop(
 
                     when (frame) {
                         is Frame.Audio.Content -> {
-                            buffer.push(frame)
+                            buffer.push(frame).getOrThrow()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
                         is Frame.Audio.EndOfStream -> {
-                            buffer.push(frame)
+                            buffer.push(frame).getOrThrow()
 
                             break
                         }
@@ -91,13 +91,13 @@ internal class DefaultBufferLoop(
 
                     when (frame) {
                         is Frame.Video.Content -> {
-                            buffer.push(frame)
+                            buffer.push(frame).getOrThrow()
 
                             onTimestamp(Timestamp(micros = frame.timestampMicros))
                         }
 
                         is Frame.Video.EndOfStream -> {
-                            buffer.push(frame)
+                            buffer.push(frame).getOrThrow()
 
                             break
                         }

@@ -44,7 +44,7 @@ internal class DefaultPlaybackLoop(
         val lastAudioTimestamp = AtomicReference(Duration.INFINITE)
 
         val audioJob = coroutineScope.launch {
-            while (isActive && isPlaying.get()) {
+            while (currentCoroutineContext().isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
                     delay(1L)
 
@@ -68,7 +68,7 @@ internal class DefaultPlaybackLoop(
         val videoJob = coroutineScope.launch {
             var lastFrameTimestamp = Duration.INFINITE
 
-            while (isActive && isPlaying.get()) {
+            while (currentCoroutineContext().isActive && isPlaying.get()) {
                 if (bufferLoop.isWaiting.get()) {
                     delay(1L)
 
@@ -91,7 +91,7 @@ internal class DefaultPlaybackLoop(
                         is Frame.Video.Content -> if (lastAudioTimestamp.get().isFinite()) {
                             val startPlaybackTime = System.nanoTime().nanoseconds
 
-                            while (isActive && isPlaying.get()) {
+                            while (currentCoroutineContext().isActive && isPlaying.get()) {
                                 if ((System.nanoTime().nanoseconds - startPlaybackTime) * renderer.playbackSpeedFactor.value.toDouble() > frame.timestampMicros.microseconds - lastAudioTimestamp.get()) {
                                     break
                                 }
