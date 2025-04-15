@@ -295,15 +295,9 @@ internal class DefaultPlayerController(
                     parameters = RendererFactory.Parameters(
                         format = format,
                         preview = if (loadPreview) {
-                            with(decoder) {
-                                runCatching {
-                                    val frame = decode().getOrThrow()
-
-                                    reset().getOrThrow()
-
-                                    frame
-                                }.getOrNull() as? Frame.Video.Content
-                            }
+                            decoder.decode().onSuccess {
+                                decoder.reset().getOrThrow()
+                            }.getOrNull() as? Frame.Video.Content
                         } else null
                     )
                 ).getOrThrow()
@@ -351,15 +345,9 @@ internal class DefaultPlayerController(
                     parameters = RendererFactory.Parameters(
                         format = videoFormat,
                         preview = if (loadPreview) {
-                            with(videoDecoder) {
-                                runCatching {
-                                    val frame = decode().getOrThrow()
-
-                                    reset().getOrThrow()
-
-                                    frame
-                                }.getOrNull() as? Frame.Video.Content
-                            }
+                            videoDecoder.decode().onSuccess {
+                                videoDecoder.reset().getOrThrow()
+                            }.getOrNull() as? Frame.Video.Content
                         } else null
                     )
                 ).getOrThrow()

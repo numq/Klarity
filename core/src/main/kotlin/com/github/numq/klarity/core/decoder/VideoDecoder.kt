@@ -26,8 +26,6 @@ internal class VideoDecoder(
 
     override suspend fun decode() = mutex.withLock {
         runCatching {
-            byteBuffer.clear()
-
             decoder.decodeVideo(byteBuffer)?.run {
                 byteBuffer.get(bytes)
 
@@ -47,8 +45,6 @@ internal class VideoDecoder(
         runCatching {
             decoder.seekTo(micros, keyframesOnly)
         }.onSuccess {
-            bytes.fill(0)
-
             byteBuffer.clear()
         }
     }
@@ -57,8 +53,6 @@ internal class VideoDecoder(
         runCatching {
             decoder.reset()
         }.onSuccess {
-            bytes.fill(0)
-
             byteBuffer.clear()
         }
     }

@@ -12,7 +12,7 @@ object SnapshotManager {
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
-        keyframesOnly: Boolean = false,
+        keyframesOnly: Boolean = true,
         timestampsMillis: (durationMillis: Long) -> (List<Long>) = { listOf(0L) },
     ) = runCatching {
         VideoDecoderFactory().create(
@@ -47,7 +47,7 @@ object SnapshotManager {
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
-        keyframesOnly: Boolean = false,
+        keyframesOnly: Boolean = true,
         timestampMillis: (durationMillis: Long) -> (Long) = { 0L },
     ) = snapshots(location = location,
         width = width,
