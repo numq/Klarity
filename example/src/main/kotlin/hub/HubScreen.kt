@@ -17,14 +17,15 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.probe.ProbeManager
+import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.snapshot.SnapshotManager
+import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import notification.Notification
 import remote.RemoteUploadingDialog
@@ -57,18 +58,25 @@ fun HubScreen(
             coroutineScope.launch(Dispatchers.Default) {
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = HubItem.Uploaded(
-                        media = media,
+                        player = KlarityPlayer.create().getOrThrow().apply {
+                            prepare(
+                                location = media.location,
+                                enableAudio = true,
+                                enableVideo = true,
+                                videoSettings = VideoSettings(loadPreview = true)
+                            ).getOrDefault(Unit)
+
+                            state.first { it is PlayerState.Ready }
+                        },
                         snapshots = SnapshotManager.snapshots(
                             location = media.location
                         ) { durationMillis ->
                             val n = 10
 
-                            (0 until n).map { i ->
-                                (durationMillis * i) / (n - 1)
-                            }
+                            (0 until n).map { i -> (durationMillis * i) / (n - 1) }
                         }.getOrNull() ?: emptyList()
                     )
-                    hubItems = hubItems.map { if (it == pendingItem) uploadedItem else it }
+                    hubItems = hubItems.map { if (it.id == pendingItem.id) uploadedItem else it }
                 }.onFailure {
                     hubItems -= pendingItem
                 }
@@ -97,7 +105,7 @@ fun HubScreen(
         if (hubItem is HubItem.Pending) {
             hubItems -= hubItem
         } else if (hubItem is HubItem.Uploaded) {
-            hubItems = hubItems.filterNot { item -> item is HubItem.Uploaded && item.media.id == hubItem.media.id }
+            hubItems = hubItems.filterNot { item -> item is HubItem.Uploaded && item.id == hubItem.id }
         }
     }
 

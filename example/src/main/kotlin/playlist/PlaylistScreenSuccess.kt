@@ -27,7 +27,6 @@ import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.preview.PreviewManager
-import com.github.numq.klarity.core.preview.PreviewState
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.queue.MediaQueue
 import com.github.numq.klarity.core.queue.SelectedItem
@@ -52,22 +51,11 @@ import kotlin.time.Duration.Companion.microseconds
 @Composable
 fun PlaylistScreenSuccess(
     player: KlarityPlayer,
-    previewManager: PreviewManager,
     openFileChooser: () -> List<File>,
     upload: (List<String>) -> List<File>,
     notify: (Notification) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
-
-    val previewState by previewManager.state.collectAsState()
-
-    val videoFormat = remember(previewState) {
-        when (previewState) {
-            is PreviewState.Empty -> null
-
-            is PreviewState.Ready -> (previewState as PreviewState.Ready).media.format
-        }
-    }
 
     val settings by player.settings.collectAsState()
 
@@ -107,6 +95,8 @@ fun PlaylistScreenSuccess(
 
     val pendingChannel = remember { Channel<PlaylistItem.Pending>(Channel.UNLIMITED) }
 
+    var previewManager by remember { mutableStateOf<PreviewManager?>(null) }
+
     fun handleException(throwable: Throwable) = notify(Notification(throwable.localizedMessage))
 
     DisposableEffect(Unit) {
@@ -135,9 +125,18 @@ fun PlaylistScreenSuccess(
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
+                coroutineScope.launch {
+                    previewManager = PreviewManager.create(location = currentState.media.location).getOrThrow()
+                }
+
                 if (currentState is PlayerState.Ready.Completed) {
                     if (queue.hasNext.value) queue.next()
                 }
+            }
+
+            is PlayerState.Empty -> {
+                previewManager?.close()?.getOrThrow()
+                previewManager = null
             }
 
             else -> Unit
@@ -152,20 +151,16 @@ fun PlaylistScreenSuccess(
 
     LaunchedEffect(selectedItem) {
         when (selectedItem) {
-            is SelectedItem.Absent -> {
-                previewManager.release().getOrDefault(Unit)
-                player.release().getOrDefault(Unit)
-            }
+            is SelectedItem.Absent -> player.release().getOrDefault(Unit)
 
             is SelectedItem.Present<*> -> ((selectedItem as? SelectedItem.Present<*>)?.item as? PlaylistItem.Uploaded)?.run {
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
-                        previewManager.prepare(location = media.location).getOrDefault(Unit)
                         player.prepare(
                             location = media.location,
                             enableAudio = true,
                             enableVideo = true,
-                            videoSettings = VideoSettings(skipPreview = false)
+                            videoSettings = VideoSettings(loadPreview = true)
                         ).getOrDefault(Unit)
                         player.play().getOrDefault(Unit)
                     }
@@ -188,14 +183,12 @@ fun PlaylistScreenSuccess(
                             }
 
                             else -> {
-                                previewManager.release().getOrDefault(Unit)
-                                previewManager.prepare(location = media.location).getOrDefault(Unit)
                                 player.release().getOrDefault(Unit)
                                 player.prepare(
                                     location = media.location,
                                     enableAudio = true,
                                     enableVideo = true,
-                                    videoSettings = VideoSettings(skipPreview = false)
+                                    videoSettings = VideoSettings(loadPreview = true)
                                 ).getOrDefault(Unit)
                                 player.play().getOrDefault(Unit)
                             }
@@ -433,20 +426,17 @@ fun PlaylistScreenSuccess(
                                         }
                                     }
 
-                                    videoFormat?.let { format ->
+                                    previewManager?.let { manager ->
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.BottomStart
                                         ) {
-                                            TimelinePreview(width = 128f,
+                                            TimelinePreview(
+                                                width = 128f,
                                                 height = 128f,
-                                                format = format,
                                                 hoveredTimestamps = hoveredTimestamps,
-                                                preview = { timestampMillis ->
-                                                    previewManager.preview(
-                                                        timestampMillis = timestampMillis
-                                                    ).onFailure(::handleException).getOrNull()
-                                                })
+                                                previewManager = manager
+                                            )
                                         }
                                     }
                                 }

@@ -1,5 +1,7 @@
 package com.github.numq.klarity.compose.renderer
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ContentChangeMode
 import org.jetbrains.skia.ImageInfo
@@ -8,20 +10,37 @@ import org.jetbrains.skia.Surface
 internal data class SkiaRendererContext(
     private val imageInfo: ImageInfo,
     private val bitmap: Bitmap,
-    override val surface: Surface,
+    private val surface: Surface,
 ) : RendererContext {
-    override fun draw(pixels: ByteArray, onSuccess: (generationId: Int) -> Unit) {
+    private val _generationId = MutableStateFlow(0)
+
+    override val generationId = _generationId.asStateFlow()
+
+    override fun withSurface(callback: (Surface) -> Unit) = callback(surface)
+
+    override fun draw(pixels: ByteArray) {
+        if (bitmap.isClosed || surface.isClosed) {
+            return
+        }
+
         if (bitmap.installPixels(imageInfo, pixels, imageInfo.minRowBytes)) {
             surface.notifyContentWillChange(ContentChangeMode.DISCARD)
 
-            surface.canvas.writePixels(bitmap, 0, 0)
+            surface.writePixels(bitmap, 0, 0)
 
             surface.flushAndSubmit()
 
-            onSuccess(surface.generationId)
+            _generationId.value = surface.generationId
         }
     }
 
+    override fun reset() {
+        if (bitmap.isClosed || surface.isClosed) {
+            return
+        }
+
+        surface.flush()
+    }
 
     override fun close() {
         bitmap.close()

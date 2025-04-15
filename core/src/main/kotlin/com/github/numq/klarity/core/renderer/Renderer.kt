@@ -17,7 +17,7 @@ interface Renderer {
     /**
      * A flow that emits the current frame of the video being rendered.
      */
-    val frame: SharedFlow<Frame.Video.Content>
+    val frame: SharedFlow<Frame.Video.Content?>
 
     /**
      * A flow that emits the current playback speed factor.

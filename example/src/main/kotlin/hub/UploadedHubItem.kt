@@ -27,13 +27,14 @@ import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Media
-import com.github.numq.klarity.core.player.KlarityPlayer
-import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.state.PlayerState
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import notification.Notification
 import kotlin.time.Duration.Companion.microseconds
 
@@ -45,21 +46,19 @@ fun UploadedHubItem(
 ) {
     val coroutineScope = rememberCoroutineScope()
 
-    val player = remember { KlarityPlayer.create().getOrThrow() }
+    val settings by hubItem.player.settings.collectAsState()
 
-    val settings by player.settings.collectAsState()
+    val state by hubItem.player.state.collectAsState()
 
-    val state by player.state.collectAsState()
+    val renderer by hubItem.player.renderer.collectAsState()
 
-    val renderer by player.renderer.collectAsState()
+    val error by hubItem.player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
 
-    val error by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
-
-    val playbackTimestamp by player.playbackTimestamp.collectAsState()
+    val playbackTimestamp by hubItem.player.playbackTimestamp.collectAsState()
 
     val hoverInteractionSource = remember { MutableInteractionSource() }
 
-    var previewJob by remember { mutableStateOf<Job?>(null) }
+    var snapshotJob by remember { mutableStateOf<Job?>(null) }
 
     var snapshotIndex by remember { mutableStateOf(0) }
 
@@ -68,11 +67,13 @@ fun UploadedHubItem(
             when (interaction) {
                 is HoverInteraction.Enter -> {
                     if (hubItem.snapshots.isNotEmpty()) {
-                        previewJob?.cancel()
-                        previewJob = coroutineScope.launch {
+                        snapshotJob?.cancel()
+                        snapshotJob = coroutineScope.launch {
                             delay(500L)
+
                             while (isActive) {
                                 snapshotIndex = (snapshotIndex + 1) % hubItem.snapshots.size
+
                                 delay(200L)
                             }
                         }
@@ -80,35 +81,29 @@ fun UploadedHubItem(
                 }
 
                 else -> {
-                    previewJob?.cancel()
-                    previewJob = null
+                    snapshotJob?.cancel()
+                    snapshotJob = null
                     snapshotIndex = 0
                 }
             }
         }.launchIn(coroutineScope)
 
         onDispose {
-            previewJob?.cancel()
-            previewJob = null
-
-            runBlocking {
-                player.close().getOrThrow()
-            }
+            snapshotJob?.cancel()
+            snapshotJob = null
         }
     }
 
     LaunchedEffect(state) {
-        player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
+        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
                 when (currentState) {
                     is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
                         if (currentState is PlayerState.Ready.Completed) {
-                            player.stop().getOrDefault(Unit)
+                            hubItem.player.stop().getOrDefault(Unit)
                         }
-
-                        hoverInteractionSource.tryEmit(HoverInteraction.Enter())
                     }
 
                     else -> Unit
@@ -134,17 +129,9 @@ fun UploadedHubItem(
                     detectTapGestures(
                         onTap = {
                             coroutineScope.launch {
-                                with(player) {
+                                with(hubItem.player) {
                                     when (state) {
-                                        is PlayerState.Empty -> {
-                                            player.prepare(
-                                                location = hubItem.media.location,
-                                                enableAudio = true,
-                                                enableVideo = true,
-                                                videoSettings = VideoSettings(skipPreview = false)
-                                            ).getOrDefault(Unit)
-                                            play().getOrDefault(Unit)
-                                        }
+                                        is PlayerState.Empty -> play().getOrDefault(Unit)
 
                                         is PlayerState.Ready.Playing -> stop().getOrDefault(Unit)
 
@@ -162,15 +149,16 @@ fun UploadedHubItem(
                         },
                         onPress = {
                             awaitRelease()
-                            player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
+                            hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
                         },
                         onLongPress = { (x, y) ->
                             if (state is PlayerState.Ready.Playing) {
                                 val playbackSpeedFactor =
                                     if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) 0.5f else 2f
                                 coroutineScope.launch {
-                                    player.changeSettings(settings.copy(playbackSpeedFactor = playbackSpeedFactor))
-                                        .getOrDefault(Unit)
+                                    hubItem.player.changeSettings(
+                                        settings = settings.copy(playbackSpeedFactor = playbackSpeedFactor)
+                                    ).getOrDefault(Unit)
                                 }
                             } else {
                                 delete()
@@ -179,67 +167,68 @@ fun UploadedHubItem(
                     )
                 }, contentAlignment = Alignment.Center
             ) {
-                when (hubItem.media) {
-                    is Media.Audio -> Icon(Icons.Default.AudioFile, null)
+                when (state) {
+                    is PlayerState.Ready.Playing -> {
+                        when ((state as PlayerState.Ready).media) {
+                            is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
-                    else -> when {
-                        state is PlayerState.Ready.Playing -> RendererComponent(
-                            modifier = Modifier.fillMaxSize(),
-                            foreground = renderer?.run renderer@{
-                                Foreground.Source(
-                                    renderer = this@renderer,
-                                    imageScale = ImageScale.Crop
-                                )
-                            } ?: Foreground.Empty
-                        ) {
-                            Icon(Icons.Default.BrokenImage, null)
-                        }
-
-                        else -> hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
-                            RendererComponent(
+                            else -> RendererComponent(
                                 modifier = Modifier.fillMaxSize(),
-                                foreground = Foreground.Frame(frame = frame, imageScale = ImageScale.Crop)
+                                foreground = renderer?.run renderer@{
+                                    Foreground.Source(renderer = this@renderer, imageScale = ImageScale.Crop)
+                                } ?: Foreground.Empty
                             ) {
                                 Icon(Icons.Default.BrokenImage, null)
                             }
                         }
-                    }
-                }
-                if (state is PlayerState.Ready.Playing) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        contentAlignment = Alignment.BottomStart
-                    ) {
-                        Text(
-                            "${playbackTimestamp.micros.microseconds}",
-                            modifier = Modifier.padding(8.dp),
-                            style = TextStyle(
-                                drawStyle = Stroke(
-                                    miter = 2f,
-                                    width = 1f,
-                                    join = StrokeJoin.Round
+
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            contentAlignment = Alignment.BottomStart
+                        ) {
+                            Text(
+                                "${playbackTimestamp.micros.microseconds}",
+                                modifier = Modifier.padding(8.dp),
+                                style = TextStyle(
+                                    drawStyle = Stroke(
+                                        miter = 2f,
+                                        width = 1f,
+                                        join = StrokeJoin.Round
+                                    )
                                 )
                             )
-                        )
-                    }
-                }
-                if (settings.playbackSpeedFactor != 1f) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Playing on ${
-                                settings.playbackSpeedFactor.toString().replace(".0", "")
-                            }x speed", modifier = Modifier.drawBehind {
-                                drawRoundRect(
-                                    color = Color.Black.copy(alpha = .5f),
-                                    cornerRadius = CornerRadius(16f, 16f)
+                        }
+
+                        if (settings.playbackSpeedFactor != 1f) {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Playing on ${
+                                        settings.playbackSpeedFactor.toString().replace(".0", "")
+                                    }x speed", modifier = Modifier.drawBehind {
+                                        drawRoundRect(
+                                            color = Color.Black.copy(alpha = .5f),
+                                            cornerRadius = CornerRadius(16f, 16f)
+                                        )
+                                    }.padding(8.dp),
+                                    color = Color.White
                                 )
-                            }.padding(8.dp),
-                            color = Color.White
-                        )
+                            }
+                        }
                     }
+
+                    is PlayerState.Ready.Stopped -> RendererComponent(
+                        modifier = Modifier.fillMaxSize(),
+                        foreground = hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
+                            Foreground.Frame(frame = frame, imageScale = ImageScale.Crop)
+                        } ?: Foreground.Empty
+                    ) {
+                        Icon(Icons.Default.BrokenImage, null)
+                    }
+
+                    else -> Unit
                 }
             }
         }

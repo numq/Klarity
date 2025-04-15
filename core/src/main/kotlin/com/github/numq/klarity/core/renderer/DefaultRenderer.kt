@@ -13,15 +13,13 @@ internal class DefaultRenderer(
     override val format: VideoFormat,
     private val preview: Frame.Video.Content?,
 ) : Renderer {
-    private val _frame = MutableSharedFlow<Frame.Video.Content>(
+    private val _frame = MutableSharedFlow<Frame.Video.Content?>(
         replay = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
     override val frame = _frame.asSharedFlow().onSubscription {
-        if (preview != null) {
-            emit(preview)
-        }
+        emit(preview)
     }
 
     override var playbackSpeedFactor = MutableStateFlow(1f)

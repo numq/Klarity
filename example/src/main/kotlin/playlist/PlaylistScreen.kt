@@ -8,7 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.github.numq.klarity.core.player.KlarityPlayer
-import com.github.numq.klarity.core.preview.PreviewManager
 import kotlinx.coroutines.runBlocking
 import notification.Notification
 import java.io.File
@@ -21,23 +20,18 @@ fun PlaylistScreen(
 ) {
     val player = remember { KlarityPlayer.create() }
 
-    val previewManager = remember { PreviewManager.create() }
-
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        player.mapCatching { player ->
-            player to previewManager.getOrThrow()
-        }.onSuccess { (player, previewManager) ->
+        player.onSuccess { player ->
             DisposableEffect(Unit) {
                 onDispose {
                     runBlocking {
                         player.close().getOrThrow()
-                        previewManager.close().getOrThrow()
                     }
                 }
             }
+
             PlaylistScreenSuccess(
                 player = player,
-                previewManager = previewManager,
                 openFileChooser = openFileChooser,
                 upload = upload,
                 notify = notify

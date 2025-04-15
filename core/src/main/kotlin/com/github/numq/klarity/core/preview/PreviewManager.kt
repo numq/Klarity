@@ -1,29 +1,45 @@
 package com.github.numq.klarity.core.preview
 
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
-import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import kotlinx.coroutines.flow.StateFlow
+import com.github.numq.klarity.core.renderer.Renderer
+import com.github.numq.klarity.core.renderer.RendererFactory
 
 interface PreviewManager {
-    val state: StateFlow<PreviewState>
+    val renderer: Renderer
 
-    suspend fun prepare(
-        location: String,
-        width: Int? = null,
-        height: Int? = null,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
+    suspend fun preview(
+        timestampMillis: Long,
+        debounceMillis: Long = 100L,
+        keyframesOnly: Boolean = false,
     ): Result<Unit>
-
-    suspend fun release(): Result<Unit>
-
-    suspend fun preview(timestampMillis: Long, keyframesOnly: Boolean = true): Result<Frame.Video.Content?>
 
     suspend fun close(): Result<Unit>
 
     companion object {
-        fun create(): Result<PreviewManager> = runCatching {
-            DefaultPreviewManager(videoDecoderFactory = VideoDecoderFactory())
+        suspend fun create(
+            location: String,
+            width: Int? = null,
+            height: Int? = null,
+            hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
+        ): Result<PreviewManager> = runCatching {
+            VideoDecoderFactory().create(
+                parameters = VideoDecoderFactory.Parameters(
+                    location = location,
+                    width = width,
+                    height = height,
+                    frameRate = null,
+                    hardwareAccelerationCandidates = hardwareAccelerationCandidates
+                )
+            ).mapCatching { decoder ->
+                DefaultPreviewManager(
+                    videoDecoder = decoder, renderer = RendererFactory().create(
+                        parameters = RendererFactory.Parameters(
+                            format = decoder.media.format, preview = null
+                        )
+                    ).getOrThrow()
+                )
+            }.getOrThrow()
         }
     }
 }

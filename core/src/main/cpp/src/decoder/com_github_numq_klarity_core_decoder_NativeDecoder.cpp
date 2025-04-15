@@ -147,16 +147,26 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 
         auto byteArray = env->NewByteArray(audioBytesSize);
 
+        if (!byteArray) {
+            std::runtime_error("Unable to create byte array");
+        }
+
         env->SetByteArrayRegion(byteArray, 0, audioBytesSize, audioBytesBuf);
 
-        auto frameObject = env->NewObject(
-                audioFrameClass,
-                audioFrameConstructor,
-                static_cast<jlong>(frame->timestampMicros),
-                byteArray
-        );
+        jobject frameObject = nullptr;
 
-        env->DeleteLocalRef(byteArray);
+        try {
+            frameObject = env->NewObject(
+                    audioFrameClass,
+                    audioFrameConstructor,
+                    static_cast<jlong>(frame->timestampMicros),
+                    byteArray
+            );
+        } catch (...) {
+            env->DeleteLocalRef(byteArray);
+
+            throw;
+        }
 
         return frameObject;
     }, nullptr);

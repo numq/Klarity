@@ -1,51 +1,29 @@
 package com.github.numq.klarity.compose.renderer
 
-import org.jetbrains.skia.*
+import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Surface
 import java.io.Closeable
 
 interface RendererContext : Closeable {
-    val surface: Surface
+    val generationId: StateFlow<Int>
 
-    fun draw(pixels: ByteArray, onSuccess: (generationId: Int) -> Unit)
+    fun withSurface(callback: (Surface) -> Unit)
+
+    fun draw(pixels: ByteArray)
+
+    fun reset()
 
     companion object {
         fun create(foreground: Foreground): RendererContext {
             require(foreground !is Foreground.Empty) { "Could not create empty renderer context" }
 
-            val width = when (foreground) {
-                is Foreground.Source -> foreground.renderer.format.width
-
-                is Foreground.Frame -> foreground.frame.width
-
-                is Foreground.Image -> foreground.width
-
-                else -> 0
-            }
-
-            val height = when (foreground) {
-                is Foreground.Source -> foreground.renderer.format.height
-
-                is Foreground.Frame -> foreground.frame.height
-
-                is Foreground.Image -> foreground.height
-
-                else -> 0
-            }
-
-            val colorType = when (foreground) {
-                is Foreground.Image -> foreground.colorType
-
-                else -> ColorType.RGBA_8888
-            }
-
-            val alphaType = when (foreground) {
-                is Foreground.Image -> foreground.alphaType
-
-                else -> ColorAlphaType.UNPREMUL
-            }
-
             val imageInfo = ImageInfo(
-                width = width, height = height, colorType = colorType, alphaType = alphaType
+                width = foreground.width,
+                height = foreground.height,
+                colorType = foreground.colorType,
+                alphaType = foreground.alphaType
             )
 
             val bitmap = Bitmap()
@@ -56,7 +34,7 @@ interface RendererContext : Closeable {
                 error("Could not allocate bitmap pixels")
             }
 
-            val surface = Surface.makeRaster(imageInfo)
+            val surface = Surface.makeRaster(bitmap.imageInfo)
 
             return SkiaRendererContext(imageInfo = imageInfo, bitmap = bitmap, surface = surface)
         }

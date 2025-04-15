@@ -123,10 +123,11 @@ interface KlarityPlayer {
      * Seeks to the specified position in the media.
      *
      * @param millis The position in milliseconds to seek to.
+     * @property keyFramesOnly Use less precise but faster keyframe seeking.
      *
      * @return A [Result] indicating success or failure of the operation.
      */
-    suspend fun seekTo(millis: Long): Result<Unit>
+    suspend fun seekTo(millis: Long, keyFramesOnly: Boolean = false): Result<Unit>
 
     /**
      * Releases any resources held by the player.

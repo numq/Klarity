@@ -5,16 +5,11 @@ import com.github.numq.klarity.core.controller.PlayerController
 import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.settings.VideoSettings
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.withContext
+import kotlin.coroutines.cancellation.CancellationException
 
 internal class DefaultKlarityPlayer(
     private val playerController: PlayerController,
 ) : KlarityPlayer {
-    private val coroutineContext = Dispatchers.Default + SupervisorJob()
-
     override val settings = playerController.settings
 
     override val state = playerController.state
@@ -27,9 +22,19 @@ internal class DefaultKlarityPlayer(
 
     override val events = playerController.events
 
-    override suspend fun changeSettings(settings: PlayerSettings) = playerController.changeSettings(settings)
+    override suspend fun changeSettings(
+        settings: PlayerSettings,
+    ) = playerController.changeSettings(settings).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
+    }
 
-    override suspend fun resetSettings() = playerController.resetSettings()
+    override suspend fun resetSettings() = playerController.resetSettings().recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
+    }
 
     override suspend fun prepare(
         location: String,
@@ -37,50 +42,66 @@ internal class DefaultKlarityPlayer(
         enableVideo: Boolean,
         audioSettings: AudioSettings,
         videoSettings: VideoSettings,
-    ) = withContext(coroutineContext) {
-        playerController.execute(
-            Command.Prepare(
-                location = location,
-                audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
-                videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0,
-                sampleRate = audioSettings.sampleRate,
-                channels = audioSettings.channels,
-                width = videoSettings.width,
-                height = videoSettings.height,
-                frameRate = videoSettings.frameRate,
-                hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates,
-                loadPreview = videoSettings.loadPreview
-            )
+    ) = playerController.execute(
+        Command.Prepare(
+            location = location,
+            audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
+            videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0,
+            sampleRate = audioSettings.sampleRate,
+            channels = audioSettings.channels,
+            width = videoSettings.width,
+            height = videoSettings.height,
+            frameRate = videoSettings.frameRate,
+            hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates,
+            loadPreview = videoSettings.loadPreview
         )
+    ).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun play() = withContext(coroutineContext) {
-        playerController.execute(Command.Play)
+    override suspend fun play() = playerController.execute(Command.Play).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun resume() = withContext(coroutineContext) {
-        playerController.execute(Command.Resume)
+    override suspend fun resume() = playerController.execute(Command.Resume).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun pause() = withContext(coroutineContext) {
-        playerController.execute(Command.Pause)
+    override suspend fun pause() = playerController.execute(Command.Pause).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun stop() = withContext(coroutineContext) {
-        playerController.execute(Command.Stop)
+    override suspend fun stop() = playerController.execute(Command.Stop).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun seekTo(millis: Long) = withContext(coroutineContext) {
-        playerController.execute(Command.SeekTo(millis = millis))
+    override suspend fun seekTo(millis: Long, keyFramesOnly: Boolean) = playerController.execute(
+        Command.SeekTo(millis = millis, keyFramesOnly = keyFramesOnly)
+    ).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun release() = withContext(coroutineContext) {
-        playerController.execute(Command.Release)
+    override suspend fun release() = playerController.execute(Command.Release).recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 
-    override suspend fun close() = runCatching {
-        coroutineContext.cancel()
-
-        playerController.close().getOrThrow()
+    override suspend fun close() = playerController.close().recoverCatching { t ->
+        if (t !is CancellationException) {
+            throw KlarityPlayerException(t)
+        }
     }
 }

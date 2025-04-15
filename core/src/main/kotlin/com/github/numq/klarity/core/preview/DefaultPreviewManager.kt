@@ -1,84 +1,49 @@
 package com.github.numq.klarity.core.preview
 
-import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import kotlinx.coroutines.flow.MutableStateFlow
-import java.util.concurrent.atomic.AtomicReference
+import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.renderer.Renderer
+import kotlinx.coroutines.*
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPreviewManager(
-    private val videoDecoderFactory: VideoDecoderFactory,
+    private val videoDecoder: Decoder<Media.Video, Frame.Video>,
+    override val renderer: Renderer,
 ) : PreviewManager {
-    private val internalState = AtomicReference<InternalPreviewState>(InternalPreviewState.Empty)
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    override val state = MutableStateFlow<PreviewState>(PreviewState.Empty)
-
-    override suspend fun prepare(
-        location: String,
-        width: Int?,
-        height: Int?,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-    ) = runCatching {
-        val currentState = internalState.get()
-
-        check(currentState is InternalPreviewState.Empty) { "Unable to load non-empty preview manager" }
-
-        videoDecoderFactory.create(
-            parameters = VideoDecoderFactory.Parameters(
-                location = location,
-                width = width,
-                height = height,
-                frameRate = null,
-                hardwareAccelerationCandidates = hardwareAccelerationCandidates
-            )
-        ).mapCatching { decoder ->
-            internalState.set(InternalPreviewState.Ready(decoder = decoder))
-
-            state.emit(PreviewState.Ready(media = decoder.media))
-        }.getOrThrow()
-    }.recoverCatching { t ->
-        throw PreviewException(t)
-    }
+    private var previewJob: Job? = null
 
     override suspend fun preview(
         timestampMillis: Long,
+        debounceMillis: Long,
         keyframesOnly: Boolean,
-    ): Result<Frame.Video.Content?> = runCatching {
-        val currentState = internalState.get()
+    ) = runCatching {
+        previewJob?.cancel()
+        previewJob = coroutineScope.launch {
+            delay(debounceMillis)
 
-        check(currentState is InternalPreviewState.Ready) { "Unable to use empty preview manager" }
+            videoDecoder.seekTo(
+                micros = timestampMillis.milliseconds.inWholeMicroseconds,
+                keyframesOnly = keyframesOnly
+            ).getOrThrow()
 
-        with(currentState.decoder) {
-            seekTo(
-                micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
-            ).map {
-                decode().getOrNull() as? Frame.Video.Content
-            }.getOrNull()
+            (videoDecoder.decode().getOrNull() as? Frame.Video.Content)?.let { frame ->
+                renderer.draw(frame).getOrThrow()
+            }
         }
     }.recoverCatching { t ->
-        throw PreviewException(t)
-    }
-
-    override suspend fun release() = runCatching {
-        val currentState = internalState.get()
-
-        if (currentState is InternalPreviewState.Ready) {
-            currentState.decoder.close().getOrThrow()
-
-            internalState.set(InternalPreviewState.Empty)
-
-            state.emit(PreviewState.Empty)
+        if (t !is CancellationException) {
+            throw PreviewManagerException(t)
         }
-    }.recoverCatching { t ->
-        throw PreviewException(t)
     }
 
     override suspend fun close() = runCatching {
-        when (val internalState = internalState.get()) {
-            is InternalPreviewState.Empty -> Unit
+        coroutineScope.cancel()
 
-            is InternalPreviewState.Ready -> internalState.decoder.close().getOrThrow()
-        }
+        videoDecoder.close().getOrThrow()
+
+        renderer.close().getOrThrow()
     }
 }

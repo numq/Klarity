@@ -11,7 +11,27 @@ import org.jetbrains.skia.ColorType
  */
 sealed interface Foreground {
     /**
-     * Defines the scaling method for the foreground image.
+     * Foreground image width.
+     */
+    val width: Int
+
+    /**
+     * Foreground image height.
+     */
+    val height: Int
+
+    /**
+     * Foreground image color type.
+     */
+    val colorType: ColorType
+
+    /**
+     * Foreground image alpha type.
+     */
+    val alphaType: ColorAlphaType
+
+    /**
+     * Foreground image scaling method.
      */
     val imageScale: ImageScale
 
@@ -19,6 +39,14 @@ sealed interface Foreground {
      * Represents an empty foreground with no image to render.
      */
     data object Empty : Foreground {
+        override val width = 0
+
+        override val height = 0
+
+        override val colorType = ColorType.UNKNOWN
+
+        override val alphaType = ColorAlphaType.UNKNOWN
+
         override val imageScale = ImageScale.None
     }
 
@@ -28,7 +56,18 @@ sealed interface Foreground {
      * @property renderer The renderer that supplies the image.
      * @property imageScale The video frame scaling method (default is [ImageScale.Fit]).
      */
-    data class Source(val renderer: Renderer, override val imageScale: ImageScale = ImageScale.Fit) : Foreground
+    data class Source(
+        val renderer: Renderer,
+        override val imageScale: ImageScale = ImageScale.Fit,
+    ) : Foreground {
+        override val width = renderer.format.width
+
+        override val height = renderer.format.height
+
+        override val colorType = ColorType.RGBA_8888
+
+        override val alphaType = ColorAlphaType.UNPREMUL
+    }
 
     /**
      * Represents a foreground based on a specific frame of a video content.
@@ -39,7 +78,15 @@ sealed interface Foreground {
     data class Frame(
         val frame: com.github.numq.klarity.core.frame.Frame.Video.Content,
         override val imageScale: ImageScale = ImageScale.Fit,
-    ) : Foreground
+    ) : Foreground {
+        override val width = frame.width
+
+        override val height = frame.height
+
+        override val colorType = ColorType.RGBA_8888
+
+        override val alphaType = ColorAlphaType.UNPREMUL
+    }
 
     /**
      * Represents a foreground created from raw image bytes.
@@ -53,10 +100,10 @@ sealed interface Foreground {
      */
     data class Image(
         val bytes: ByteArray,
-        val width: Int,
-        val height: Int,
-        val colorType: ColorType = ColorType.BGRA_8888,
-        val alphaType: ColorAlphaType = ColorAlphaType.UNPREMUL,
+        override val width: Int,
+        override val height: Int,
+        override val colorType: ColorType = ColorType.BGRA_8888,
+        override val alphaType: ColorAlphaType = ColorAlphaType.UNPREMUL,
         override val imageScale: ImageScale = ImageScale.Fit,
     ) : Foreground {
         override fun equals(other: Any?): Boolean {

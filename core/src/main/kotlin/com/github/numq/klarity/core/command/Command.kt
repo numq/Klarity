@@ -40,7 +40,7 @@ sealed interface Command {
         override val descriptor = Descriptor.STOP
     }
 
-    data class SeekTo(val millis: Long) : Command {
+    data class SeekTo(val millis: Long, val keyFramesOnly: Boolean) : Command {
         override val descriptor = Descriptor.SEEK_TO
     }
 
