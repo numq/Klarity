@@ -54,6 +54,10 @@ sealed interface Foreground {
      * Represents a foreground where the image is provided by a renderer source.
      *
      * @property renderer The renderer that supplies the image.
+     * @property width The width of the image.
+     * @property height The height of the image.
+     * @property colorType The color type of the image (default is [ColorType.BGRA_8888]).
+     * @property alphaType The alpha type used in the image (default is [ColorAlphaType.UNPREMUL]).
      * @property imageScale The video frame scaling method (default is [ImageScale.Fit]).
      */
     data class Source(
@@ -73,6 +77,10 @@ sealed interface Foreground {
      * Represents a foreground based on a specific frame of a video content.
      *
      * @property frame The video frame content used as the foreground image.
+     * @property width The width of the image.
+     * @property height The height of the image.
+     * @property colorType The color type of the image (default is [ColorType.BGRA_8888]).
+     * @property alphaType The alpha type used in the image (default is [ColorAlphaType.UNPREMUL]).
      * @property imageScale The video frame scaling method (default is [ImageScale.Fit]).
      */
     data class Frame(
