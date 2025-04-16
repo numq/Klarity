@@ -27,13 +27,10 @@ import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Media
-import com.github.numq.klarity.core.preview.PreviewManager
-import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import notification.Notification
 import kotlin.time.Duration.Companion.microseconds
 
@@ -55,11 +52,47 @@ fun UploadedHubItem(
 
     val hoverInteractionSource = remember { MutableInteractionSource() }
 
+    var previewJob by remember { mutableStateOf<Job?>(null) }
+
     LaunchedEffect(state) {
         hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
+                hubItem.previewManager?.preview(0L)?.getOrThrow()
+
+                previewJob?.cancel()
+                previewJob = launch(Dispatchers.Default) {
+                    when (state) {
+                        is PlayerState.Ready.Stopped -> {
+                            hoverInteractionSource.interactions.collectLatest { interaction ->
+                                when (interaction) {
+                                    is HoverInteraction.Enter -> {
+                                        val n = 10
+
+                                        var snapshotIndex = 0
+
+                                        while (isActive) {
+                                            snapshotIndex = (snapshotIndex + 1) % n
+
+                                            hubItem.previewManager?.preview(
+                                                timestampMillis = (currentState.media.durationMicros.microseconds.inWholeMilliseconds * snapshotIndex) / (n - 1)
+                                            )?.getOrThrow()
+
+                                            delay(500L)
+                                        }
+                                    }
+
+                                    is HoverInteraction.Exit -> hubItem.previewManager?.preview(timestampMillis = 0L)
+                                        ?.getOrThrow()
+                                }
+                            }
+                        }
+
+                        else -> return@launch
+                    }
+                }
+
                 when (currentState) {
                     is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
                         if (currentState is PlayerState.Ready.Completed) {
@@ -71,13 +104,27 @@ fun UploadedHubItem(
                 }
             }
 
-            else -> Unit
+            else -> {
+                previewJob?.cancel()
+                previewJob = null
+            }
         }
     }
 
     LaunchedEffect(error) {
         error?.run {
             notify(Notification(exception.localizedMessage))
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            hubItem.renderer?.close()
+
+            runBlocking {
+                hubItem.previewManager?.close()
+                hubItem.player.close()
+            }
         }
     }
 
@@ -128,93 +175,12 @@ fun UploadedHubItem(
                     )
                 }, contentAlignment = Alignment.Center
             ) {
-                when (val currentState = state) {
+                when (state) {
                     is PlayerState.Ready -> {
-                        val format = remember(currentState) {
-                            when (val media = currentState.media) {
-                                is Media.Audio -> null
-
-                                is Media.Video -> media.format
-
-                                is Media.AudioVideo -> media.videoFormat
-                            }
-                        }
-
-                        val previewManager = remember(currentState.media.location) {
-                            runBlocking {
-                                PreviewManager.create(location = currentState.media.location).getOrThrow()
-                            }
-                        }
-
-                        DisposableEffect(currentState.media.location) {
-                            onDispose {
-                                runBlocking {
-                                    previewManager.close().getOrThrow()
-                                }
-                            }
-                        }
-
-                        val playerRenderer = remember(format) {
-                            format?.let(Renderer::create)?.getOrThrow()?.also(hubItem.player::attachRenderer)
-                        }
-
-                        DisposableEffect(format) {
-                            onDispose {
-                                playerRenderer?.close()
-                            }
-                        }
-
-                        var snapshotJob by remember { mutableStateOf<Job?>(null) }
-
-                        var snapshotIndex by remember { mutableStateOf(0) }
-
-                        DisposableEffect(Unit) {
-                            hoverInteractionSource.interactions.onEach { interaction ->
-                                when (interaction) {
-                                    is HoverInteraction.Enter -> {
-                                        val n = 10
-
-                                        snapshotJob?.cancel()
-                                        snapshotJob = coroutineScope.launch {
-                                            delay(500L)
-
-                                            while (isActive) {
-                                                if (state !is PlayerState.Ready.Playing) {
-                                                    snapshotIndex = (snapshotIndex + 1) % n
-
-                                                    previewManager.preview(
-                                                        timestampMillis = (currentState.media.durationMicros.microseconds.inWholeMilliseconds * snapshotIndex) / (n - 1)
-                                                    ).getOrThrow()
-                                                }
-
-                                                delay(200L)
-                                            }
-                                        }
-                                    }
-
-                                    else -> {
-                                        snapshotJob?.cancel()
-                                        snapshotJob = null
-
-                                        snapshotIndex = 0
-                                    }
-                                }
-                            }.launchIn(coroutineScope)
-
-                            onDispose {
-                                snapshotJob?.cancel()
-                                snapshotJob = null
-
-                                runBlocking {
-                                    hubItem.player.release().getOrThrow()
-                                }
-                            }
-                        }
-
                         when ((state as PlayerState.Ready).media) {
                             is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
-                            else -> playerRenderer?.let {
+                            else -> hubItem.renderer?.let {
                                 RendererComponent(
                                     modifier = Modifier.fillMaxSize(),
                                     foreground = Foreground(

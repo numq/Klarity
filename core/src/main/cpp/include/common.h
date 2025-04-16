@@ -10,14 +10,6 @@
 #include "hwaccel.h"
 #include "sampler.h"
 
-extern std::shared_mutex decoderMutex;
-
-extern std::shared_mutex samplerMutex;
-
-extern std::unordered_map<jlong, std::unique_ptr<Decoder>> decoderPointers;
-
-extern std::unordered_map<jlong, std::unique_ptr<Sampler>> samplerPointers;
-
 extern jclass runtimeExceptionClass;
 
 extern jclass decoderExceptionClass;
@@ -41,10 +33,6 @@ extern jmethodID videoFrameConstructor;
 extern Decoder *getDecoderPointer(jlong handle);
 
 extern Sampler *getSamplerPointer(jlong handle);
-
-extern void deleteDecoderPointer(jlong handle);
-
-extern void deleteSamplerPointer(jlong handle);
 
 inline void handleException(JNIEnv *env, const std::function<void()> &call) {
     try {

@@ -20,28 +20,6 @@ internal class NativeDecoder(
     frameRate: Double? = null,
     hardwareAccelerationCandidates: IntArray? = null,
 ) : Closeable {
-    internal val nativeHandle by lazy {
-        requireNotNull(createNative(
-            location = location,
-            findAudioStream = findAudioStream,
-            findVideoStream = findVideoStream,
-            decodeAudioStream = decodeAudioStream,
-            decodeVideoStream = decodeVideoStream,
-            sampleRate = sampleRate ?: 0,
-            channels = channels ?: 0,
-            width = width ?: 0,
-            height = height ?: 0,
-            frameRate = frameRate ?: .0,
-            hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
-        ).takeIf { it != -1L }) { "Could not instantiate native decoder" }
-    }
-
-    private val cleanable by lazy {
-        NativeCleaner.cleaner.register(this) {
-            deleteNative(handle = nativeHandle)
-        }
-    }
-
     companion object {
         fun getAvailableHardwareAcceleration() = getAvailableHardwareAccelerationNative() ?: intArrayOf()
 
@@ -82,19 +60,62 @@ internal class NativeDecoder(
         private external fun deleteNative(handle: Long)
     }
 
-    val format by lazy {
+    private val lock = Any()
+
+    internal var nativeHandle = -1L
+
+    init {
+        synchronized(lock) {
+            nativeHandle = createNative(
+                location = location,
+                findAudioStream = findAudioStream,
+                findVideoStream = findVideoStream,
+                decodeAudioStream = decodeAudioStream,
+                decodeVideoStream = decodeVideoStream,
+                sampleRate = sampleRate ?: 0,
+                channels = channels ?: 0,
+                width = width ?: 0,
+                height = height ?: 0,
+                frameRate = frameRate ?: .0,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
+            )
+
+            require(nativeHandle != -1L) { "Could not instantiate native decoder" }
+        }
+    }
+
+    private val cleanable = NativeCleaner.cleaner.register(this) {
+        synchronized(lock) {
+            deleteNative(handle = nativeHandle)
+
+            nativeHandle = -1L
+        }
+    }
+
+    val format = synchronized(lock) {
+        check(nativeHandle != -1L) { "Decoder has been closed" }
+
         getFormatNative(handle = nativeHandle)
     }
 
-    fun decodeAudio() = decodeAudioNative(handle = nativeHandle)
 
-    fun decodeVideo(byteBuffer: ByteBuffer) = decodeVideoNative(handle = nativeHandle, byteBuffer = byteBuffer)
+    fun decodeAudio() = synchronized(lock) {
+        decodeAudioNative(handle = nativeHandle)
+    }
 
-    fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = seekToNative(
-        handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
-    )
+    fun decodeVideo(byteBuffer: ByteBuffer) = synchronized(lock) {
+        decodeVideoNative(handle = nativeHandle, byteBuffer = byteBuffer)
+    }
 
-    fun reset() = resetNative(handle = nativeHandle)
+    fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
+        seekToNative(
+            handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
+        )
+    }
+
+    fun reset() = synchronized(lock) {
+        resetNative(handle = nativeHandle)
+    }
 
     override fun close() = cleanable.clean()
 }

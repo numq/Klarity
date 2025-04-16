@@ -9,7 +9,6 @@ import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
-import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
@@ -34,13 +33,13 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
-    private val audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
-    private val videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
+    private val audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
+    private val videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
     private val audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
     private val videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
     private val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
     private val playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-    private val samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>
+    private val samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
 ) : PlayerController {
     companion object {
         const val MIN_AUDIO_BUFFER_SIZE = 1
@@ -56,6 +55,10 @@ internal class DefaultPlayerController(
 
     override fun attachRenderer(renderer: Renderer) {
         this.renderer = renderer
+    }
+
+    override fun detachRenderer() {
+        renderer = null
     }
 
     /**

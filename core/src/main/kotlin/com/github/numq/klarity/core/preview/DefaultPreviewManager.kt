@@ -21,6 +21,10 @@ internal class DefaultPreviewManager(
         this.renderer = renderer
     }
 
+    override fun detachRenderer() {
+        renderer = null
+    }
+
     override suspend fun preview(
         timestampMillis: Long,
         debounceMillis: Long,
@@ -28,6 +32,8 @@ internal class DefaultPreviewManager(
     ) = runCatching {
         previewJob?.cancel()
         previewJob = coroutineScope.launch {
+            delay(debounceMillis)
+
             videoDecoder.seekTo(
                 micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).getOrThrow()

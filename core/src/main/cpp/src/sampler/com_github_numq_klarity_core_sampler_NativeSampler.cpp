@@ -7,18 +7,12 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         jint channels
 ) {
     return handleException<jlong>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
-        auto sampler = std::make_unique<Sampler>(
+        auto sampler = new Sampler(
                 static_cast<uint32_t>(sampleRate),
                 static_cast<uint32_t>(channels)
         );
 
-        auto handle = reinterpret_cast<jlong>(sampler.get());
-
-        samplerPointers[handle] = std::move(sampler);
-
-        return handle;
+        return reinterpret_cast<jlong>(sampler);
     }, -1);
 }
 
@@ -29,8 +23,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         jfloat factor
 ) {
     return handleException(env, [&] {
-        std::shared_lock<std::shared_mutex> lock(samplerMutex);
-
         auto sampler = getSamplerPointer(handle);
 
         sampler->setPlaybackSpeed(static_cast<float>(factor));
@@ -44,8 +36,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         jfloat value
 ) {
     return handleException(env, [&] {
-        std::shared_lock<std::shared_mutex> lock(samplerMutex);
-
         auto sampler = getSamplerPointer(handle);
 
         sampler->setVolume(static_cast<float>(value));
@@ -58,8 +48,6 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         jlong handle
 ) {
     return handleException<jlong>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
         auto sampler = getSamplerPointer(handle);
 
         return static_cast<jlong>(sampler->start());
@@ -73,8 +61,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         jbyteArray bytes
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
         auto size = env->GetArrayLength(bytes);
 
         if (size <= 0) {
@@ -106,8 +92,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         jlong handle
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
         auto sampler = getSamplerPointer(handle);
 
         sampler->pause();
@@ -120,8 +104,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_s
         jlong handle
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
         auto sampler = getSamplerPointer(handle);
 
         sampler->stop();
@@ -134,8 +116,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_d
         jlong handle
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(samplerMutex);
-
-        deleteSamplerPointer(handle);
+        delete getSamplerPointer(handle);
     });
 }

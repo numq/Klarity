@@ -10,10 +10,12 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,25 +36,17 @@ fun UploadedPlaylistItem(
     select: () -> Unit,
     delete: () -> Unit,
 ) {
-    val format = remember(playlistItem.media) {
-        when (val media = playlistItem.media) {
-            is Media.Audio -> null
-
-            is Media.Video -> media.format
-
-            is Media.AudioVideo -> media.videoFormat
-        }
+    val renderer = remember(playlistItem.id) {
+        playlistItem.media.videoFormat?.let(Renderer::create)?.getOrThrow()
     }
 
-    val renderer = remember(playlistItem.snapshot, format) {
+    LaunchedEffect(playlistItem.id) {
         playlistItem.snapshot?.let { frame ->
-            format?.let(Renderer::create)?.getOrThrow()?.also {
-                it.render(frame)
-            }
+            renderer?.render(frame)
         }
     }
 
-    DisposableEffect(format) {
+    DisposableEffect(Unit) {
         onDispose {
             renderer?.close()
         }
@@ -74,12 +68,16 @@ fun UploadedPlaylistItem(
                     ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    renderer?.let {
-                        RendererComponent(
-                            modifier = Modifier.aspectRatio(1f).clip(CircleShape),
-                            foreground = Foreground(renderer = it, imageScale = ImageScale.Crop),
-                        )
-                    } ?: Icon(Icons.Default.BrokenImage, null)
+                    when (playlistItem.media) {
+                        is Media.Audio -> Icon(Icons.Default.AudioFile, null)
+
+                        else -> renderer?.let {
+                            RendererComponent(
+                                modifier = Modifier.aspectRatio(1f).clip(CircleShape),
+                                foreground = Foreground(renderer = it, imageScale = ImageScale.Crop),
+                            )
+                        } ?: Icon(Icons.Default.BrokenImage, null)
+                    }
                     Text(
                         text = playlistItem.media.location,
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp),

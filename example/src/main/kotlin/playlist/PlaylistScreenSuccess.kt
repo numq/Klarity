@@ -114,9 +114,11 @@ fun PlaylistScreenSuccess(
                 }
             }
         }.launchIn(coroutineScope)
+
         onDispose {
             uploadingJob?.cancel()
             uploadingJob = null
+
             pendingChannel.close()
         }
     }
@@ -281,28 +283,12 @@ fun PlaylistScreenSuccess(
                         is PlayerState.Empty -> Box(modifier = Modifier.fillMaxSize())
 
                         is PlayerState.Ready -> {
-                            val format = remember(currentState) {
-                                when (val media = currentState.media) {
-                                    is Media.Audio -> null
-
-                                    is Media.Video -> media.format
-
-                                    is Media.AudioVideo -> media.videoFormat
-                                }
-                            }
-
                             val previewManager = remember(currentState.media.location) {
-                                runBlocking {
-                                    PreviewManager.create(location = currentState.media.location).getOrThrow()
-                                }
+                                PreviewManager.create(location = currentState.media.location).getOrThrow()
                             }
 
-                            DisposableEffect(currentState.media.location) {
-                                onDispose {
-                                    runBlocking {
-                                        previewManager.close().getOrThrow()
-                                    }
-                                }
+                            val format = remember(currentState.media.videoFormat) {
+                                currentState.media.videoFormat
                             }
 
                             val playerRenderer = remember(format) {
@@ -317,10 +303,28 @@ fun PlaylistScreenSuccess(
                                 mutableStateOf<HoveredTimestamp?>(null)
                             }
 
+                            LaunchedEffect(hoveredTimestamp) {
+                                hoveredTimestamp?.run {
+                                    previewManager.preview(
+                                        timestampMillis = millis,
+                                        debounceMillis = 100L
+                                    ).getOrDefault(Unit)
+                                }
+                            }
+
                             DisposableEffect(format) {
+                                playerRenderer?.let(player::attachRenderer)
+
+                                previewRenderer?.let(previewManager::attachRenderer)
+
                                 onDispose {
                                     playerRenderer?.close()
+
                                     previewRenderer?.close()
+
+                                    runBlocking {
+                                        previewManager.close().getOrThrow()
+                                    }
                                 }
                             }
 
@@ -456,17 +460,19 @@ fun PlaylistScreenSuccess(
                                         }
                                     }
 
-                                    previewRenderer?.let { renderer ->
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.BottomStart
-                                        ) {
-                                            TimelinePreview(
-                                                width = 128f,
-                                                height = 128f,
-                                                hoveredTimestamp = hoveredTimestamp,
-                                                previewRenderer = renderer,
-                                            )
+                                    hoveredTimestamp?.let { timestamp ->
+                                        previewRenderer?.let { renderer ->
+                                            Box(
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentAlignment = Alignment.BottomStart
+                                            ) {
+                                                TimelinePreview(
+                                                    width = 128f,
+                                                    height = 128f,
+                                                    hoveredTimestamp = timestamp,
+                                                    previewRenderer = renderer,
+                                                )
+                                            }
                                         }
                                     }
                                 }

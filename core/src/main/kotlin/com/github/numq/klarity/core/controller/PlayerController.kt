@@ -9,7 +9,6 @@ import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
-import com.github.numq.klarity.core.factory.SuspendFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
@@ -38,6 +37,8 @@ interface PlayerController {
 
     fun attachRenderer(renderer: Renderer)
 
+    fun detachRenderer()
+
     suspend fun changeSettings(newSettings: PlayerSettings): Result<Unit>
 
     suspend fun resetSettings(): Result<Unit>
@@ -49,13 +50,13 @@ interface PlayerController {
     companion object {
         internal fun create(
             initialSettings: PlayerSettings?,
-            audioDecoderFactory: SuspendFactory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
-            videoDecoderFactory: SuspendFactory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
+            audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
+            videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
             audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
             videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
             bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
             playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-            samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>
+            samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,

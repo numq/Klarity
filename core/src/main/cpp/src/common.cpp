@@ -1,13 +1,5 @@
 #include "common.h"
 
-std::shared_mutex decoderMutex;
-
-std::shared_mutex samplerMutex;
-
-std::unordered_map<jlong, std::unique_ptr<Decoder>> decoderPointers;
-
-std::unordered_map<jlong, std::unique_ptr<Sampler>> samplerPointers;
-
 jclass runtimeExceptionClass = nullptr;
 
 jclass decoderExceptionClass = nullptr;
@@ -29,49 +21,23 @@ jclass videoFrameClass = nullptr;
 jmethodID videoFrameConstructor = nullptr;
 
 Decoder *getDecoderPointer(jlong handle) {
-    auto it = decoderPointers.find(handle);
+    auto decoder = reinterpret_cast<Decoder *>(handle);
 
-    if (it == decoderPointers.end()) {
-        throw std::runtime_error("Invalid handle");
+    if (!decoder) {
+        throw std::runtime_error("Invalid decoder handle");
     }
 
-    return it->second.get();
+    return decoder;
 }
 
 Sampler *getSamplerPointer(jlong handle) {
-    auto it = samplerPointers.find(handle);
+    auto sampler = reinterpret_cast<Sampler *>(handle);
 
-    if (it == samplerPointers.end()) {
-        throw std::runtime_error("Invalid handle");
+    if (!sampler) {
+        throw std::runtime_error("Invalid sampler handle");
     }
 
-    return it->second.get();
-}
-
-void deleteDecoderPointer(jlong handle) {
-    if (decoderPointers.find(handle) == decoderPointers.end()) {
-        throw std::runtime_error("Invalid handle");
-    }
-
-    erase_if(
-            decoderPointers,
-            [&handle](const auto &p) {
-                return p.first == handle;
-            }
-    );
-}
-
-void deleteSamplerPointer(jlong handle) {
-    if (samplerPointers.find(handle) == samplerPointers.end()) {
-        throw std::runtime_error("Invalid handle");
-    }
-
-    erase_if(
-            samplerPointers,
-            [&handle](const auto &p) {
-                return p.first == handle;
-            }
-    );
+    return sampler;
 }
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -168,18 +134,6 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
     JNIEnv *env;
 
     if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_10) != JNI_OK) return;
-
-    {
-        std::unique_lock<std::shared_mutex> decoderLock(decoderMutex);
-
-        decoderPointers.clear();
-    }
-
-    {
-        std::unique_lock<std::shared_mutex> samplerLock(samplerMutex);
-
-        samplerPointers.clear();
-    }
 
     Pa_Terminate();
 

@@ -6,7 +6,22 @@ import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * Provides frame capture functionality for video media at specified timestamps.
+ */
 object SnapshotManager {
+    /**
+     * Captures multiple video frames at specified timestamps.
+     *
+     * @param location Media file path or URI
+     * @param width Optional target width (keeps original if null)
+     * @param height Optional target height (keeps original if null)
+     * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
+     * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
+     * @param timestampsMillis Function that receives media duration and returns timestamps in milliseconds
+     * @return [Result] containing list of captured frames, or failure if decoding failed
+     * @throws SnapshotManagerException if frame capture fails
+     */
     suspend fun snapshots(
         location: String,
         width: Int? = null,
@@ -42,6 +57,18 @@ object SnapshotManager {
         }.getOrThrow()
     }
 
+    /**
+     * Captures a single video frame at specified timestamp.
+     *
+     * @param location Media file path or URI
+     * @param width Optional target width (maintains aspect ratio if null)
+     * @param height Optional target height (maintains aspect ratio if null)
+     * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
+     * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
+     * @param timestampMillis Function that receives media duration and returns timestamp in milliseconds
+     * @return [Result] containing captured frame (nullable if no frame at timestamp), or failure
+     * @throws SnapshotManagerException if frame capture fails
+     */
     suspend fun snapshot(
         location: String,
         width: Int? = null,

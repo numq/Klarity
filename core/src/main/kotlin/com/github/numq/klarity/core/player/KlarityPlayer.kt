@@ -19,9 +19,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Interface representing a media player capable of handling audio and video playback.
- * The player provides various functionalities for controlling playback, changing settings,
- * and monitoring player state and events.
+ * Interface representing a media player.
  */
 interface KlarityPlayer {
     /**
@@ -50,11 +48,16 @@ interface KlarityPlayer {
     val events: SharedFlow<PlayerEvent>
 
     /**
-     * Attaches a renderer to the player.
+     * Attaches the renderer to the player.
      *
      * @param renderer The new renderer to attach.
      */
     fun attachRenderer(renderer: Renderer)
+
+    /**
+     * Detaches the renderer from the player.
+     */
+    fun detachRenderer()
 
     /**
      * Changes the settings of the player.

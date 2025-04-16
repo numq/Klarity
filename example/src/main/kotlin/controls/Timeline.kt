@@ -24,9 +24,11 @@ fun Timeline(
         foregroundSecondaryColor = MaterialTheme.colors.primaryVariant,
         thumbColor = MaterialTheme.colors.primary,
         onHoveredValue = { hoveredValue ->
-            onHoveredTimestamp?.invoke(hoveredValue?.run {
-                HoveredTimestamp(offset = offset, millis = value.toLong())
-            })
+            onHoveredTimestamp?.invoke(
+                hoveredValue?.run {
+                    HoveredTimestamp(offset = offset, millis = value.toLong())
+                }
+            )
         }
     )
 }

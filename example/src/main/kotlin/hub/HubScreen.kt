@@ -18,7 +18,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.core.player.KlarityPlayer
+import com.github.numq.klarity.core.preview.PreviewManager
 import com.github.numq.klarity.core.probe.ProbeManager
+import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.settings.VideoSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -57,16 +59,42 @@ fun HubScreen(
             hubItems += pendingItem
             coroutineScope.launch(Dispatchers.Default) {
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
-                    val uploadedItem = HubItem.Uploaded(
-                        player = KlarityPlayer.create().getOrThrow().apply {
-                            prepare(
+                    when (val format = media.videoFormat) {
+                        null -> HubItem.Uploaded(
+                            player = KlarityPlayer.create().getOrThrow().apply {
+                                prepare(
+                                    location = media.location,
+                                    enableAudio = true,
+                                    enableVideo = true,
+                                    videoSettings = VideoSettings(loadPreview = true)
+                                ).getOrDefault(Unit)
+                            },
+                            previewManager = null,
+                            renderer = null
+                        )
+
+                        else -> {
+                            val player = KlarityPlayer.create().getOrThrow()
+
+                            player.prepare(
                                 location = media.location,
                                 enableAudio = true,
                                 enableVideo = true,
                                 videoSettings = VideoSettings(loadPreview = true)
-                            ).getOrDefault(Unit)
+                            ).getOrThrow()
+
+                            val previewManager = PreviewManager.create(location = media.location).getOrThrow()
+
+                            val renderer = Renderer.create(format = format).getOrThrow()
+
+                            player.attachRenderer(renderer)
+
+                            previewManager.attachRenderer(renderer)
+
+                            HubItem.Uploaded(player = player, previewManager = previewManager, renderer = renderer)
                         }
-                    )
+                    }
+                }.onSuccess { uploadedItem ->
                     hubItems = hubItems.map { if (it.id == pendingItem.id) uploadedItem else it }
                 }.onFailure {
                     hubItems -= pendingItem
@@ -107,9 +135,12 @@ fun HubScreen(
             isDragAndDrop = false
         }, onDrop = { externalDragValue ->
             isDragAndDrop = false
+
             when (val data = externalDragValue.dragData) {
                 is DragData.FilesList -> addFiles(upload(data.readFiles()))
+
                 is DragData.Text -> addLocation(data.readText())
+
                 else -> Unit
             }
         }), contentAlignment = Alignment.Center

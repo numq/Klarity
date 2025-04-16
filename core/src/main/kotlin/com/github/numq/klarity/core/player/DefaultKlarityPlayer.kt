@@ -23,6 +23,8 @@ internal class DefaultKlarityPlayer(
 
     override fun attachRenderer(renderer: Renderer) = playerController.attachRenderer(renderer)
 
+    override fun detachRenderer() = playerController.detachRenderer()
+
     override suspend fun changeSettings(
         settings: PlayerSettings,
     ) = playerController.changeSettings(settings).recoverCatching { t ->

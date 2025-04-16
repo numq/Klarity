@@ -38,8 +38,6 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jintArray hardwareAccelerationCandidates
 ) {
     return handleException<jlong>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         auto locationChars = env->GetStringUTFChars(location, nullptr);
 
         if (!locationChars) {
@@ -65,7 +63,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
 
         env->ReleaseIntArrayElements(hardwareAccelerationCandidates, intArray, JNI_ABORT);
 
-        auto decoder = std::make_unique<Decoder>(
+        auto decoder = new Decoder(
                 locationStr,
                 findAudioStream,
                 findVideoStream,
@@ -79,11 +77,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
                 candidates
         );
 
-        auto handle = reinterpret_cast<jlong>(decoder.get());
-
-        decoderPointers[handle] = std::move(decoder);
-
-        return handle;
+        return reinterpret_cast<jlong>(decoder);
     }, -1);
 }
 
@@ -93,8 +87,6 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jlong handle
 ) {
     return handleException<jobject>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         auto decoder = getDecoderPointer(handle);
 
         auto format = decoder->format;
@@ -131,8 +123,6 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jlong handle
 ) {
     return handleException<jobject>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         auto decoder = getDecoderPointer(handle);
 
         auto frame = decoder->decodeAudio().release();
@@ -179,8 +169,6 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jobject byteBuffer
 ) {
     return handleException<jobject>(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         if (!byteBuffer) {
             throw std::runtime_error("Provided byte buffer is null");
         }
@@ -221,8 +209,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_s
         jboolean keyframesOnly
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         auto decoder = getDecoderPointer(handle);
 
         decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly);
@@ -235,8 +221,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_r
         jlong handle
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
         auto decoder = getDecoderPointer(handle);
 
         decoder->reset();
@@ -249,8 +233,6 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_d
         jlong handle
 ) {
     return handleException(env, [&] {
-        std::unique_lock<std::shared_mutex> lock(decoderMutex);
-
-        deleteDecoderPointer(handle);
+        delete getDecoderPointer(handle);
     });
 }

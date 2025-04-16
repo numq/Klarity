@@ -19,25 +19,23 @@ import extension.formatTimestamp
 fun TimelinePreview(
     width: Float,
     height: Float,
-    hoveredTimestamp: HoveredTimestamp?,
+    hoveredTimestamp: HoveredTimestamp,
     previewRenderer: Renderer
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
-        hoveredTimestamp?.run {
-            Card(modifier = Modifier.padding(4.dp).graphicsLayer {
-                translationX = (offset.x - width.div(2)).coerceIn(0f, maxWidth.value - width)
-            }) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.CenterVertically)
-                ) {
-                    RendererComponent(
-                        modifier = Modifier.size(width = width.dp, height = height.dp),
-                        foreground = Foreground(renderer = previewRenderer, imageScale = ImageScale.Crop)
-                    )
-                    Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
-                        Text(text = millis.formatTimestamp(), modifier = Modifier.padding(4.dp))
-                    }
+        Card(modifier = Modifier.padding(4.dp).graphicsLayer {
+            translationX = (hoveredTimestamp.offset.x - width.div(2)).coerceIn(0f, maxWidth.value - width)
+        }) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.CenterVertically)
+            ) {
+                RendererComponent(
+                    modifier = Modifier.size(width = width.dp, height = height.dp),
+                    foreground = Foreground(renderer = previewRenderer, imageScale = ImageScale.Crop)
+                )
+                Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
+                    Text(text = hoveredTimestamp.millis.formatTimestamp(), modifier = Modifier.padding(4.dp))
                 }
             }
         }

@@ -1,20 +1,9 @@
 package com.github.numq.klarity.core.sampler
 
 import com.github.numq.klarity.core.cleaner.NativeCleaner
+import java.io.Closeable
 
-internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
-    private val nativeHandle by lazy {
-        requireNotNull(createNative(
-            sampleRate = sampleRate, channels = channels
-        ).takeIf { it != -1L }) { "Could not instantiate native sampler" }
-    }
-
-    private val cleanable by lazy {
-        NativeCleaner.cleaner.register(this) {
-            deleteNative(handle = nativeHandle)
-        }
-    }
-
+internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
     companion object {
         @JvmStatic
         private external fun createNative(sampleRate: Int, channels: Int): Long
@@ -41,17 +30,49 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : AutoCloseable {
         private external fun deleteNative(handle: Long)
     }
 
-    fun setPlaybackSpeed(factor: Float) = setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
+    private val lock = Any()
 
-    fun setVolume(value: Float) = setVolumeNative(handle = nativeHandle, value = value)
+    private var nativeHandle = -1L
 
-    fun start() = startNative(handle = nativeHandle)
+    init {
+        synchronized(lock) {
+            nativeHandle = createNative(sampleRate = sampleRate, channels = channels)
 
-    fun play(bytes: ByteArray, size: Int) = playNative(handle = nativeHandle, bytes = bytes, size = size)
+            require(nativeHandle != -1L) { "Could not instantiate native sampler" }
+        }
+    }
 
-    fun pause() = pauseNative(handle = nativeHandle)
+    private val cleanable = NativeCleaner.cleaner.register(this) {
+        synchronized(lock) {
+            deleteNative(handle = nativeHandle)
 
-    fun stop() = stopNative(handle = nativeHandle)
+            nativeHandle = -1L
+        }
+    }
+
+    fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
+        setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
+    }
+
+    fun setVolume(value: Float) = synchronized(lock) {
+        setVolumeNative(handle = nativeHandle, value = value)
+    }
+
+    fun start() = synchronized(lock) {
+        startNative(handle = nativeHandle)
+    }
+
+    fun play(bytes: ByteArray, size: Int) = synchronized(lock) {
+        playNative(handle = nativeHandle, bytes = bytes, size = size)
+    }
+
+    fun pause() = synchronized(lock) {
+        pauseNative(handle = nativeHandle)
+    }
+
+    fun stop() = synchronized(lock) {
+        stopNative(handle = nativeHandle)
+    }
 
     override fun close() = cleanable.clean()
 }
