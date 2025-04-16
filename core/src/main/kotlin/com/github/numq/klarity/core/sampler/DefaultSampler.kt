@@ -1,6 +1,5 @@
 package com.github.numq.klarity.core.sampler
 
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -13,7 +12,7 @@ internal class DefaultSampler(
 
     private var currentVolume = 1f
 
-    override var playbackSpeedFactor = MutableStateFlow(1f)
+    private var playbackSpeedFactor = 1f
 
     override suspend fun getLatency() = mutex.withLock { Result.success(latency) }
 
@@ -23,7 +22,7 @@ internal class DefaultSampler(
 
             sampler.setPlaybackSpeed(factor)
 
-            playbackSpeedFactor.emit(factor)
+            playbackSpeedFactor = factor
         }
     }
 

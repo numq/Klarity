@@ -1,29 +1,30 @@
 package com.github.numq.klarity.compose.renderer
 
+import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.flow.StateFlow
-import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.ImageInfo
-import org.jetbrains.skia.Surface
+import org.jetbrains.skia.*
 import java.io.Closeable
 
 interface RendererContext : Closeable {
     val generationId: StateFlow<Int>
 
+    val bitmap: Bitmap
+
+    val surface: Surface
+
     fun withSurface(callback: (Surface) -> Unit)
+
+    fun withBitmap(callback: (Bitmap) -> Unit)
 
     fun draw(pixels: ByteArray)
 
-    fun reset()
-
     companion object {
-        fun create(foreground: Foreground): RendererContext {
-            require(foreground !is Foreground.Empty) { "Could not create empty renderer context" }
-
+        fun create(renderer: Renderer): RendererContext {
             val imageInfo = ImageInfo(
-                width = foreground.width,
-                height = foreground.height,
-                colorType = foreground.colorType,
-                alphaType = foreground.alphaType
+                width = renderer.format.width,
+                height = renderer.format.height,
+                colorType = ColorType.RGBA_8888,
+                alphaType = ColorAlphaType.UNPREMUL
             )
 
             val bitmap = Bitmap()
@@ -36,7 +37,7 @@ interface RendererContext : Closeable {
 
             val surface = Surface.makeRaster(bitmap.imageInfo)
 
-            return SkiaRendererContext(imageInfo = imageInfo, bitmap = bitmap, surface = surface)
+            return SkiaRendererContext(renderer = renderer, imageInfo = imageInfo, bitmap = bitmap, surface = surface)
         }
     }
 }

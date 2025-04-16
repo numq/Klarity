@@ -16,11 +16,6 @@ sealed interface PlayerEvent {
      */
     sealed interface Buffer : PlayerEvent {
         /**
-         * Represents a waiting state for the buffer to fill.
-         */
-        data object Waiting : Buffer
-
-        /**
          * Represents a state indicating that the buffer has been filled and is ready.
          */
         data object Complete : Buffer

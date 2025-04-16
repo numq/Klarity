@@ -17,7 +17,6 @@ import com.github.numq.klarity.core.loop.playback.PlaybackLoop
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.renderer.RendererFactory
 import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
@@ -35,9 +34,9 @@ interface PlayerController {
 
     val playbackTimestamp: StateFlow<Timestamp>
 
-    val renderer: StateFlow<Renderer?>
-
     val events: SharedFlow<PlayerEvent>
+
+    fun attachRenderer(renderer: Renderer)
 
     suspend fun changeSettings(newSettings: PlayerSettings): Result<Unit>
 
@@ -56,8 +55,7 @@ interface PlayerController {
             videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
             bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
             playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-            samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>,
-            rendererFactory: Factory<RendererFactory.Parameters, Renderer>,
+            samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,
@@ -67,8 +65,7 @@ interface PlayerController {
                 videoBufferFactory = videoBufferFactory,
                 bufferLoopFactory = bufferLoopFactory,
                 playbackLoopFactory = playbackLoopFactory,
-                samplerFactory = samplerFactory,
-                rendererFactory = rendererFactory,
+                samplerFactory = samplerFactory
             )
         }
     }

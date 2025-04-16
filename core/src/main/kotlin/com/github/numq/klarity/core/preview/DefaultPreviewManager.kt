@@ -9,11 +9,17 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPreviewManager(
     private val videoDecoder: Decoder<Media.Video, Frame.Video>,
-    override val renderer: Renderer,
 ) : PreviewManager {
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var previewJob: Job? = null
+
+    @Volatile
+    private var renderer: Renderer? = null
+
+    override fun attachRenderer(renderer: Renderer) {
+        this.renderer = renderer
+    }
 
     override suspend fun preview(
         timestampMillis: Long,
@@ -22,15 +28,12 @@ internal class DefaultPreviewManager(
     ) = runCatching {
         previewJob?.cancel()
         previewJob = coroutineScope.launch {
-            delay(debounceMillis)
-
             videoDecoder.seekTo(
-                micros = timestampMillis.milliseconds.inWholeMicroseconds,
-                keyframesOnly = keyframesOnly
+                micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).getOrThrow()
 
             (videoDecoder.decode().getOrNull() as? Frame.Video.Content)?.let { frame ->
-                renderer.draw(frame).getOrThrow()
+                renderer?.render(frame)
             }
         }
     }.recoverCatching { t ->
@@ -43,7 +46,5 @@ internal class DefaultPreviewManager(
         coroutineScope.cancel()
 
         videoDecoder.close().getOrThrow()
-
-        renderer.close().getOrThrow()
     }
 }

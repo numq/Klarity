@@ -1,7 +1,7 @@
 package com.github.numq.klarity.core.loop.playback
 
-import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.pipeline.Pipeline
+import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.timestamp.Timestamp
 
 interface PlaybackLoop {
@@ -16,8 +16,14 @@ interface PlaybackLoop {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun create(bufferLoop: BufferLoop, pipeline: Pipeline): Result<PlaybackLoop> = runCatching {
-            DefaultPlaybackLoop(bufferLoop = bufferLoop, pipeline = pipeline)
+        internal fun create(
+            pipeline: Pipeline,
+            getPlaybackSpeedFactor: () -> Double,
+            getRenderer: () -> Renderer?
+        ): Result<PlaybackLoop> = runCatching {
+            DefaultPlaybackLoop(
+                pipeline = pipeline, getPlaybackSpeedFactor = getPlaybackSpeedFactor, getRenderer = getRenderer
+            )
         }
     }
 }

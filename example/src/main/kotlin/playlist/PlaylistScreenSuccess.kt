@@ -30,6 +30,7 @@ import com.github.numq.klarity.core.preview.PreviewManager
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.queue.MediaQueue
 import com.github.numq.klarity.core.queue.SelectedItem
+import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.snapshot.SnapshotManager
 import com.github.numq.klarity.core.state.PlayerState
@@ -40,8 +41,12 @@ import extension.formatTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import notification.Notification
 import remote.RemoteUploadingDialog
 import java.io.File
@@ -60,8 +65,6 @@ fun PlaylistScreenSuccess(
     val settings by player.settings.collectAsState()
 
     val state by player.state.collectAsState()
-
-    val renderer by player.renderer.collectAsState()
 
     val error by player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
 
@@ -95,8 +98,6 @@ fun PlaylistScreenSuccess(
 
     val pendingChannel = remember { Channel<PlaylistItem.Pending>(Channel.UNLIMITED) }
 
-    var previewManager by remember { mutableStateOf<PreviewManager?>(null) }
-
     fun handleException(throwable: Throwable) = notify(Notification(throwable.localizedMessage))
 
     DisposableEffect(Unit) {
@@ -123,23 +124,8 @@ fun PlaylistScreenSuccess(
     LaunchedEffect(state) {
         player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
 
-        when (val currentState = state) {
-            is PlayerState.Ready -> {
-                coroutineScope.launch {
-                    previewManager = PreviewManager.create(location = currentState.media.location).getOrThrow()
-                }
-
-                if (currentState is PlayerState.Ready.Completed) {
-                    if (queue.hasNext.value) queue.next()
-                }
-            }
-
-            is PlayerState.Empty -> {
-                previewManager?.close()?.getOrThrow()
-                previewManager = null
-            }
-
-            else -> Unit
+        if (state is PlayerState.Ready.Completed) {
+            if (queue.hasNext.value) queue.next()
         }
     }
 
@@ -295,7 +281,48 @@ fun PlaylistScreenSuccess(
                         is PlayerState.Empty -> Box(modifier = Modifier.fillMaxSize())
 
                         is PlayerState.Ready -> {
-                            val hoveredTimestamps = remember { MutableSharedFlow<HoveredTimestamp?>() }
+                            val format = remember(currentState) {
+                                when (val media = currentState.media) {
+                                    is Media.Audio -> null
+
+                                    is Media.Video -> media.format
+
+                                    is Media.AudioVideo -> media.videoFormat
+                                }
+                            }
+
+                            val previewManager = remember(currentState.media.location) {
+                                runBlocking {
+                                    PreviewManager.create(location = currentState.media.location).getOrThrow()
+                                }
+                            }
+
+                            DisposableEffect(currentState.media.location) {
+                                onDispose {
+                                    runBlocking {
+                                        previewManager.close().getOrThrow()
+                                    }
+                                }
+                            }
+
+                            val playerRenderer = remember(format) {
+                                format?.let(Renderer::create)?.getOrThrow()?.also(player::attachRenderer)
+                            }
+
+                            val previewRenderer = remember(format) {
+                                format?.let(Renderer::create)?.getOrThrow()?.also(previewManager::attachRenderer)
+                            }
+
+                            var hoveredTimestamp by remember {
+                                mutableStateOf<HoveredTimestamp?>(null)
+                            }
+
+                            DisposableEffect(format) {
+                                onDispose {
+                                    playerRenderer?.close()
+                                    previewRenderer?.close()
+                                }
+                            }
 
                             Column(
                                 modifier = Modifier.fillMaxSize(),
@@ -328,16 +355,16 @@ fun PlaylistScreenSuccess(
                                         verticalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                            when (currentState.media) {
-                                                is Media.Audio -> Icon(Icons.Default.AudioFile, null)
-
-                                                else -> RendererComponent(modifier = Modifier.fillMaxSize(),
-                                                    background = Background.Blur(),
-                                                    foreground = renderer?.let { renderer ->
-                                                        Foreground.Source(renderer = renderer)
-                                                    } ?: Foreground.Empty) {
-                                                    Icon(Icons.Default.BrokenImage, null)
-                                                }
+                                            if (currentState.media is Media.Audio) {
+                                                Icon(Icons.Default.AudioFile, null)
+                                            } else {
+                                                playerRenderer?.let { renderer ->
+                                                    RendererComponent(
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        background = Background.Blur(),
+                                                        foreground = Foreground(renderer = renderer)
+                                                    )
+                                                } ?: Icon(Icons.Default.BrokenImage, null)
                                             }
 
                                             if (settings.playbackSpeedFactor != 1f) {
@@ -358,6 +385,7 @@ fun PlaylistScreenSuccess(
                                                 }
                                             }
                                         }
+
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(8.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -415,18 +443,20 @@ fun PlaylistScreenSuccess(
                                                     volume = settings.volume,
                                                     isMuted = settings.isMuted,
                                                     toggleMute = {
-                                                        player.changeSettings(settings.copy(isMuted = !settings.isMuted))
-                                                            .getOrDefault(Unit)
+                                                        player.changeSettings(
+                                                            settings.copy(isMuted = !settings.isMuted)
+                                                        ).getOrDefault(Unit)
                                                     },
                                                     changeVolume = { volume ->
-                                                        player.changeSettings(settings.copy(volume = volume))
-                                                            .getOrDefault(Unit)
+                                                        player.changeSettings(
+                                                            settings.copy(volume = volume)
+                                                        ).getOrDefault(Unit)
                                                     })
                                             }
                                         }
                                     }
 
-                                    previewManager?.let { manager ->
+                                    previewRenderer?.let { renderer ->
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.BottomStart
@@ -434,12 +464,13 @@ fun PlaylistScreenSuccess(
                                             TimelinePreview(
                                                 width = 128f,
                                                 height = 128f,
-                                                hoveredTimestamps = hoveredTimestamps,
-                                                previewManager = manager
+                                                hoveredTimestamp = hoveredTimestamp,
+                                                previewRenderer = renderer,
                                             )
                                         }
                                     }
                                 }
+
                                 Timeline(modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
                                     bufferTimestampMillis = bufferTimestamp.millis,
                                     playbackTimestampMillis = playbackTimestamp.millis,
@@ -449,10 +480,9 @@ fun PlaylistScreenSuccess(
                                         player.resume().getOrDefault(Unit)
                                     },
                                     onHoveredTimestamp = { value ->
-                                        coroutineScope.launch {
-                                            hoveredTimestamps.emit(value)
-                                        }
-                                    })
+                                        hoveredTimestamp = value
+                                    }
+                                )
                             }
                         }
                     }

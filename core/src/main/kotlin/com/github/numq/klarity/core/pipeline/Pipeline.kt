@@ -4,7 +4,6 @@ import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
-import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 
 sealed interface Pipeline {
@@ -18,12 +17,10 @@ sealed interface Pipeline {
         val videoDecoder: Decoder<Media.Video, Frame.Video>,
         val audioBuffer: Buffer<Frame.Audio>,
         val videoBuffer: Buffer<Frame.Video>,
-        val sampler: Sampler,
-        val renderer: Renderer,
+        val sampler: Sampler
     ) : Pipeline {
         override suspend fun close() = runCatching {
             sampler.close().getOrThrow()
-            renderer.close().getOrThrow()
             audioBuffer.close().getOrThrow()
             videoBuffer.close().getOrThrow()
             audioDecoder.close().getOrThrow()
@@ -47,11 +44,9 @@ sealed interface Pipeline {
     data class Video(
         override val media: Media.Video,
         val decoder: Decoder<Media.Video, Frame.Video>,
-        val buffer: Buffer<Frame.Video>,
-        val renderer: Renderer,
+        val buffer: Buffer<Frame.Video>
     ) : Pipeline {
         override suspend fun close() = runCatching {
-            renderer.close().getOrThrow()
             buffer.close().getOrThrow()
             decoder.close().getOrThrow()
         }

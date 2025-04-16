@@ -26,10 +26,10 @@ internal class VideoDecoder(
 
     override suspend fun decode() = mutex.withLock {
         runCatching {
+            byteBuffer.clear()
+
             decoder.decodeVideo(byteBuffer)?.run {
                 byteBuffer.get(bytes)
-
-                byteBuffer.clear()
 
                 Frame.Video.Content(
                     timestampMicros = timestampMicros,

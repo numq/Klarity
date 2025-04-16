@@ -2,48 +2,24 @@ package com.github.numq.klarity.core.renderer
 
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.onSubscription
+import java.util.concurrent.atomic.AtomicReference
 
-internal class DefaultRenderer(
-    override val format: VideoFormat,
-    private val preview: Frame.Video.Content?,
-) : Renderer {
-    private val _frame = MutableSharedFlow<Frame.Video.Content?>(
-        replay = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+internal class DefaultRenderer(override val format: VideoFormat) : Renderer {
+    private fun isFormatValid(frame: Frame.Video.Content) = frame.width == format.width && frame.height == format.height
 
-    override val frame = _frame.asSharedFlow().onSubscription {
-        emit(preview)
+    private val callbackRef = AtomicReference<(Frame.Video.Content) -> Unit?>(null)
+
+    override fun onRender(callback: (Frame.Video.Content) -> Unit) {
+        callbackRef.set(callback)
     }
 
-    override var playbackSpeedFactor = MutableStateFlow(1f)
-
-    override suspend fun setPlaybackSpeed(factor: Float) = runCatching {
-        require(factor > 0f) { "Speed factor should be positive" }
-
-        playbackSpeedFactor.value = factor
+    override fun render(frame: Frame.Video.Content) {
+        if (isFormatValid(frame)) {
+            callbackRef.get()?.invoke(frame)
+        }
     }
 
-    override suspend fun draw(frame: Frame.Video.Content) = runCatching {
-        _frame.tryEmit(frame)
-
-        Unit
-    }
-
-    override suspend fun reset() = runCatching {
-        preview?.let(_frame::tryEmit)
-
-        Unit
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override suspend fun close() = runCatching {
-        _frame.resetReplayCache()
+    override fun close() {
+        callbackRef.set(null)
     }
 }

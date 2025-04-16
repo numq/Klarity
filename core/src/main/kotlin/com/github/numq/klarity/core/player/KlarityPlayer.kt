@@ -9,7 +9,6 @@ import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.renderer.RendererFactory
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
@@ -46,15 +45,16 @@ interface KlarityPlayer {
     val playbackTimestamp: StateFlow<Timestamp>
 
     /**
-     * A flow that provides the current renderer being used for video playback.
-     * Can be null if no renderer is set.
-     */
-    val renderer: StateFlow<Renderer?>
-
-    /**
      * A flow that emits events related to the player's state and actions.
      */
     val events: SharedFlow<PlayerEvent>
+
+    /**
+     * Attaches a renderer to the player.
+     *
+     * @param renderer The new renderer to attach.
+     */
+    fun attachRenderer(renderer: Renderer)
 
     /**
      * Changes the settings of the player.
@@ -207,8 +207,7 @@ interface KlarityPlayer {
                     videoBufferFactory = VideoBufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),
-                    samplerFactory = SamplerFactory(),
-                    rendererFactory = RendererFactory()
+                    samplerFactory = SamplerFactory()
                 )
             ).mapCatching(::DefaultKlarityPlayer).getOrThrow()
         }

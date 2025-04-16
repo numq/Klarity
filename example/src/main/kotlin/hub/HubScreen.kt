@@ -20,12 +20,12 @@ import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.settings.VideoSettings
-import com.github.numq.klarity.core.snapshot.SnapshotManager
-import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notification.Notification
 import remote.RemoteUploadingDialog
@@ -65,16 +65,7 @@ fun HubScreen(
                                 enableVideo = true,
                                 videoSettings = VideoSettings(loadPreview = true)
                             ).getOrDefault(Unit)
-
-                            state.first { it is PlayerState.Ready }
-                        },
-                        snapshots = SnapshotManager.snapshots(
-                            location = media.location
-                        ) { durationMillis ->
-                            val n = 10
-
-                            (0 until n).map { i -> (durationMillis * i) / (n - 1) }
-                        }.getOrNull() ?: emptyList()
+                        }
                     )
                     hubItems = hubItems.map { if (it.id == pendingItem.id) uploadedItem else it }
                 }.onFailure {

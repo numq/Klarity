@@ -2,25 +2,23 @@ package com.github.numq.klarity.core.loop.playback
 
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultPlaybackLoop(
-    private val bufferLoop: BufferLoop,
     private val pipeline: Pipeline,
+    private val getPlaybackSpeedFactor: () -> Double,
+    private val getRenderer: () -> Renderer?
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
@@ -35,27 +33,20 @@ internal class DefaultPlaybackLoop(
         audioBuffer: Buffer<Frame.Audio>,
         videoBuffer: Buffer<Frame.Video>,
         sampler: Sampler,
-        renderer: Renderer,
         onAudioTimestamp: suspend (Timestamp) -> Unit,
         onVideoTimestamp: suspend (Timestamp) -> Unit,
     ) {
         val latency = sampler.getLatency().getOrThrow()
 
-        val lastAudioTimestamp = AtomicReference(Duration.INFINITE)
+        var lastAudioTimestamp = Duration.INFINITE
 
         val audioJob = coroutineScope.launch {
             while (currentCoroutineContext().isActive && isPlaying.get()) {
-                if (bufferLoop.isWaiting.get()) {
-                    delay(1L)
-
-                    continue
-                }
-
                 when (val frame = audioBuffer.poll().getOrThrow()) {
                     is Frame.Audio.Content -> {
                         onAudioTimestamp(Timestamp(micros = frame.timestampMicros - latency))
 
-                        lastAudioTimestamp.set((frame.timestampMicros - latency).microseconds)
+                        lastAudioTimestamp = (frame.timestampMicros - latency).microseconds
 
                         sampler.play(bytes = frame.bytes).getOrThrow()
                     }
@@ -69,18 +60,11 @@ internal class DefaultPlaybackLoop(
             var lastFrameTimestamp = Duration.INFINITE
 
             while (currentCoroutineContext().isActive && isPlaying.get()) {
-                if (bufferLoop.isWaiting.get()) {
-                    delay(1L)
-
-                    continue
-                }
-
                 when {
                     audioJob.isCompleted -> {
                         handleVideoPlayback(
                             media = media,
                             buffer = videoBuffer,
-                            renderer = renderer,
                             onTimestamp = onVideoTimestamp
                         )
 
@@ -88,20 +72,20 @@ internal class DefaultPlaybackLoop(
                     }
 
                     else -> when (val frame = videoBuffer.poll().getOrThrow()) {
-                        is Frame.Video.Content -> if (lastAudioTimestamp.get().isFinite()) {
+                        is Frame.Video.Content -> if (lastAudioTimestamp.isFinite()) {
                             val startPlaybackTime = System.nanoTime().nanoseconds
 
                             while (currentCoroutineContext().isActive && isPlaying.get()) {
-                                if ((System.nanoTime().nanoseconds - startPlaybackTime) * renderer.playbackSpeedFactor.value.toDouble() > frame.timestampMicros.microseconds - lastAudioTimestamp.get()) {
+                                if ((System.nanoTime().nanoseconds - startPlaybackTime) * getPlaybackSpeedFactor() > frame.timestampMicros.microseconds - lastAudioTimestamp) {
                                     break
                                 }
 
-                                delay(1L)
+                                delay(10L)
                             }
 
                             currentCoroutineContext().ensureActive()
 
-                            renderer.draw(frame).getOrThrow()
+                            getRenderer()?.render(frame)
 
                             onVideoTimestamp(Timestamp(micros = frame.timestampMicros))
 
@@ -110,7 +94,7 @@ internal class DefaultPlaybackLoop(
 
                         is Frame.Video.EndOfStream -> {
                             if (lastFrameTimestamp.isFinite()) {
-                                delay((media.durationMicros.microseconds - lastFrameTimestamp) / renderer.playbackSpeedFactor.value.toDouble())
+                                delay((media.durationMicros.microseconds - lastFrameTimestamp) / getPlaybackSpeedFactor())
                             }
 
                             break
@@ -144,7 +128,6 @@ internal class DefaultPlaybackLoop(
     private suspend fun handleVideoPlayback(
         media: Media,
         buffer: Buffer<Frame.Video>,
-        renderer: Renderer,
         onTimestamp: suspend (Timestamp) -> Unit,
     ) {
         var lastFrameTimestamp = Duration.INFINITE
@@ -159,16 +142,16 @@ internal class DefaultPlaybackLoop(
                     val startPlaybackTime = System.nanoTime().nanoseconds
 
                     while (currentCoroutineContext().isActive && isPlaying.get()) {
-                        if ((System.nanoTime().nanoseconds - startPlaybackTime) * renderer.playbackSpeedFactor.value.toDouble() > frame.timestampMicros.microseconds - lastFrameTimestamp) {
+                        if ((System.nanoTime().nanoseconds - startPlaybackTime) * getPlaybackSpeedFactor() > frame.timestampMicros.microseconds - lastFrameTimestamp) {
                             break
                         }
 
-                        delay(1L)
+                        delay(10L)
                     }
 
                     currentCoroutineContext().ensureActive()
 
-                    renderer.draw(frame).getOrThrow()
+                    getRenderer()?.render(frame)
 
                     onTimestamp(Timestamp(micros = frame.timestampMicros))
 
@@ -177,7 +160,7 @@ internal class DefaultPlaybackLoop(
 
                 is Frame.Video.EndOfStream -> {
                     if (lastFrameTimestamp.isFinite()) {
-                        delay((media.durationMicros.microseconds - lastFrameTimestamp) / renderer.playbackSpeedFactor.value.toDouble())
+                        delay((media.durationMicros.microseconds - lastFrameTimestamp) / getPlaybackSpeedFactor())
                     }
 
                     break
@@ -208,44 +191,21 @@ internal class DefaultPlaybackLoop(
                 try {
                     with(pipeline) {
                         when (this) {
-                            is Pipeline.AudioVideo -> {
-                                val audioTimestamps = MutableSharedFlow<Timestamp>()
-
-                                val videoTimestamps = MutableSharedFlow<Timestamp>()
-
-                                val timestampJob = when {
-                                    ((pipeline.media as? Media.AudioVideo)?.videoFormat?.frameRate ?: 0.0) > 0.0 -> {
-                                        audioTimestamps.combine(videoTimestamps) { a, v ->
-                                            if (a.micros >= v.micros) a else v
-                                        }
-                                    }
-
-                                    else -> merge(audioTimestamps, videoTimestamps)
-                                }.onEach(onTimestamp).launchIn(this@launch)
-
-                                handleMediaPlayback(
-                                    media = media,
-                                    audioBuffer = audioBuffer,
-                                    videoBuffer = videoBuffer,
-                                    sampler = sampler,
-                                    renderer = renderer,
-                                    onAudioTimestamp = { timestamp ->
-                                        audioTimestamps.emit(timestamp)
-                                    },
-                                    onVideoTimestamp = { timestamp ->
-                                        videoTimestamps.emit(timestamp)
-                                    },
-                                )
-
-                                timestampJob.cancelAndJoin()
-                            }
+                            is Pipeline.AudioVideo -> handleMediaPlayback(
+                                media = media,
+                                audioBuffer = audioBuffer,
+                                videoBuffer = videoBuffer,
+                                sampler = sampler,
+                                onAudioTimestamp = onTimestamp,
+                                onVideoTimestamp = onTimestamp,
+                            )
 
                             is Pipeline.Audio -> handleAudioPlayback(
                                 buffer = buffer, sampler = sampler, onTimestamp = onTimestamp
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                media = media, buffer = buffer, renderer = renderer, onTimestamp = onTimestamp
+                                media = media, buffer = buffer, onTimestamp = onTimestamp
                             )
                         }
                     }

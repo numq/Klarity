@@ -27,14 +27,13 @@ import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.preview.PreviewManager
+import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.state.PlayerState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import notification.Notification
 import kotlin.time.Duration.Companion.microseconds
 
@@ -50,49 +49,11 @@ fun UploadedHubItem(
 
     val state by hubItem.player.state.collectAsState()
 
-    val renderer by hubItem.player.renderer.collectAsState()
-
     val error by hubItem.player.events.filterIsInstance<PlayerEvent.Error>().collectAsState(null)
 
     val playbackTimestamp by hubItem.player.playbackTimestamp.collectAsState()
 
     val hoverInteractionSource = remember { MutableInteractionSource() }
-
-    var snapshotJob by remember { mutableStateOf<Job?>(null) }
-
-    var snapshotIndex by remember { mutableStateOf(0) }
-
-    DisposableEffect(Unit) {
-        hoverInteractionSource.interactions.onEach { interaction ->
-            when (interaction) {
-                is HoverInteraction.Enter -> {
-                    if (hubItem.snapshots.isNotEmpty()) {
-                        snapshotJob?.cancel()
-                        snapshotJob = coroutineScope.launch {
-                            delay(500L)
-
-                            while (isActive) {
-                                snapshotIndex = (snapshotIndex + 1) % hubItem.snapshots.size
-
-                                delay(200L)
-                            }
-                        }
-                    }
-                }
-
-                else -> {
-                    snapshotJob?.cancel()
-                    snapshotJob = null
-                    snapshotIndex = 0
-                }
-            }
-        }.launchIn(coroutineScope)
-
-        onDispose {
-            snapshotJob?.cancel()
-            snapshotJob = null
-        }
-    }
 
     LaunchedEffect(state) {
         hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
@@ -167,65 +128,140 @@ fun UploadedHubItem(
                     )
                 }, contentAlignment = Alignment.Center
             ) {
-                when (state) {
-                    is PlayerState.Ready.Playing -> {
+                when (val currentState = state) {
+                    is PlayerState.Ready -> {
+                        val format = remember(currentState) {
+                            when (val media = currentState.media) {
+                                is Media.Audio -> null
+
+                                is Media.Video -> media.format
+
+                                is Media.AudioVideo -> media.videoFormat
+                            }
+                        }
+
+                        val previewManager = remember(currentState.media.location) {
+                            runBlocking {
+                                PreviewManager.create(location = currentState.media.location).getOrThrow()
+                            }
+                        }
+
+                        DisposableEffect(currentState.media.location) {
+                            onDispose {
+                                runBlocking {
+                                    previewManager.close().getOrThrow()
+                                }
+                            }
+                        }
+
+                        val playerRenderer = remember(format) {
+                            format?.let(Renderer::create)?.getOrThrow()?.also(hubItem.player::attachRenderer)
+                        }
+
+                        DisposableEffect(format) {
+                            onDispose {
+                                playerRenderer?.close()
+                            }
+                        }
+
+                        var snapshotJob by remember { mutableStateOf<Job?>(null) }
+
+                        var snapshotIndex by remember { mutableStateOf(0) }
+
+                        DisposableEffect(Unit) {
+                            hoverInteractionSource.interactions.onEach { interaction ->
+                                when (interaction) {
+                                    is HoverInteraction.Enter -> {
+                                        val n = 10
+
+                                        snapshotJob?.cancel()
+                                        snapshotJob = coroutineScope.launch {
+                                            delay(500L)
+
+                                            while (isActive) {
+                                                if (state !is PlayerState.Ready.Playing) {
+                                                    snapshotIndex = (snapshotIndex + 1) % n
+
+                                                    previewManager.preview(
+                                                        timestampMillis = (currentState.media.durationMicros.microseconds.inWholeMilliseconds * snapshotIndex) / (n - 1)
+                                                    ).getOrThrow()
+                                                }
+
+                                                delay(200L)
+                                            }
+                                        }
+                                    }
+
+                                    else -> {
+                                        snapshotJob?.cancel()
+                                        snapshotJob = null
+
+                                        snapshotIndex = 0
+                                    }
+                                }
+                            }.launchIn(coroutineScope)
+
+                            onDispose {
+                                snapshotJob?.cancel()
+                                snapshotJob = null
+
+                                runBlocking {
+                                    hubItem.player.release().getOrThrow()
+                                }
+                            }
+                        }
+
                         when ((state as PlayerState.Ready).media) {
                             is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
-                            else -> RendererComponent(
-                                modifier = Modifier.fillMaxSize(),
-                                foreground = renderer?.run renderer@{
-                                    Foreground.Source(renderer = this@renderer, imageScale = ImageScale.Crop)
-                                } ?: Foreground.Empty
-                            ) {
-                                Icon(Icons.Default.BrokenImage, null)
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(8.dp),
-                            contentAlignment = Alignment.BottomStart
-                        ) {
-                            Text(
-                                "${playbackTimestamp.micros.microseconds}",
-                                modifier = Modifier.padding(8.dp),
-                                style = TextStyle(
-                                    drawStyle = Stroke(
-                                        miter = 2f,
-                                        width = 1f,
-                                        join = StrokeJoin.Round
+                            else -> playerRenderer?.let {
+                                RendererComponent(
+                                    modifier = Modifier.fillMaxSize(),
+                                    foreground = Foreground(
+                                        renderer = it,
+                                        imageScale = ImageScale.Crop
                                     )
                                 )
-                            )
+                            } ?: Icon(Icons.Default.BrokenImage, null)
                         }
 
-                        if (settings.playbackSpeedFactor != 1f) {
+                        if (state is PlayerState.Ready.Playing) {
                             Box(
                                 modifier = Modifier.fillMaxSize().padding(8.dp),
-                                contentAlignment = Alignment.Center
+                                contentAlignment = Alignment.BottomStart
                             ) {
                                 Text(
-                                    "Playing on ${
-                                        settings.playbackSpeedFactor.toString().replace(".0", "")
-                                    }x speed", modifier = Modifier.drawBehind {
-                                        drawRoundRect(
-                                            color = Color.Black.copy(alpha = .5f),
-                                            cornerRadius = CornerRadius(16f, 16f)
+                                    "${playbackTimestamp.micros.microseconds}",
+                                    modifier = Modifier.padding(8.dp),
+                                    style = TextStyle(
+                                        drawStyle = Stroke(
+                                            miter = 2f,
+                                            width = 1f,
+                                            join = StrokeJoin.Round
                                         )
-                                    }.padding(8.dp),
-                                    color = Color.White
+                                    )
                                 )
                             }
-                        }
-                    }
 
-                    is PlayerState.Ready.Stopped -> RendererComponent(
-                        modifier = Modifier.fillMaxSize(),
-                        foreground = hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
-                            Foreground.Frame(frame = frame, imageScale = ImageScale.Crop)
-                        } ?: Foreground.Empty
-                    ) {
-                        Icon(Icons.Default.BrokenImage, null)
+                            if (settings.playbackSpeedFactor != 1f) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Playing on ${
+                                            settings.playbackSpeedFactor.toString().replace(".0", "")
+                                        }x speed", modifier = Modifier.drawBehind {
+                                            drawRoundRect(
+                                                color = Color.Black.copy(alpha = .5f),
+                                                cornerRadius = CornerRadius(16f, 16f)
+                                            )
+                                        }.padding(8.dp),
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     else -> Unit

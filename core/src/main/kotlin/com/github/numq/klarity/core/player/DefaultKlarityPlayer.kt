@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
+import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.settings.VideoSettings
@@ -18,9 +19,9 @@ internal class DefaultKlarityPlayer(
 
     override val playbackTimestamp = playerController.playbackTimestamp
 
-    override val renderer = playerController.renderer
-
     override val events = playerController.events
+
+    override fun attachRenderer(renderer: Renderer) = playerController.attachRenderer(renderer)
 
     override suspend fun changeSettings(
         settings: PlayerSettings,
@@ -52,8 +53,7 @@ internal class DefaultKlarityPlayer(
             width = videoSettings.width,
             height = videoSettings.height,
             frameRate = videoSettings.frameRate,
-            hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates,
-            loadPreview = videoSettings.loadPreview
+            hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates
         )
     ).recoverCatching { t ->
         if (t !is CancellationException) {

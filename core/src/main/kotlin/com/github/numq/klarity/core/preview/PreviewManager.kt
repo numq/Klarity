@@ -3,10 +3,9 @@ package com.github.numq.klarity.core.preview
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.renderer.RendererFactory
 
 interface PreviewManager {
-    val renderer: Renderer
+    fun attachRenderer(renderer: Renderer)
 
     suspend fun preview(
         timestampMillis: Long,
@@ -32,13 +31,7 @@ interface PreviewManager {
                     hardwareAccelerationCandidates = hardwareAccelerationCandidates
                 )
             ).mapCatching { decoder ->
-                DefaultPreviewManager(
-                    videoDecoder = decoder, renderer = RendererFactory().create(
-                        parameters = RendererFactory.Parameters(
-                            format = decoder.media.format, preview = null
-                        )
-                    ).getOrThrow()
-                )
+                DefaultPreviewManager(videoDecoder = decoder)
             }.getOrThrow()
         }
     }

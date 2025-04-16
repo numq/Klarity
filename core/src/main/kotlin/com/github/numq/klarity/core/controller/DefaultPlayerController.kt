@@ -19,7 +19,6 @@ import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.renderer.RendererFactory
 import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
@@ -29,7 +28,6 @@ import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.milliseconds
@@ -42,12 +40,22 @@ internal class DefaultPlayerController(
     private val videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
     private val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
     private val playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-    private val samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>,
-    private val rendererFactory: Factory<RendererFactory.Parameters, Renderer>,
+    private val samplerFactory: SuspendFactory<SamplerFactory.Parameters, Sampler>
 ) : PlayerController {
     companion object {
         const val MIN_AUDIO_BUFFER_SIZE = 1
         const val MIN_VIDEO_BUFFER_SIZE = 1
+    }
+
+    /**
+     * Renderer
+     */
+
+    @Volatile
+    private var renderer: Renderer? = null
+
+    override fun attachRenderer(renderer: Renderer) {
+        this.renderer = renderer
     }
 
     /**
@@ -70,30 +78,15 @@ internal class DefaultPlayerController(
         setPlaybackSpeed(factor = settings.playbackSpeedFactor).getOrDefault(Unit)
     }
 
-    private suspend fun Renderer.applySettings(settings: PlayerSettings) {
-        setPlaybackSpeed(factor = settings.playbackSpeedFactor).getOrDefault(Unit)
-    }
-
     private suspend fun applySettings(pipeline: Pipeline, settings: PlayerSettings) = runCatching {
         when (pipeline) {
-            is Pipeline.AudioVideo -> {
-                pipeline.sampler.applySettings(settings)
-                pipeline.renderer.applySettings(settings)
-            }
+            is Pipeline.AudioVideo -> pipeline.sampler.applySettings(settings)
 
             is Pipeline.Audio -> pipeline.sampler.applySettings(settings)
 
-            is Pipeline.Video -> pipeline.renderer.applySettings(settings)
+            is Pipeline.Video -> Unit
         }
     }
-
-    /**
-     * Renderer
-     */
-
-    private val _renderer = MutableStateFlow<Renderer?>(null)
-
-    override val renderer = _renderer.asStateFlow()
 
     /**
      * State
@@ -102,6 +95,18 @@ internal class DefaultPlayerController(
     private var internalState: InternalPlayerState = InternalPlayerState.Empty
 
     override val state = MutableStateFlow<PlayerState>(PlayerState.Empty)
+
+    private suspend fun withInternalState(
+        onEmpty: (suspend InternalPlayerState.Empty.() -> Unit)? = null,
+        onPreparing: (suspend InternalPlayerState.Preparing.() -> Unit)? = null,
+        onReady: (suspend InternalPlayerState.Ready.() -> Unit)? = null
+    ) = when (val state = internalState) {
+        is InternalPlayerState.Empty -> onEmpty?.invoke(state)
+
+        is InternalPlayerState.Preparing -> onPreparing?.invoke(state)
+
+        is InternalPlayerState.Ready -> onReady?.invoke(state)
+    }
 
     private suspend fun updateState(newState: InternalPlayerState) {
         if (internalState == newState) return
@@ -172,11 +177,7 @@ internal class DefaultPlayerController(
     private suspend fun handleException(throwable: Throwable) {
         events.emit(PlayerEvent.Error((throwable as? Exception) ?: Exception(throwable)))
 
-        handleRelease()
-    }
-
-    private suspend fun handleBufferWaiting() {
-        events.emit(PlayerEvent.Buffer.Waiting)
+        (internalState as? InternalPlayerState.Ready)?.handleRelease()
     }
 
     /**
@@ -209,22 +210,20 @@ internal class DefaultPlayerController(
      * Command
      */
 
-    private val executionMutex = Mutex()
+    private val commandMutex = Mutex()
 
-    private val executionScope = CoroutineScope(Dispatchers.Default)
+    private val commandScope = CoroutineScope(Dispatchers.Default)
 
-    private var executionJob: Job? = null
+    private var commandJob: Job? = null
 
-    private suspend fun executeMediaCommand(
-        command: suspend () -> Unit,
-    ) = executionMutex.withLock {
-        command()
-    }
+    private suspend fun executeMediaCommand(command: suspend () -> Unit) = commandMutex.withLock { command() }
 
-    private suspend fun executePlaybackCommand(
+    private suspend fun InternalPlayerState.Ready.executePlaybackCommand(
         command: suspend InternalPlayerState.Ready.() -> Unit,
-    ) = executionMutex.withLock {
+    ) = commandMutex.withLock {
         check(internalState is InternalPlayerState.Ready) { "Unable to execute playback command" }
+
+        updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
 
         when (val currentInternalState = internalState) {
             is InternalPlayerState.Ready -> if (currentInternalState.media.durationMicros > 0L) {
@@ -244,8 +243,7 @@ internal class DefaultPlayerController(
         width: Int?,
         height: Int?,
         frameRate: Double?,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-        loadPreview: Boolean,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
@@ -291,20 +289,7 @@ internal class DefaultPlayerController(
                     parameters = VideoBufferFactory.Parameters(capacity = videoBufferSize)
                 ).getOrThrow()
 
-                val renderer = rendererFactory.create(
-                    parameters = RendererFactory.Parameters(
-                        format = format,
-                        preview = if (loadPreview) {
-                            decoder.decode().onSuccess {
-                                decoder.reset().getOrThrow()
-                            }.getOrNull() as? Frame.Video.Content
-                        } else null
-                    )
-                ).getOrThrow()
-
-                _renderer.emit(renderer)
-
-                Pipeline.Video(media = media, decoder = decoder, buffer = buffer, renderer = renderer)
+                Pipeline.Video(media = media, decoder = decoder, buffer = buffer)
             }
 
             is Media.AudioVideo -> with(media) {
@@ -341,27 +326,13 @@ internal class DefaultPlayerController(
                     parameters = VideoBufferFactory.Parameters(capacity = videoBufferSize)
                 ).getOrThrow()
 
-                val renderer = rendererFactory.create(
-                    parameters = RendererFactory.Parameters(
-                        format = videoFormat,
-                        preview = if (loadPreview) {
-                            videoDecoder.decode().onSuccess {
-                                videoDecoder.reset().getOrThrow()
-                            }.getOrNull() as? Frame.Video.Content
-                        } else null
-                    )
-                ).getOrThrow()
-
-                _renderer.emit(renderer)
-
                 Pipeline.AudioVideo(
                     media = media,
                     audioDecoder = audioDecoder,
                     videoDecoder = videoDecoder,
                     audioBuffer = audioBuffer,
                     videoBuffer = videoBuffer,
-                    sampler = sampler,
-                    renderer = renderer
+                    sampler = sampler
                 )
             }
         }
@@ -373,7 +344,11 @@ internal class DefaultPlayerController(
         ).getOrThrow()
 
         val playbackLoop = playbackLoopFactory.create(
-            parameters = PlaybackLoopFactory.Parameters(bufferLoop = bufferLoop, pipeline = pipeline)
+            parameters = PlaybackLoopFactory.Parameters(
+                pipeline = pipeline,
+                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
+                getRenderer = { renderer }
+            )
         ).getOrThrow()
 
         updateState(
@@ -387,9 +362,7 @@ internal class DefaultPlayerController(
         )
     }
 
-    private suspend fun handlePlay() = executePlaybackCommand {
-        updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
-
+    private suspend fun InternalPlayerState.Ready.handlePlay() = executePlaybackCommand {
         when (val pipeline = pipeline) {
             is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
 
@@ -407,16 +380,13 @@ internal class DefaultPlayerController(
         bufferLoop.start(
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onWaiting = ::handleBufferWaiting,
             endOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
 
-    private suspend fun handlePause() = executePlaybackCommand {
-        updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
-
+    private suspend fun InternalPlayerState.Ready.handlePause() = executePlaybackCommand {
         playbackLoop.stop().getOrThrow()
 
         when (val pipeline = pipeline) {
@@ -430,9 +400,7 @@ internal class DefaultPlayerController(
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))
     }
 
-    private suspend fun handleResume() = executePlaybackCommand {
-        updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
-
+    private suspend fun InternalPlayerState.Ready.handleResume() = executePlaybackCommand {
         when (val pipeline = pipeline) {
             is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
 
@@ -450,9 +418,7 @@ internal class DefaultPlayerController(
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
 
-    private suspend fun handleStop() = executePlaybackCommand {
-        updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
-
+    private suspend fun InternalPlayerState.Ready.handleStop() = executePlaybackCommand {
         playbackLoop.stop().getOrThrow()
 
         bufferLoop.stop().getOrThrow()
@@ -460,7 +426,6 @@ internal class DefaultPlayerController(
         when (val pipeline = pipeline) {
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
-                renderer.reset().getOrThrow()
                 audioBuffer.flush().getOrThrow()
                 videoBuffer.flush().getOrThrow()
                 audioDecoder.reset().getOrThrow()
@@ -474,17 +439,16 @@ internal class DefaultPlayerController(
             }
 
             is Pipeline.Video -> with(pipeline) {
-                renderer.reset().getOrThrow()
                 buffer.flush().getOrThrow()
                 decoder.reset().getOrThrow()
             }
         }
 
         joinAll(
-            executionScope.launch {
+            commandScope.launch {
                 bufferTimestamp.emit(Timestamp.ZERO)
             },
-            executionScope.launch {
+            commandScope.launch {
                 playbackTimestamp.emit(Timestamp.ZERO)
             }
         )
@@ -492,9 +456,10 @@ internal class DefaultPlayerController(
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.STOPPED))
     }
 
-    private suspend fun handleSeekTo(millis: Long, keyFramesOnly: Boolean) = executePlaybackCommand {
-        updateState(updateStatus(status = InternalPlayerState.Ready.Status.SEEKING))
-
+    private suspend fun InternalPlayerState.Ready.handleSeekTo(
+        millis: Long,
+        keyFramesOnly: Boolean
+    ) = executePlaybackCommand {
         playbackLoop.stop().getOrThrow()
 
         bufferLoop.stop().getOrThrow()
@@ -506,29 +471,42 @@ internal class DefaultPlayerController(
                 audioBuffer.flush().getOrThrow()
 
                 videoBuffer.flush().getOrThrow()
-
-                audioDecoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
-                ).getOrThrow()
-
-                videoDecoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
-                ).getOrThrow()
             }
 
             is Pipeline.Audio -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
                 buffer.flush().getOrThrow()
+            }
 
+            is Pipeline.Video -> pipeline.buffer.flush().getOrThrow()
+        }
+
+        updateState(updateStatus(status = InternalPlayerState.Ready.Status.SEEKING))
+
+        when (val pipeline = pipeline) {
+            is Pipeline.AudioVideo -> with(pipeline) {
+                joinAll(
+                    commandScope.launch {
+                        audioDecoder.seekTo(
+                            micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                        ).getOrThrow()
+                    },
+                    commandScope.launch {
+                        videoDecoder.seekTo(
+                            micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                        ).getOrThrow()
+                    }
+                )
+            }
+
+            is Pipeline.Audio -> with(pipeline) {
                 decoder.seekTo(
                     micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
-                buffer.flush().getOrThrow()
-
                 decoder.seekTo(
                     micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
@@ -538,43 +516,36 @@ internal class DefaultPlayerController(
         bufferLoop.start(
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onWaiting = ::handleBufferWaiting,
             endOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))
     }
 
-    private suspend fun handleRelease() = executeMediaCommand {
-        when (val currentInternalState = internalState) {
-            is InternalPlayerState.Ready -> {
-                updateState(currentInternalState.updateStatus(status = InternalPlayerState.Ready.Status.RELEASING))
+    private suspend fun InternalPlayerState.Ready.handleRelease() = executeMediaCommand {
+        updateState(updateStatus(status = InternalPlayerState.Ready.Status.RELEASING))
 
-                with(currentInternalState) {
-                    playbackLoop.close().getOrThrow()
-                    bufferLoop.close().getOrThrow()
-                    pipeline.close().getOrThrow()
-                }
+        playbackLoop.close().getOrThrow()
 
-                joinAll(
-                    executionScope.launch {
-                        bufferTimestamp.emit(Timestamp.ZERO)
-                    },
-                    executionScope.launch {
-                        playbackTimestamp.emit(Timestamp.ZERO)
-                    }
-                )
+        bufferLoop.close().getOrThrow()
 
-                updateState(InternalPlayerState.Empty)
+        pipeline.close().getOrThrow()
+
+        joinAll(
+            commandScope.launch {
+                bufferTimestamp.emit(Timestamp.ZERO)
+            },
+            commandScope.launch {
+                playbackTimestamp.emit(Timestamp.ZERO)
             }
+        )
 
-            else -> return@executeMediaCommand
-        }
+        updateState(InternalPlayerState.Empty)
     }
 
     override val events = MutableSharedFlow<PlayerEvent>()
 
-    override suspend fun changeSettings(newSettings: PlayerSettings) = executionMutex.withLock {
+    override suspend fun changeSettings(newSettings: PlayerSettings) = commandMutex.withLock {
         runCatching {
             (internalState as? InternalPlayerState.Ready)?.run {
                 applySettings(pipeline, newSettings).getOrThrow()
@@ -584,7 +555,7 @@ internal class DefaultPlayerController(
         }
     }
 
-    override suspend fun resetSettings() = executionMutex.withLock {
+    override suspend fun resetSettings() = commandMutex.withLock {
         runCatching {
             val newSettings = initialSettings ?: defaultSettings
 
@@ -595,10 +566,10 @@ internal class DefaultPlayerController(
     override suspend fun execute(command: Command) = runCatching {
         val status = (internalState as? InternalPlayerState.Ready)?.status
 
-        when (command) {
-            is Command.Prepare -> if (internalState is InternalPlayerState.Empty) {
-                with(command) {
-                    executionScope.launch {
+        commandJob = commandScope.launch {
+            when (command) {
+                is Command.Prepare -> withInternalState(onEmpty = {
+                    with(command) {
                         handlePrepare(
                             location = location,
                             audioBufferSize = audioBufferSize,
@@ -608,76 +579,65 @@ internal class DefaultPlayerController(
                             width = width,
                             height = height,
                             frameRate = frameRate,
-                            hardwareAccelerationCandidates = hardwareAccelerationCandidates,
-                            loadPreview = loadPreview
+                            hardwareAccelerationCandidates = hardwareAccelerationCandidates
                         )
-                    }.also { job ->
-                        executionJob = job
-                    }.join()
-                }
-            }
+                    }
+                })
 
-            is Command.Play -> if (status == InternalPlayerState.Ready.Status.STOPPED) {
-                executionScope.launch {
-                    handlePlay()
-                }.also { job ->
-                    executionJob = job
-                }.join()
-            }
-
-            is Command.Pause -> if (status == InternalPlayerState.Ready.Status.PLAYING) {
-                executionScope.launch {
-                    handlePause()
-                }.also { job ->
-                    executionJob = job
-                }.join()
-            }
-
-            is Command.Resume -> if (status == InternalPlayerState.Ready.Status.PAUSED) {
-                executionScope.launch {
-                    handleResume()
-                }.also { job ->
-                    executionJob = job
-                }.join()
-            }
-
-            is Command.Stop -> if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
-                if (status == InternalPlayerState.Ready.Status.SEEKING) {
-                    executionJob?.cancelAndJoin()
+                is Command.Play -> withInternalState {
+                    if (status == InternalPlayerState.Ready.Status.STOPPED) {
+                        handlePlay()
+                    }
                 }
 
-                executionScope.launch {
-                    handleStop()
-                }.also { job ->
-                    executionJob = job
-                }.join()
-            }
-
-            is Command.SeekTo -> if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.STOPPED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
-                if (status == InternalPlayerState.Ready.Status.SEEKING) {
-                    executionJob?.cancelAndJoin()
+                is Command.Pause -> withInternalState {
+                    if (status == InternalPlayerState.Ready.Status.PLAYING) {
+                        handlePause()
+                    }
                 }
 
-                executionScope.launch {
-                    handleSeekTo(millis = command.millis, keyFramesOnly = command.keyFramesOnly)
-                }.also { job ->
-                    executionJob = job
-                }.join()
+                is Command.Resume -> withInternalState {
+                    if (status == InternalPlayerState.Ready.Status.PAUSED) {
+                        handleResume()
+                    }
+                }
+
+                is Command.Stop -> withInternalState {
+                    if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
+                        if (status == InternalPlayerState.Ready.Status.SEEKING) {
+                            commandJob?.cancelAndJoin()
+                        }
+
+                        handleStop()
+                    }
+                }
+
+                is Command.SeekTo -> withInternalState {
+                    if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.STOPPED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
+                        if (status == InternalPlayerState.Ready.Status.SEEKING) {
+                            commandJob?.cancelAndJoin()
+                        }
+
+                        handleSeekTo(millis = command.millis, keyFramesOnly = command.keyFramesOnly)
+                    }
+                }
+
+                is Command.Release -> withInternalState {
+                    commandJob?.cancelAndJoin()
+
+                    commandJob = null
+
+                    handleRelease()
+                }
             }
-
-            is Command.Release -> if (internalState is InternalPlayerState.Preparing || internalState is InternalPlayerState.Ready) {
-                executionJob?.cancel()
-
-                executionJob = null
-
-                handleRelease()
-            }
+        }.also {
+            it.join()
         }
     }
 
-    override suspend fun close() = executionMutex.withLock {
+    override suspend fun close() = commandMutex.withLock {
         runCatching {
-            executionScope.cancel()
+            commandScope.cancel()
 
             when (val currentState = internalState) {
                 is InternalPlayerState.Empty,

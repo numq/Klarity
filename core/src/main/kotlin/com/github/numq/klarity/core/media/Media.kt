@@ -10,14 +10,6 @@ sealed interface Media {
 
     val durationMicros: Long
 
-    data class AudioVideo(
-        override val id: Long,
-        override val location: String,
-        override val durationMicros: Long,
-        val audioFormat: AudioFormat,
-        val videoFormat: VideoFormat,
-    ) : Media
-
     data class Audio(
         override val id: Long,
         override val location: String,
@@ -30,5 +22,13 @@ sealed interface Media {
         override val location: String,
         override val durationMicros: Long,
         val format: VideoFormat,
+    ) : Media
+
+    data class AudioVideo(
+        override val id: Long,
+        override val location: String,
+        override val durationMicros: Long,
+        val audioFormat: AudioFormat,
+        val videoFormat: VideoFormat,
     ) : Media
 }
