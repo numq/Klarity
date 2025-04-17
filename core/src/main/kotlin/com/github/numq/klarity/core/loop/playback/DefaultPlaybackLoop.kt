@@ -28,8 +28,70 @@ internal class DefaultPlaybackLoop(
 
     private val isPlaying = AtomicBoolean(false)
 
-    private suspend fun handleMediaPlayback(
+    private suspend fun handleAudioPlayback(
+        buffer: Buffer<Frame.Audio>,
+        sampler: Sampler,
+        onTimestamp: suspend (Timestamp) -> Unit,
+    ) {
+        while (currentCoroutineContext().isActive && isPlaying.get()) {
+            when (val frame = buffer.poll().getOrThrow()) {
+                is Frame.Audio.Content -> {
+                    sampler.play(bytes = frame.bytes).getOrThrow()
+
+                    onTimestamp(Timestamp(micros = frame.timestampMicros))
+                }
+
+                is Frame.Audio.EndOfStream -> break
+            }
+        }
+    }
+
+    private suspend fun handleVideoPlayback(
         media: Media,
+        buffer: Buffer<Frame.Video>,
+        onTimestamp: suspend (Timestamp) -> Unit,
+    ) {
+        var lastFrameTimestamp = Duration.INFINITE
+
+        while (currentCoroutineContext().isActive && isPlaying.get()) {
+            when (val frame = buffer.poll().getOrThrow()) {
+                is Frame.Video.Content -> {
+                    if (lastFrameTimestamp.isInfinite()) {
+                        lastFrameTimestamp = frame.timestampMicros.microseconds
+                    }
+
+                    val startPlaybackTime = System.nanoTime().nanoseconds
+
+                    while (currentCoroutineContext().isActive && isPlaying.get()) {
+                        if ((System.nanoTime().nanoseconds - startPlaybackTime) * getPlaybackSpeedFactor() > frame.timestampMicros.microseconds - lastFrameTimestamp) {
+                            break
+                        }
+
+                        delay(10L)
+                    }
+
+                    currentCoroutineContext().ensureActive()
+
+                    getRenderer()?.render(frame)
+
+                    onTimestamp(Timestamp(micros = frame.timestampMicros))
+
+                    lastFrameTimestamp = frame.timestampMicros.microseconds
+                }
+
+                is Frame.Video.EndOfStream -> {
+                    if (lastFrameTimestamp.isFinite()) {
+                        delay((media.durationMicros.microseconds - lastFrameTimestamp) / getPlaybackSpeedFactor())
+                    }
+
+                    break
+                }
+            }
+        }
+    }
+
+    private suspend fun handleMediaPlayback(
+        media: Media.AudioVideo,
         audioBuffer: Buffer<Frame.Audio>,
         videoBuffer: Buffer<Frame.Video>,
         sampler: Sampler,
@@ -107,72 +169,10 @@ internal class DefaultPlaybackLoop(
         joinAll(audioJob, videoJob)
     }
 
-    private suspend fun handleAudioPlayback(
-        buffer: Buffer<Frame.Audio>,
-        sampler: Sampler,
-        onTimestamp: suspend (Timestamp) -> Unit,
-    ) {
-        while (currentCoroutineContext().isActive && isPlaying.get()) {
-            when (val frame = buffer.poll().getOrThrow()) {
-                is Frame.Audio.Content -> {
-                    sampler.play(bytes = frame.bytes).getOrThrow()
-
-                    onTimestamp(Timestamp(micros = frame.timestampMicros))
-                }
-
-                is Frame.Audio.EndOfStream -> break
-            }
-        }
-    }
-
-    private suspend fun handleVideoPlayback(
-        media: Media,
-        buffer: Buffer<Frame.Video>,
-        onTimestamp: suspend (Timestamp) -> Unit,
-    ) {
-        var lastFrameTimestamp = Duration.INFINITE
-
-        while (currentCoroutineContext().isActive && isPlaying.get()) {
-            when (val frame = buffer.poll().getOrThrow()) {
-                is Frame.Video.Content -> {
-                    if (lastFrameTimestamp.isInfinite()) {
-                        lastFrameTimestamp = frame.timestampMicros.microseconds
-                    }
-
-                    val startPlaybackTime = System.nanoTime().nanoseconds
-
-                    while (currentCoroutineContext().isActive && isPlaying.get()) {
-                        if ((System.nanoTime().nanoseconds - startPlaybackTime) * getPlaybackSpeedFactor() > frame.timestampMicros.microseconds - lastFrameTimestamp) {
-                            break
-                        }
-
-                        delay(10L)
-                    }
-
-                    currentCoroutineContext().ensureActive()
-
-                    getRenderer()?.render(frame)
-
-                    onTimestamp(Timestamp(micros = frame.timestampMicros))
-
-                    lastFrameTimestamp = frame.timestampMicros.microseconds
-                }
-
-                is Frame.Video.EndOfStream -> {
-                    if (lastFrameTimestamp.isFinite()) {
-                        delay((media.durationMicros.microseconds - lastFrameTimestamp) / getPlaybackSpeedFactor())
-                    }
-
-                    break
-                }
-            }
-        }
-    }
-
     override suspend fun start(
         onException: suspend (PlaybackLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
-        endOfMedia: suspend () -> Unit,
+        onEndOfMedia: suspend () -> Unit,
     ) = mutex.withLock {
         runCatching {
             check(!isPlaying.get()) { "Unable to start playback loop, call stop first." }
@@ -191,15 +191,6 @@ internal class DefaultPlaybackLoop(
                 try {
                     with(pipeline) {
                         when (this) {
-                            is Pipeline.AudioVideo -> handleMediaPlayback(
-                                media = media,
-                                audioBuffer = audioBuffer,
-                                videoBuffer = videoBuffer,
-                                sampler = sampler,
-                                onAudioTimestamp = onTimestamp,
-                                onVideoTimestamp = onTimestamp,
-                            )
-
                             is Pipeline.Audio -> handleAudioPlayback(
                                 buffer = buffer, sampler = sampler, onTimestamp = onTimestamp
                             )
@@ -207,12 +198,37 @@ internal class DefaultPlaybackLoop(
                             is Pipeline.Video -> handleVideoPlayback(
                                 media = media, buffer = buffer, onTimestamp = onTimestamp
                             )
+
+                            is Pipeline.AudioVideo -> {
+                                var lastTimestampMicros = 0L
+
+                                handleMediaPlayback(
+                                    media = media,
+                                    audioBuffer = audioBuffer,
+                                    videoBuffer = videoBuffer,
+                                    sampler = sampler,
+                                    onAudioTimestamp = { audioTimestamp ->
+                                        if (audioTimestamp.micros > lastTimestampMicros) {
+                                            onTimestamp(audioTimestamp)
+
+                                            lastTimestampMicros = audioTimestamp.micros
+                                        }
+                                    },
+                                    onVideoTimestamp = { videoTimestamp ->
+                                        if (videoTimestamp.micros > lastTimestampMicros) {
+                                            onTimestamp(videoTimestamp)
+
+                                            lastTimestampMicros = videoTimestamp.micros
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
 
                     currentCoroutineContext().ensureActive()
 
-                    endOfMedia()
+                    onEndOfMedia()
                 } catch (t: Throwable) {
                     throw t
                 } finally {

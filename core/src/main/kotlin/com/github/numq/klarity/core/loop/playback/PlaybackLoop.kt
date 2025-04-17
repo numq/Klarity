@@ -8,7 +8,7 @@ interface PlaybackLoop {
     suspend fun start(
         onException: suspend (PlaybackLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
-        endOfMedia: suspend () -> Unit,
+        onEndOfMedia: suspend () -> Unit,
     ): Result<Unit>
 
     suspend fun stop(): Result<Unit>

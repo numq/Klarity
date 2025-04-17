@@ -215,7 +215,7 @@ internal class DefaultPlayerController(
 
     private val commandMutex = Mutex()
 
-    private val commandScope = CoroutineScope(Dispatchers.Default)
+    private val commandScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var commandJob: Job? = null
 
@@ -377,13 +377,13 @@ internal class DefaultPlayerController(
         playbackLoop.start(
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            endOfMedia = { handlePlaybackCompletion() }
+            onEndOfMedia = { handlePlaybackCompletion() }
         ).getOrThrow()
 
         bufferLoop.start(
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            endOfMedia = { handleBufferCompletion() }
+            onEndOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
@@ -415,7 +415,7 @@ internal class DefaultPlayerController(
         playbackLoop.start(
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            endOfMedia = { handlePlaybackCompletion() }
+            onEndOfMedia = { handlePlaybackCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
@@ -519,7 +519,7 @@ internal class DefaultPlayerController(
         bufferLoop.start(
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            endOfMedia = { handleBufferCompletion() }
+            onEndOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))

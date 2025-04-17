@@ -68,7 +68,7 @@ internal class DefaultBufferLoop(
     override suspend fun start(
         onException: suspend (BufferLoopException) -> Unit,
         onTimestamp: suspend (Timestamp) -> Unit,
-        endOfMedia: suspend () -> Unit,
+        onEndOfMedia: suspend () -> Unit,
     ) = mutex.withLock {
         runCatching {
             check(!isBuffering) { "Unable to start buffer loop, call stop first." }
@@ -86,25 +86,6 @@ internal class DefaultBufferLoop(
             job = coroutineScope.launch(context = coroutineExceptionHandler) {
                 try {
                     when (pipeline) {
-                        is Pipeline.AudioVideo -> with(pipeline) {
-                            joinAll(
-                                launch {
-                                    handleAudioBuffer(
-                                        decoder = audioDecoder,
-                                        buffer = audioBuffer,
-                                        onTimestamp = onTimestamp
-                                    )
-                                },
-                                launch {
-                                    handleVideoBuffer(
-                                        decoder = videoDecoder,
-                                        buffer = videoBuffer,
-                                        onTimestamp = onTimestamp
-                                    )
-                                }
-                            )
-                        }
-
                         is Pipeline.Audio -> with(pipeline) {
                             handleAudioBuffer(
                                 decoder = decoder,
@@ -120,11 +101,44 @@ internal class DefaultBufferLoop(
                                 onTimestamp = onTimestamp
                             )
                         }
+
+                        is Pipeline.AudioVideo -> with(pipeline) {
+                            var lastTimestampMicros = 0L
+
+                            joinAll(
+                                launch {
+                                    handleAudioBuffer(
+                                        decoder = audioDecoder,
+                                        buffer = audioBuffer,
+                                        onTimestamp = { audioTimestamp ->
+                                            if (audioTimestamp.micros > lastTimestampMicros) {
+                                                onTimestamp(audioTimestamp)
+
+                                                lastTimestampMicros = audioTimestamp.micros
+                                            }
+                                        }
+                                    )
+                                },
+                                launch {
+                                    handleVideoBuffer(
+                                        decoder = videoDecoder,
+                                        buffer = videoBuffer,
+                                        onTimestamp = { videoTimestamp ->
+                                            if (videoTimestamp.micros > lastTimestampMicros) {
+                                                onTimestamp(videoTimestamp)
+
+                                                lastTimestampMicros = videoTimestamp.micros
+                                            }
+                                        }
+                                    )
+                                }
+                            )
+                        }
                     }
 
                     currentCoroutineContext().ensureActive()
 
-                    endOfMedia()
+                    onEndOfMedia()
                 } catch (t: Throwable) {
                     throw t
                 } finally {

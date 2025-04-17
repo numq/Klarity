@@ -27,7 +27,7 @@ fun RendererComponent(
 ) {
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val rendererContext = remember(foreground.renderer.format) {
+            val rendererContext = remember(foreground.renderer) {
                 RendererContext.create(foreground.renderer)
             }
 
