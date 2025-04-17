@@ -14,8 +14,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.withSave
-import org.jetbrains.skia.FilterBlurMode
-import org.jetbrains.skia.MaskFilter
+import org.jetbrains.skia.FilterTileMode
+import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Surface
 import org.jetbrains.skia.Paint as SkPaint
 
@@ -27,7 +27,7 @@ fun RendererComponent(
 ) {
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val rendererContext = remember(foreground.renderer) {
+            val rendererContext = remember(foreground.renderer.format) {
                 RendererContext.create(foreground.renderer)
             }
 
@@ -132,9 +132,10 @@ private fun DrawScope.drawBackground(
                 canvas.scale(backgroundSize.width / surface.width, backgroundSize.height / surface.height)
 
                 surface.draw(canvas.nativeCanvas, 0, 0, SkPaint().apply {
-                    maskFilter = MaskFilter.makeBlur(
-                        mode = FilterBlurMode.NORMAL,
-                        sigma = background.sigma
+                    imageFilter = ImageFilter.makeBlur(
+                        sigmaX = background.sigma,
+                        sigmaY = background.sigma,
+                        mode = FilterTileMode.CLAMP
                     )
                 })
             }

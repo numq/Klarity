@@ -39,7 +39,7 @@ sealed interface Background {
      * @property imageScale The video frame scaling method (default is [ImageScale.Crop]).
      */
     data class Blur(
-        val sigma: Float = 2f,
+        val sigma: Float = 8f,
         override val imageScale: ImageScale = ImageScale.Crop,
     ) : Background
 }
