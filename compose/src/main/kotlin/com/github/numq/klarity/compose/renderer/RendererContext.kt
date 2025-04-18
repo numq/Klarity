@@ -5,16 +5,10 @@ import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.*
 import java.io.Closeable
 
-interface RendererContext : Closeable {
+internal interface RendererContext : Closeable {
     val generationId: StateFlow<Int>
 
-    val bitmap: Bitmap
-
-    val surface: Surface
-
     fun withSurface(callback: (Surface) -> Unit)
-
-    fun withBitmap(callback: (Bitmap) -> Unit)
 
     fun draw(pixels: ByteArray)
 
@@ -37,7 +31,12 @@ interface RendererContext : Closeable {
 
             val surface = Surface.makeRaster(bitmap.imageInfo)
 
-            return SkiaRendererContext(renderer = renderer, imageInfo = imageInfo, bitmap = bitmap, surface = surface)
+            return SkiaRendererContext(
+                renderer = renderer,
+                imageInfo = imageInfo,
+                bitmap = bitmap,
+                surface = surface
+            )
         }
     }
 }

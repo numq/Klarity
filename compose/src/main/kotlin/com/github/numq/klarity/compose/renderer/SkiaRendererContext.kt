@@ -11,8 +11,8 @@ import org.jetbrains.skia.Surface
 internal class SkiaRendererContext(
     renderer: Renderer,
     private val imageInfo: ImageInfo,
-    override val bitmap: Bitmap,
-    override val surface: Surface,
+    private val bitmap: Bitmap,
+    private val surface: Surface,
 ) : RendererContext {
     init {
         renderer.onRender { frame ->
@@ -20,41 +20,41 @@ internal class SkiaRendererContext(
         }
     }
 
+    private val lock = Any()
+
     private val _generationId = MutableStateFlow(0)
 
     override val generationId = _generationId.asStateFlow()
 
-    override fun withSurface(callback: (Surface) -> Unit) {
+    override fun withSurface(callback: (Surface) -> Unit) = synchronized(lock) {
         if (!surface.isClosed) {
             callback(surface)
         }
     }
 
-    override fun withBitmap(callback: (Bitmap) -> Unit) {
+    override fun draw(pixels: ByteArray) = synchronized(lock) {
+        when {
+            surface.isClosed || bitmap.isClosed || pixels.size < bitmap.computeByteSize() -> return
+
+            bitmap.installPixels(imageInfo, pixels, imageInfo.minRowBytes) -> {
+                surface.notifyContentWillChange(ContentChangeMode.DISCARD)
+
+                surface.writePixels(bitmap, 0, 0)
+
+                surface.flushAndSubmit()
+
+                _generationId.value = surface.generationId
+            }
+        }
+    }
+
+    override fun close() = synchronized(lock) {
         if (!bitmap.isClosed) {
-            callback(bitmap)
-        }
-    }
-
-    override fun draw(pixels: ByteArray) {
-        if (bitmap.isClosed || surface.isClosed) {
-            return
+            bitmap.close()
         }
 
-        if (bitmap.installPixels(imageInfo, pixels, imageInfo.minRowBytes)) {
-            surface.notifyContentWillChange(ContentChangeMode.DISCARD)
-
-            surface.writePixels(bitmap, 0, 0)
-
-            surface.flushAndSubmit()
-
-            _generationId.value = surface.generationId
+        if (!surface.isClosed) {
+            surface.close()
         }
-    }
-
-    override fun close() {
-        bitmap.close()
-
-        surface.close()
     }
 }
