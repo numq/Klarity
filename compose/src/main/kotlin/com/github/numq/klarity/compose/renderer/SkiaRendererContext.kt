@@ -16,7 +16,7 @@ internal class SkiaRendererContext(
 ) : RendererContext {
     init {
         renderer.onRender { frame ->
-            draw(frame.bytes)
+            render(frame.bytes)
         }
     }
 
@@ -32,7 +32,7 @@ internal class SkiaRendererContext(
         }
     }
 
-    override fun draw(pixels: ByteArray) = synchronized(lock) {
+    override fun render(pixels: ByteArray) = synchronized(lock) {
         when {
             surface.isClosed || bitmap.isClosed || pixels.size < bitmap.computeByteSize() -> return
 

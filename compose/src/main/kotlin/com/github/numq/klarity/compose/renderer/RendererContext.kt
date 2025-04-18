@@ -10,7 +10,7 @@ internal interface RendererContext : Closeable {
 
     fun withSurface(callback: (Surface) -> Unit)
 
-    fun draw(pixels: ByteArray)
+    fun render(pixels: ByteArray)
 
     companion object {
         fun create(renderer: Renderer): RendererContext {
@@ -31,12 +31,7 @@ internal interface RendererContext : Closeable {
 
             val surface = Surface.makeRaster(bitmap.imageInfo)
 
-            return SkiaRendererContext(
-                renderer = renderer,
-                imageInfo = imageInfo,
-                bitmap = bitmap,
-                surface = surface
-            )
+            return SkiaRendererContext(renderer = renderer, imageInfo = imageInfo, bitmap = bitmap, surface = surface)
         }
     }
 }
