@@ -35,7 +35,7 @@ internal class DefaultPreviewManager(
             delay(debounceMillis)
 
             videoDecoder.seekTo(
-                micros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
+                timestampMicros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
             ).getOrThrow()
 
             (videoDecoder.decode().getOrNull() as? Frame.Video.Content)?.let { frame ->

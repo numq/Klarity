@@ -42,8 +42,8 @@ internal class DefaultPlayerController(
     private val samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
 ) : PlayerController {
     companion object {
-        const val MIN_AUDIO_BUFFER_SIZE = 1
-        const val MIN_VIDEO_BUFFER_SIZE = 1
+        const val MIN_AUDIO_BUFFER_SIZE = 100
+        const val MIN_VIDEO_BUFFER_SIZE = 100
     }
 
     /**
@@ -471,9 +471,14 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                audioBuffer.flush().getOrThrow()
-
-                videoBuffer.flush().getOrThrow()
+                joinAll(
+                    commandScope.launch {
+                        audioBuffer.flush().getOrThrow()
+                    },
+                    commandScope.launch {
+                        videoBuffer.flush().getOrThrow()
+                    }
+                )
             }
 
             is Pipeline.Audio -> with(pipeline) {
@@ -487,40 +492,60 @@ internal class DefaultPlayerController(
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.SEEKING))
 
+        var timestampAfterSeekMicros = millis.milliseconds.inWholeMicroseconds
+
         when (val pipeline = pipeline) {
             is Pipeline.AudioVideo -> with(pipeline) {
                 joinAll(
                     commandScope.launch {
                         audioDecoder.seekTo(
-                            micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                            timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                         ).getOrThrow()
                     },
                     commandScope.launch {
-                        videoDecoder.seekTo(
-                            micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                        timestampAfterSeekMicros = videoDecoder.seekTo(
+                            timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                         ).getOrThrow()
                     }
                 )
             }
 
             is Pipeline.Audio -> with(pipeline) {
-                decoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                timestampAfterSeekMicros = decoder.seekTo(
+                    timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
-                decoder.seekTo(
-                    micros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                timestampAfterSeekMicros = decoder.seekTo(
+                    timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
             }
         }
+
+        joinAll(
+            commandScope.launch {
+                bufferTimestamp.emit(Timestamp.ZERO)
+            },
+            commandScope.launch {
+                playbackTimestamp.emit(Timestamp.ZERO)
+            }
+        )
 
         bufferLoop.start(
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
             onEndOfMedia = { handleBufferCompletion() }
         ).getOrThrow()
+
+        joinAll(
+            commandScope.launch {
+                bufferTimestamp.emit(Timestamp(micros = timestampAfterSeekMicros))
+            },
+            commandScope.launch {
+                playbackTimestamp.emit(Timestamp(micros = timestampAfterSeekMicros))
+            }
+        )
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))
     }
@@ -606,22 +631,28 @@ internal class DefaultPlayerController(
                 }
 
                 is Command.Stop -> withInternalState {
-                    if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
-                        if (status == InternalPlayerState.Ready.Status.SEEKING) {
-                            commandJob?.cancelAndJoin()
-                        }
+                    when (status) {
+                        InternalPlayerState.Ready.Status.PLAYING,
+                        InternalPlayerState.Ready.Status.PAUSED,
+                        InternalPlayerState.Ready.Status.COMPLETED,
+                        InternalPlayerState.Ready.Status.SEEKING -> handleStop()
 
-                        handleStop()
+                        else -> return@withInternalState
                     }
                 }
 
                 is Command.SeekTo -> withInternalState {
-                    if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED || status == InternalPlayerState.Ready.Status.STOPPED || status == InternalPlayerState.Ready.Status.COMPLETED || status == InternalPlayerState.Ready.Status.SEEKING) {
-                        if (status == InternalPlayerState.Ready.Status.SEEKING) {
-                            commandJob?.cancelAndJoin()
-                        }
+                    when (status) {
+                        InternalPlayerState.Ready.Status.PLAYING,
+                        InternalPlayerState.Ready.Status.PAUSED,
+                        InternalPlayerState.Ready.Status.STOPPED,
+                        InternalPlayerState.Ready.Status.COMPLETED,
+                        InternalPlayerState.Ready.Status.SEEKING -> handleSeekTo(
+                            millis = command.millis,
+                            keyFramesOnly = command.keyFramesOnly
+                        )
 
-                        handleSeekTo(millis = command.millis, keyFramesOnly = command.keyFramesOnly)
+                        else -> return@withInternalState
                     }
                 }
 

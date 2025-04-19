@@ -45,7 +45,7 @@ object SnapshotManager {
                 }.map { timestampMillis ->
                     timestampMillis.milliseconds.inWholeMicroseconds
                 }.mapNotNull { timestampMicros ->
-                    decoder.seekTo(micros = timestampMicros, keyframesOnly = keyframesOnly).getOrNull()
+                    decoder.seekTo(timestampMicros = timestampMicros, keyframesOnly = keyframesOnly).getOrNull()
 
                     decoder.decode().getOrNull() as? Frame.Video.Content
                 }

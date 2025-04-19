@@ -11,7 +11,7 @@ interface Decoder<Media, Frame> {
 
     suspend fun decode(): Result<Frame>
 
-    suspend fun seekTo(micros: Long, keyframesOnly: Boolean): Result<Unit>
+    suspend fun seekTo(timestampMicros: Long, keyframesOnly: Boolean): Result<Long>
 
     suspend fun reset(): Result<Unit>
 

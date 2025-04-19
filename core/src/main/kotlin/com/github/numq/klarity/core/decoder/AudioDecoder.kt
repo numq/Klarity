@@ -22,9 +22,9 @@ internal class AudioDecoder(
         }
     }
 
-    override suspend fun seekTo(micros: Long, keyframesOnly: Boolean) = mutex.withLock {
+    override suspend fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
-            decoder.seekTo(micros, keyframesOnly)
+            decoder.seekTo(timestampMicros, keyframesOnly)
         }
     }
 
