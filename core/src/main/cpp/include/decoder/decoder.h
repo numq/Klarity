@@ -148,7 +148,7 @@ public:
 
     std::unique_ptr<VideoFrame> decodeVideo(uint8_t *buffer, uint32_t bufferSize);
 
-    void seekTo(long timestampMicros, bool keyframesOnly);
+    uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
 };
