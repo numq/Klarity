@@ -42,8 +42,8 @@ internal class DefaultPlayerController(
     private val samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
 ) : PlayerController {
     companion object {
-        const val MIN_AUDIO_BUFFER_SIZE = 100
-        const val MIN_VIDEO_BUFFER_SIZE = 100
+        const val MIN_AUDIO_BUFFER_SIZE = 1
+        const val MIN_VIDEO_BUFFER_SIZE = 1
     }
 
     /**
