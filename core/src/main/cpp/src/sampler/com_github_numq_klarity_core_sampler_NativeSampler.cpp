@@ -80,7 +80,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
                 reinterpret_cast<uint8_t *>(byteArray) + size
         );
 
-        env->ReleaseByteArrayElements(bytes, byteArray, 0);
+        env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
 
         sampler->play(samples.data(), samples.size());
     });

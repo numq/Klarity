@@ -16,7 +16,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     outputParameters.device = deviceIndex;
     outputParameters.channelCount = static_cast<int>(channels);
     outputParameters.sampleFormat = paFloat32;
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultHighOutputLatency;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 
     PaStream *rawStream = nullptr;
@@ -127,7 +127,7 @@ void Sampler::pause() {
     auto isStreamActive = Pa_IsStreamActive(stream.get());
 
     if (isStreamActive == 1) {
-        PaError err = Pa_StopStream(stream.get());
+        PaError err = Pa_AbortStream(stream.get());
 
         if (err != paNoError) {
             throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
@@ -147,7 +147,7 @@ void Sampler::stop() {
     auto isStreamActive = Pa_IsStreamActive(stream.get());
 
     if (isStreamActive == 1) {
-        PaError err = Pa_AbortStream(stream.get());
+        PaError err = Pa_StopStream(stream.get());
 
         if (err != paNoError) {
             throw SamplerException("Failed to abort PortAudio stream: " + std::string(Pa_GetErrorText(err)));
@@ -157,9 +157,11 @@ void Sampler::stop() {
     if (stretch) {
         int outputSamples = stretch->outputLatency();
 
-        std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
+        if (outputSamples > 0) {
+            std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
 
-        stretch->flush(outputBuffers, outputSamples);
+            stretch->flush(outputBuffers, outputSamples);
+        }
 
         stretch->reset();
     }
