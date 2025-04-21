@@ -23,13 +23,12 @@ import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.InternalPlayerState
 import com.github.numq.klarity.core.state.PlayerState
-import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
@@ -45,6 +44,12 @@ internal class DefaultPlayerController(
         const val MIN_AUDIO_BUFFER_SIZE = 1
         const val MIN_VIDEO_BUFFER_SIZE = 1
     }
+
+    /**
+     * Coroutines
+     */
+
+    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     /**
      * Renderer
@@ -143,32 +148,22 @@ internal class DefaultPlayerController(
      * Timestamp
      */
 
-    override val bufferTimestamp = MutableStateFlow(Timestamp.ZERO)
+    override val bufferTimestamp = MutableStateFlow(Duration.ZERO)
 
-    override val playbackTimestamp = MutableStateFlow(Timestamp.ZERO)
+    override val playbackTimestamp = MutableStateFlow(Duration.ZERO)
 
-    private suspend fun handleBufferTimestamp(timestamp: Timestamp) {
+    private suspend fun handleBufferTimestamp(timestamp: Duration) {
         (internalState as? InternalPlayerState.Ready)?.status?.let { status ->
             if (status == InternalPlayerState.Ready.Status.PLAYING || status == InternalPlayerState.Ready.Status.PAUSED) {
-                bufferTimestamp.emit(
-                    timestamp.copy(
-                        micros = timestamp.micros.coerceAtLeast(0L),
-                        millis = timestamp.millis.coerceAtLeast(0L)
-                    )
-                )
+                bufferTimestamp.emit(timestamp)
             }
         }
     }
 
-    private suspend fun handlePlaybackTimestamp(timestamp: Timestamp) {
+    private suspend fun handlePlaybackTimestamp(timestamp: Duration) {
         (internalState as? InternalPlayerState.Ready)?.status?.let { status ->
             if (status == InternalPlayerState.Ready.Status.PLAYING) {
-                playbackTimestamp.emit(
-                    timestamp.copy(
-                        micros = timestamp.micros.coerceAtLeast(0L),
-                        millis = timestamp.millis.coerceAtLeast(0L)
-                    )
-                )
+                playbackTimestamp.emit(timestamp)
             }
         }
     }
@@ -190,7 +185,7 @@ internal class DefaultPlayerController(
     private suspend fun InternalPlayerState.Ready.handleBufferCompletion() {
         bufferLoop.stop().getOrThrow()
 
-        bufferTimestamp.emit(Timestamp(micros = media.durationMicros))
+        bufferTimestamp.emit(media.duration)
 
         events.emit(PlayerEvent.Buffer.Complete)
     }
@@ -204,7 +199,7 @@ internal class DefaultPlayerController(
             is Pipeline.Video -> Unit
         }
 
-        playbackTimestamp.emit(Timestamp(micros = media.durationMicros))
+        playbackTimestamp.emit(media.duration)
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.COMPLETED))
     }
@@ -214,8 +209,6 @@ internal class DefaultPlayerController(
      */
 
     private val commandMutex = Mutex()
-
-    private val commandScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var commandJob: Job? = null
 
@@ -229,7 +222,7 @@ internal class DefaultPlayerController(
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
 
         when (val currentInternalState = internalState) {
-            is InternalPlayerState.Ready -> if (currentInternalState.media.durationMicros > 0L) {
+            is InternalPlayerState.Ready -> if (currentInternalState.media.duration.isPositive()) {
                 command(currentInternalState)
             }
 
@@ -260,9 +253,7 @@ internal class DefaultPlayerController(
             is Media.Audio -> with(media) {
                 val decoder = audioDecoderFactory.create(
                     parameters = AudioDecoderFactory.Parameters(
-                        location = location,
-                        sampleRate = sampleRate,
-                        channels = channels
+                        location = location, sampleRate = sampleRate, channels = channels
                     )
                 ).getOrThrow()
 
@@ -298,9 +289,7 @@ internal class DefaultPlayerController(
             is Media.AudioVideo -> with(media) {
                 val audioDecoder = audioDecoderFactory.create(
                     parameters = AudioDecoderFactory.Parameters(
-                        location = location,
-                        sampleRate = sampleRate,
-                        channels = channels
+                        location = location, sampleRate = sampleRate, channels = channels
                     )
                 ).getOrThrow()
 
@@ -310,8 +299,7 @@ internal class DefaultPlayerController(
 
                 val sampler = samplerFactory.create(
                     parameters = SamplerFactory.Parameters(
-                        sampleRate = audioFormat.sampleRate,
-                        channels = audioFormat.channels
+                        sampleRate = audioFormat.sampleRate, channels = audioFormat.channels
                     )
                 ).getOrThrow()
 
@@ -375,16 +363,16 @@ internal class DefaultPlayerController(
         }
 
         playbackLoop.start(
+            coroutineScope = coroutineScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            onEndOfMedia = { handlePlaybackCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
 
         bufferLoop.start(
+            coroutineScope = coroutineScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onEndOfMedia = { handleBufferCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
@@ -413,10 +401,10 @@ internal class DefaultPlayerController(
         }
 
         playbackLoop.start(
+            coroutineScope = coroutineScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            onEndOfMedia = { handlePlaybackCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
@@ -447,21 +435,17 @@ internal class DefaultPlayerController(
             }
         }
 
-        joinAll(
-            commandScope.launch {
-                bufferTimestamp.emit(Timestamp.ZERO)
-            },
-            commandScope.launch {
-                playbackTimestamp.emit(Timestamp.ZERO)
-            }
-        )
+        joinAll(coroutineScope.launch {
+            bufferTimestamp.emit(Duration.ZERO)
+        }, coroutineScope.launch {
+            playbackTimestamp.emit(Duration.ZERO)
+        })
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.STOPPED))
     }
 
     private suspend fun InternalPlayerState.Ready.handleSeekTo(
-        millis: Long,
-        keyFramesOnly: Boolean
+        timestamp: Duration, keyFramesOnly: Boolean
     ) = executePlaybackCommand {
         playbackLoop.stop().getOrThrow()
 
@@ -471,14 +455,11 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                joinAll(
-                    commandScope.launch {
-                        audioBuffer.flush().getOrThrow()
-                    },
-                    commandScope.launch {
-                        videoBuffer.flush().getOrThrow()
-                    }
-                )
+                joinAll(coroutineScope.launch {
+                    audioBuffer.flush().getOrThrow()
+                }, coroutineScope.launch {
+                    videoBuffer.flush().getOrThrow()
+                })
             }
 
             is Pipeline.Audio -> with(pipeline) {
@@ -492,60 +473,51 @@ internal class DefaultPlayerController(
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.SEEKING))
 
-        var timestampAfterSeekMicros = millis.milliseconds.inWholeMicroseconds
+        var timestampAfterSeek = timestamp
 
         when (val pipeline = pipeline) {
             is Pipeline.AudioVideo -> with(pipeline) {
-                joinAll(
-                    commandScope.launch {
-                        audioDecoder.seekTo(
-                            timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
-                        ).getOrThrow()
-                    },
-                    commandScope.launch {
-                        timestampAfterSeekMicros = videoDecoder.seekTo(
-                            timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
-                        ).getOrThrow()
-                    }
-                )
+                joinAll(coroutineScope.launch {
+                    audioDecoder.seekTo(
+                        timestamp = timestamp, keyframesOnly = keyFramesOnly
+                    ).getOrThrow()
+                }, coroutineScope.launch {
+                    timestampAfterSeek = videoDecoder.seekTo(
+                        timestamp = timestamp, keyframesOnly = keyFramesOnly
+                    ).getOrThrow()
+                })
             }
 
             is Pipeline.Audio -> with(pipeline) {
-                timestampAfterSeekMicros = decoder.seekTo(
-                    timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                timestampAfterSeek = decoder.seekTo(
+                    timestamp = timestamp, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
-                timestampAfterSeekMicros = decoder.seekTo(
-                    timestampMicros = millis.milliseconds.inWholeMicroseconds, keyframesOnly = keyFramesOnly
+                timestampAfterSeek = decoder.seekTo(
+                    timestamp = timestamp, keyframesOnly = keyFramesOnly
                 ).getOrThrow()
             }
         }
 
-        joinAll(
-            commandScope.launch {
-                bufferTimestamp.emit(Timestamp.ZERO)
-            },
-            commandScope.launch {
-                playbackTimestamp.emit(Timestamp.ZERO)
-            }
-        )
+        joinAll(coroutineScope.launch {
+            bufferTimestamp.emit(Duration.ZERO)
+        }, coroutineScope.launch {
+            playbackTimestamp.emit(Duration.ZERO)
+        })
 
         bufferLoop.start(
+            coroutineScope = coroutineScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onEndOfMedia = { handleBufferCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
 
-        joinAll(
-            commandScope.launch {
-                bufferTimestamp.emit(Timestamp(micros = timestampAfterSeekMicros))
-            },
-            commandScope.launch {
-                playbackTimestamp.emit(Timestamp(micros = timestampAfterSeekMicros))
-            }
-        )
+        joinAll(coroutineScope.launch {
+            bufferTimestamp.emit(timestampAfterSeek)
+        }, coroutineScope.launch {
+            playbackTimestamp.emit(timestampAfterSeek)
+        })
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))
     }
@@ -559,14 +531,11 @@ internal class DefaultPlayerController(
 
         pipeline.close().getOrThrow()
 
-        joinAll(
-            commandScope.launch {
-                bufferTimestamp.emit(Timestamp.ZERO)
-            },
-            commandScope.launch {
-                playbackTimestamp.emit(Timestamp.ZERO)
-            }
-        )
+        joinAll(coroutineScope.launch {
+            bufferTimestamp.emit(Duration.ZERO)
+        }, coroutineScope.launch {
+            playbackTimestamp.emit(Duration.ZERO)
+        })
 
         updateState(InternalPlayerState.Empty)
     }
@@ -594,7 +563,7 @@ internal class DefaultPlayerController(
     override suspend fun execute(command: Command) = runCatching {
         val status = (internalState as? InternalPlayerState.Ready)?.status
 
-        commandJob = commandScope.launch {
+        commandJob = coroutineScope.launch {
             when (command) {
                 is Command.Prepare -> withInternalState(onEmpty = {
                     with(command) {
@@ -632,10 +601,7 @@ internal class DefaultPlayerController(
 
                 is Command.Stop -> withInternalState {
                     when (status) {
-                        InternalPlayerState.Ready.Status.PLAYING,
-                        InternalPlayerState.Ready.Status.PAUSED,
-                        InternalPlayerState.Ready.Status.COMPLETED,
-                        InternalPlayerState.Ready.Status.SEEKING -> handleStop()
+                        InternalPlayerState.Ready.Status.PLAYING, InternalPlayerState.Ready.Status.PAUSED, InternalPlayerState.Ready.Status.COMPLETED, InternalPlayerState.Ready.Status.SEEKING -> handleStop()
 
                         else -> return@withInternalState
                     }
@@ -643,13 +609,8 @@ internal class DefaultPlayerController(
 
                 is Command.SeekTo -> withInternalState {
                     when (status) {
-                        InternalPlayerState.Ready.Status.PLAYING,
-                        InternalPlayerState.Ready.Status.PAUSED,
-                        InternalPlayerState.Ready.Status.STOPPED,
-                        InternalPlayerState.Ready.Status.COMPLETED,
-                        InternalPlayerState.Ready.Status.SEEKING -> handleSeekTo(
-                            millis = command.millis,
-                            keyFramesOnly = command.keyFramesOnly
+                        InternalPlayerState.Ready.Status.PLAYING, InternalPlayerState.Ready.Status.PAUSED, InternalPlayerState.Ready.Status.STOPPED, InternalPlayerState.Ready.Status.COMPLETED, InternalPlayerState.Ready.Status.SEEKING -> handleSeekTo(
+                            timestamp = command.timestamp, keyFramesOnly = command.keyFramesOnly
                         )
 
                         else -> return@withInternalState
@@ -671,7 +632,7 @@ internal class DefaultPlayerController(
 
     override suspend fun close() = commandMutex.withLock {
         runCatching {
-            commandScope.cancel()
+            coroutineScope.cancel()
 
             when (val currentState = internalState) {
                 is InternalPlayerState.Empty,

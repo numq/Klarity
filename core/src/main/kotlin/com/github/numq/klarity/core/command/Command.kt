@@ -1,6 +1,7 @@
 package com.github.numq.klarity.core.command
 
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import kotlin.time.Duration
 
 sealed interface Command {
     enum class Descriptor {
@@ -39,7 +40,7 @@ sealed interface Command {
         override val descriptor = Descriptor.STOP
     }
 
-    data class SeekTo(val millis: Long, val keyFramesOnly: Boolean) : Command {
+    data class SeekTo(val timestamp: Duration, val keyFramesOnly: Boolean) : Command {
         override val descriptor = Descriptor.SEEK_TO
     }
 

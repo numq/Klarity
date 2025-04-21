@@ -14,9 +14,9 @@ import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.state.PlayerState
-import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration
 
 /**
  * Interface representing a media player.
@@ -33,14 +33,14 @@ interface KlarityPlayer {
     val state: StateFlow<PlayerState>
 
     /**
-     * A flow that provides the current timestamp of the audio buffer.
+     * A flow that provides the current timestamp of the buffer.
      */
-    val bufferTimestamp: StateFlow<Timestamp>
+    val bufferTimestamp: StateFlow<Duration>
 
     /**
      * A flow that provides the current timestamp of the playback.
      */
-    val playbackTimestamp: StateFlow<Timestamp>
+    val playbackTimestamp: StateFlow<Duration>
 
     /**
      * A flow that emits events related to the player's state and actions.
@@ -125,12 +125,12 @@ interface KlarityPlayer {
     /**
      * Seeks to the specified position in the media.
      *
-     * @param millis The position in milliseconds to seek to.
+     * @param timestamp The seeking timestamp.
      * @property keyFramesOnly Use less precise but faster keyframe seeking.
      *
      * @return A [Result] indicating success or failure of the operation.
      */
-    suspend fun seekTo(millis: Long, keyFramesOnly: Boolean = false): Result<Unit>
+    suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean = false): Result<Unit>
 
     /**
      * Releases any resources held by the player.

@@ -7,6 +7,7 @@ import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.settings.VideoSettings
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
 
 internal class DefaultKlarityPlayer(
     private val playerController: PlayerController,
@@ -87,8 +88,8 @@ internal class DefaultKlarityPlayer(
         }
     }
 
-    override suspend fun seekTo(millis: Long, keyFramesOnly: Boolean) = playerController.execute(
-        Command.SeekTo(millis = millis, keyFramesOnly = keyFramesOnly)
+    override suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean) = playerController.execute(
+        Command.SeekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly)
     ).recoverCatching { t ->
         if (t !is CancellationException) {
             throw KlarityPlayerException(t)

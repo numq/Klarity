@@ -2,13 +2,14 @@ package com.github.numq.klarity.core.media
 
 import com.github.numq.klarity.core.format.AudioFormat
 import com.github.numq.klarity.core.format.VideoFormat
+import kotlin.time.Duration
 
 sealed interface Media {
     val id: Long
 
     val location: String
 
-    val durationMicros: Long
+    val duration: Duration
 
     val audioFormat: AudioFormat?
 
@@ -17,7 +18,7 @@ sealed interface Media {
     data class Audio(
         override val id: Long,
         override val location: String,
-        override val durationMicros: Long,
+        override val duration: Duration,
         val format: AudioFormat,
     ) : Media {
         override val audioFormat = format
@@ -28,7 +29,7 @@ sealed interface Media {
     data class Video(
         override val id: Long,
         override val location: String,
-        override val durationMicros: Long,
+        override val duration: Duration,
         val format: VideoFormat,
     ) : Media {
         override val audioFormat = null
@@ -39,7 +40,7 @@ sealed interface Media {
     data class AudioVideo(
         override val id: Long,
         override val location: String,
-        override val durationMicros: Long,
+        override val duration: Duration,
         override val audioFormat: AudioFormat,
         override val videoFormat: VideoFormat,
     ) : Media

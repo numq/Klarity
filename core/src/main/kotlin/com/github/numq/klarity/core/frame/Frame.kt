@@ -1,9 +1,11 @@
 package com.github.numq.klarity.core.frame
 
+import kotlin.time.Duration
+
 sealed interface Frame {
     sealed interface Audio : Frame {
         data class Content(
-            val timestampMicros: Long,
+            val timestamp: Duration,
             val bytes: ByteArray,
         ) : Audio {
             override fun equals(other: Any?): Boolean {
@@ -12,14 +14,14 @@ sealed interface Frame {
 
                 other as Content
 
-                if (timestampMicros != other.timestampMicros) return false
+                if (timestamp != other.timestamp) return false
                 if (!bytes.contentEquals(other.bytes)) return false
 
                 return true
             }
 
             override fun hashCode(): Int {
-                var result = timestampMicros.hashCode()
+                var result = timestamp.hashCode()
                 result = 31 * result + bytes.contentHashCode()
                 return result
             }
@@ -30,7 +32,7 @@ sealed interface Frame {
 
     sealed interface Video : Frame {
         data class Content(
-            val timestampMicros: Long,
+            val timestamp: Duration,
             val bytes: ByteArray,
             val width: Int,
             val height: Int,
@@ -41,19 +43,19 @@ sealed interface Frame {
 
                 other as Content
 
-                if (timestampMicros != other.timestampMicros) return false
-                if (!bytes.contentEquals(other.bytes)) return false
                 if (width != other.width) return false
                 if (height != other.height) return false
+                if (timestamp != other.timestamp) return false
+                if (!bytes.contentEquals(other.bytes)) return false
 
                 return true
             }
 
             override fun hashCode(): Int {
-                var result = timestampMicros.hashCode()
-                result = 31 * result + bytes.contentHashCode()
-                result = 31 * result + width
+                var result = width
                 result = 31 * result + height
+                result = 31 * result + timestamp.hashCode()
+                result = 31 * result + bytes.contentHashCode()
                 return result
             }
         }

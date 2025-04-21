@@ -5,7 +5,7 @@ import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.*
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 internal class DefaultPreviewManager(
     private val videoDecoder: Decoder<Media.Video, Frame.Video>,
@@ -26,16 +26,16 @@ internal class DefaultPreviewManager(
     }
 
     override suspend fun preview(
-        timestampMillis: Long,
-        debounceMillis: Long,
+        timestamp: Duration,
+        debounceTime: Duration,
         keyframesOnly: Boolean,
     ) = runCatching {
         previewJob?.cancel()
         previewJob = coroutineScope.launch {
-            delay(debounceMillis)
+            delay(debounceTime)
 
             videoDecoder.seekTo(
-                timestampMicros = timestampMillis.milliseconds.inWholeMicroseconds, keyframesOnly = keyframesOnly
+                timestamp = timestamp, keyframesOnly = keyframesOnly
             ).getOrThrow()
 
             (videoDecoder.decode().getOrNull() as? Frame.Video.Content)?.let { frame ->

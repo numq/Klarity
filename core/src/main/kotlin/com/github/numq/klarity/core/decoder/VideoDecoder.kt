@@ -5,6 +5,8 @@ import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.nio.ByteBuffer
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
 
 internal class VideoDecoder(
     private val decoder: NativeDecoder,
@@ -32,7 +34,7 @@ internal class VideoDecoder(
                 byteBuffer.get(bytes)
 
                 Frame.Video.Content(
-                    timestampMicros = timestampMicros,
+                    timestamp = timestampMicros.microseconds,
                     bytes = bytes,
                     width = decoder.format.width,
                     height = decoder.format.height
@@ -41,9 +43,9 @@ internal class VideoDecoder(
         }
     }
 
-    override suspend fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = mutex.withLock {
+    override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
-            decoder.seekTo(timestampMicros, keyframesOnly)
+            decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).microseconds
         }.onSuccess {
             byteBuffer.clear()
         }

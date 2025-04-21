@@ -3,8 +3,7 @@ package com.github.numq.klarity.core.snapshot
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
-import kotlin.time.Duration.Companion.microseconds
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 /**
  * Provides frame capture functionality for video media at specified timestamps.
@@ -18,7 +17,7 @@ object SnapshotManager {
      * @param height Optional target height (keeps original if null)
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @param timestampsMillis Function that receives media duration and returns timestamps in milliseconds
+     * @param timestamps A function that provides a media duration that can be used to construct desired timestamps
      * @return [Result] containing list of captured frames, or failure if decoding failed
      * @throws SnapshotManagerException if frame capture fails
      */
@@ -28,7 +27,7 @@ object SnapshotManager {
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
-        timestampsMillis: (durationMillis: Long) -> (List<Long>) = { listOf(0L) },
+        timestamps: (duration: Duration) -> (List<Duration>) = { listOf(Duration.ZERO) },
     ) = runCatching {
         VideoDecoderFactory().create(
             parameters = VideoDecoderFactory.Parameters(
@@ -40,12 +39,10 @@ object SnapshotManager {
             )
         ).mapCatching { decoder ->
             try {
-                timestampsMillis(decoder.media.durationMicros.microseconds.inWholeMilliseconds).filter {
-                    it in 0L..decoder.media.durationMicros
-                }.map { timestampMillis ->
-                    timestampMillis.milliseconds.inWholeMicroseconds
-                }.mapNotNull { timestampMicros ->
-                    decoder.seekTo(timestampMicros = timestampMicros, keyframesOnly = keyframesOnly).getOrNull()
+                timestamps(decoder.media.duration).filter {
+                    it in Duration.ZERO..decoder.media.duration
+                }.mapNotNull { timestamp ->
+                    decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrNull()
 
                     decoder.decode().getOrNull() as? Frame.Video.Content
                 }
@@ -65,7 +62,7 @@ object SnapshotManager {
      * @param height Optional target height (maintains aspect ratio if null)
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @param timestampMillis Function that receives media duration and returns timestamp in milliseconds
+     * @param timestamp A function that provides a media duration that can be used to construct desired timestamp
      * @return [Result] containing captured frame (nullable if no frame at timestamp), or failure
      * @throws SnapshotManagerException if frame capture fails
      */
@@ -75,13 +72,14 @@ object SnapshotManager {
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
-        timestampMillis: (durationMillis: Long) -> (Long) = { 0L },
-    ) = snapshots(location = location,
+        timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
+    ) = snapshots(
+        location = location,
         width = width,
         height = height,
         keyframesOnly = keyframesOnly,
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,
-        timestampsMillis = { durationMillis ->
-            listOf(timestampMillis(durationMillis))
+        timestamps = { duration ->
+            listOf(timestamp(duration))
         }).map(List<Frame.Video.Content?>::firstOrNull)
 }

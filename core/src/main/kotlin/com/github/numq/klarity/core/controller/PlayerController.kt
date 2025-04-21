@@ -20,18 +20,18 @@ import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.PlayerState
-import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Duration
 
 interface PlayerController {
     val settings: StateFlow<PlayerSettings>
 
     val state: StateFlow<PlayerState>
 
-    val bufferTimestamp: StateFlow<Timestamp>
+    val bufferTimestamp: StateFlow<Duration>
 
-    val playbackTimestamp: StateFlow<Timestamp>
+    val playbackTimestamp: StateFlow<Duration>
 
     val events: SharedFlow<PlayerEvent>
 

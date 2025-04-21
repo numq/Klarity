@@ -4,6 +4,8 @@ import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
 
 internal class AudioDecoder(
     private val decoder: NativeDecoder,
@@ -15,16 +17,16 @@ internal class AudioDecoder(
         runCatching {
             decoder.decodeAudio()?.run {
                 Frame.Audio.Content(
-                    timestampMicros = timestampMicros,
+                    timestamp = timestampMicros.microseconds,
                     bytes = audioBytes
                 )
             } ?: Frame.Audio.EndOfStream
         }
     }
 
-    override suspend fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = mutex.withLock {
+    override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
         runCatching {
-            decoder.seekTo(timestampMicros, keyframesOnly)
+            decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).microseconds
         }
     }
 

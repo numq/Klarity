@@ -5,13 +5,15 @@ import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
 
 interface Decoder<Media, Frame> {
     val media: Media
 
     suspend fun decode(): Result<Frame>
 
-    suspend fun seekTo(timestampMicros: Long, keyframesOnly: Boolean): Result<Long>
+    suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean): Result<Duration>
 
     suspend fun reset(): Result<Unit>
 
@@ -51,7 +53,7 @@ interface Decoder<Media, Frame> {
                     audioFormat != null && videoFormat != null -> Media.AudioVideo(
                         id = decoder.nativeHandle,
                         location = location,
-                        durationMicros = decoder.format.durationMicros,
+                        duration = decoder.format.durationMicros.microseconds,
                         audioFormat = audioFormat,
                         videoFormat = videoFormat
                     )
@@ -59,14 +61,14 @@ interface Decoder<Media, Frame> {
                     audioFormat != null -> Media.Audio(
                         id = decoder.nativeHandle,
                         location = location,
-                        durationMicros = decoder.format.durationMicros,
+                        duration = decoder.format.durationMicros.microseconds,
                         format = audioFormat
                     )
 
                     videoFormat != null -> Media.Video(
                         id = decoder.nativeHandle,
                         location = location,
-                        durationMicros = decoder.format.durationMicros,
+                        duration = decoder.format.durationMicros.microseconds,
                         format = videoFormat
                     )
 
@@ -106,7 +108,7 @@ interface Decoder<Media, Frame> {
                 Media.Audio(
                     id = nativeHandle,
                     location = location,
-                    durationMicros = format.durationMicros,
+                    duration = format.durationMicros.microseconds,
                     format = audioFormat
                 )
             }
@@ -156,7 +158,7 @@ interface Decoder<Media, Frame> {
                 Media.Video(
                     id = nativeHandle,
                     location = location,
-                    durationMicros = format.durationMicros,
+                    duration = format.durationMicros.microseconds,
                     format = videoFormat
                 )
             }

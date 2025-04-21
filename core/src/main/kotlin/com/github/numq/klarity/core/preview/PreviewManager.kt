@@ -3,6 +3,7 @@ package com.github.numq.klarity.core.preview
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.renderer.Renderer
+import kotlin.time.Duration
 
 /**
  * Provides real-time frame capture functionality for video media at specified timestamps, displays the captured frames through an attached renderer.
@@ -29,16 +30,16 @@ interface PreviewManager {
      * Seeks to the specified timestamp and renders the corresponding frame if a renderer is attached.
      * If no renderer is attached, the operation will complete successfully but no rendering will occur.
      *
-     * @param timestampMillis Target position in milliseconds (0 = start of media)
-     * @param debounceMillis Minimum delay between consecutive requests (0 = no debouncing)
+     * @param timestamp Desired timestamp
+     * @param debounceTime Minimum delay between consecutive requests
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
      * @return [Result] indicating success or containing failure information
      * @throws PreviewManagerException if seek or decode operation fails
      * @throws IllegalArgumentException if timestamp is out of bounds
      */
     suspend fun preview(
-        timestampMillis: Long,
-        debounceMillis: Long = 0L,
+        timestamp: Duration,
+        debounceTime: Duration = Duration.ZERO,
         keyframesOnly: Boolean = false,
     ): Result<Unit>
 
