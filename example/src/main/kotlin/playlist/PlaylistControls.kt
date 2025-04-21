@@ -18,16 +18,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.core.queue.RepeatMode
 import com.github.numq.klarity.core.state.PlayerState
-import com.github.numq.klarity.core.timestamp.Timestamp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun PlaylistControls(
     modifier: Modifier,
     color: Color,
     state: PlayerState,
-    playbackTimestamp: Timestamp,
+    playbackTimestamp: Duration,
     isShuffled: Boolean,
     shuffle: suspend () -> Unit,
     repeatMode: RepeatMode,
@@ -61,12 +62,12 @@ fun PlaylistControls(
         IconButton(onClick = {
             interactionJob?.cancel()
             interactionJob = coroutineScope.launch {
-                if (playbackTimestamp.millis > 2000L) {
+                if (playbackTimestamp > 2.milliseconds) {
                     stop()
                     play()
                 } else previous()
             }
-        }, enabled = hasPrevious || playbackTimestamp.millis > 2000L) {
+        }, enabled = hasPrevious || playbackTimestamp > 2.milliseconds) {
             Icon(Icons.Default.SkipPrevious, null, tint = color)
         }
         IconButton(onClick = {

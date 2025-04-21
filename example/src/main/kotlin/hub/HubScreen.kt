@@ -21,7 +21,6 @@ import com.github.numq.klarity.core.player.KlarityPlayer
 import com.github.numq.klarity.core.preview.PreviewManager
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.settings.VideoSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -62,12 +61,7 @@ fun HubScreen(
                     when (val format = media.videoFormat) {
                         null -> HubItem.Uploaded(
                             player = KlarityPlayer.create().getOrThrow().apply {
-                                prepare(
-                                    location = media.location,
-                                    enableAudio = true,
-                                    enableVideo = true,
-                                    videoSettings = VideoSettings(loadPreview = true)
-                                ).getOrDefault(Unit)
+                                prepare(location = media.location).getOrDefault(Unit)
                             },
                             previewManager = null,
                             renderer = null
@@ -76,12 +70,7 @@ fun HubScreen(
                         else -> {
                             val player = KlarityPlayer.create().getOrThrow()
 
-                            player.prepare(
-                                location = media.location,
-                                enableAudio = true,
-                                enableVideo = true,
-                                videoSettings = VideoSettings(loadPreview = true)
-                            ).getOrThrow()
+                            player.prepare(location = media.location).getOrThrow()
 
                             val previewManager = PreviewManager.create(location = media.location).getOrThrow()
 
@@ -210,7 +199,8 @@ fun HubScreen(
 
             val pointColor by ButtonDefaults.buttonColors().backgroundColor(true)
 
-            StepSlider(initialStep = sliderStep,
+            StepSlider(
+                initialStep = sliderStep,
                 steps = sliderSteps,
                 sliderColor = sliderColor,
                 pointColor = pointColor,

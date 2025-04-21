@@ -31,7 +31,6 @@ import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.queue.MediaQueue
 import com.github.numq.klarity.core.queue.SelectedItem
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.snapshot.SnapshotManager
 import com.github.numq.klarity.core.state.PlayerState
 import controls.HoveredTimestamp
@@ -50,7 +49,7 @@ import kotlinx.coroutines.runBlocking
 import notification.Notification
 import remote.RemoteUploadingDialog
 import java.io.File
-import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -144,12 +143,7 @@ fun PlaylistScreenSuccess(
             is SelectedItem.Present<*> -> ((selectedItem as? SelectedItem.Present<*>)?.item as? PlaylistItem.Uploaded)?.run {
                 when (val currentState = state) {
                     is PlayerState.Empty -> {
-                        player.prepare(
-                            location = media.location,
-                            enableAudio = true,
-                            enableVideo = true,
-                            videoSettings = VideoSettings(loadPreview = true)
-                        ).getOrDefault(Unit)
+                        player.prepare(location = media.location).getOrDefault(Unit)
                         player.play().getOrDefault(Unit)
                     }
 
@@ -172,12 +166,7 @@ fun PlaylistScreenSuccess(
 
                             else -> {
                                 player.release().getOrDefault(Unit)
-                                player.prepare(
-                                    location = media.location,
-                                    enableAudio = true,
-                                    enableVideo = true,
-                                    videoSettings = VideoSettings(loadPreview = true)
-                                ).getOrDefault(Unit)
+                                player.prepare(location = media.location).getOrDefault(Unit)
                                 player.play().getOrDefault(Unit)
                             }
                         }
@@ -306,8 +295,8 @@ fun PlaylistScreenSuccess(
                             LaunchedEffect(hoveredTimestamp) {
                                 hoveredTimestamp?.run {
                                     previewManager.preview(
-                                        timestampMillis = millis,
-                                        debounceMillis = 100L
+                                        timestamp = timestamp,
+                                        debounceTime = 100.milliseconds
                                     ).getOrDefault(Unit)
                                 }
                             }
@@ -400,7 +389,7 @@ fun PlaylistScreenSuccess(
                                                 contentAlignment = Alignment.CenterStart
                                             ) {
                                                 Text(
-                                                    text = "${playbackTimestamp.millis.formatTimestamp()}/${currentState.media.durationMicros.microseconds.inWholeMilliseconds.formatTimestamp()}",
+                                                    text = "${playbackTimestamp.inWholeMilliseconds.formatTimestamp()}/${currentState.media.duration.inWholeMilliseconds.formatTimestamp()}",
                                                     modifier = Modifier.padding(8.dp),
                                                     color = MaterialTheme.colors.primary
                                                 )
@@ -443,7 +432,8 @@ fun PlaylistScreenSuccess(
                                                 modifier = Modifier.weight(1f),
                                                 contentAlignment = Alignment.CenterStart
                                             ) {
-                                                VolumeControls(modifier = Modifier.fillMaxWidth(),
+                                                VolumeControls(
+                                                    modifier = Modifier.fillMaxWidth(),
                                                     volume = settings.volume,
                                                     isMuted = settings.isMuted,
                                                     toggleMute = {
@@ -477,12 +467,13 @@ fun PlaylistScreenSuccess(
                                     }
                                 }
 
-                                Timeline(modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
-                                    bufferTimestampMillis = bufferTimestamp.millis,
-                                    playbackTimestampMillis = playbackTimestamp.millis,
-                                    durationTimestampMillis = currentState.media.durationMicros.microseconds.inWholeMilliseconds,
-                                    seekTo = { timestampMillis ->
-                                        player.seekTo(timestampMillis).getOrDefault(Unit)
+                                Timeline(
+                                    modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
+                                    bufferTimestamp = bufferTimestamp,
+                                    playbackTimestamp = playbackTimestamp,
+                                    durationTimestamp = currentState.media.duration,
+                                    seekTo = { timestamp ->
+                                        player.seekTo(timestamp).getOrDefault(Unit)
                                         player.resume().getOrDefault(Unit)
                                     },
                                     onHoveredTimestamp = { value ->

@@ -35,7 +35,10 @@ fun TimelinePreview(
                     foreground = Foreground(renderer = previewRenderer, imageScale = ImageScale.Crop)
                 )
                 Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
-                    Text(text = hoveredTimestamp.millis.formatTimestamp(), modifier = Modifier.padding(4.dp))
+                    Text(
+                        text = hoveredTimestamp.timestamp.inWholeMilliseconds.formatTimestamp(),
+                        modifier = Modifier.padding(4.dp)
+                    )
                 }
             }
         }

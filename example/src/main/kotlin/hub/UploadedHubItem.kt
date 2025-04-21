@@ -32,7 +32,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
 import notification.Notification
-import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.ZERO
 
 @Composable
 fun UploadedHubItem(
@@ -59,7 +59,7 @@ fun UploadedHubItem(
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
-                hubItem.previewManager?.preview(0L)?.getOrThrow()
+                hubItem.previewManager?.preview(ZERO)?.getOrThrow()
 
                 previewJob?.cancel()
                 previewJob = launch(Dispatchers.Default) {
@@ -76,14 +76,14 @@ fun UploadedHubItem(
                                             snapshotIndex = (snapshotIndex + 1) % n
 
                                             hubItem.previewManager?.preview(
-                                                timestampMillis = (currentState.media.durationMicros.microseconds.inWholeMilliseconds * snapshotIndex) / (n - 1)
+                                                timestamp = (currentState.media.duration * snapshotIndex) / (n - 1)
                                             )?.getOrThrow()
 
                                             delay(500L)
                                         }
                                     }
 
-                                    is HoverInteraction.Exit -> hubItem.previewManager?.preview(timestampMillis = 0L)
+                                    is HoverInteraction.Exit -> hubItem.previewManager?.preview(timestamp = ZERO)
                                         ?.getOrThrow()
                                 }
                             }
@@ -197,7 +197,7 @@ fun UploadedHubItem(
                                 contentAlignment = Alignment.BottomStart
                             ) {
                                 Text(
-                                    "${playbackTimestamp.micros.microseconds}",
+                                    "$playbackTimestamp",
                                     modifier = Modifier.padding(8.dp),
                                     style = TextStyle(
                                         drawStyle = Stroke(
