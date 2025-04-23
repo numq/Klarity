@@ -138,7 +138,6 @@ public:
             uint32_t channels,
             uint32_t width,
             uint32_t height,
-            double frameRate,
             const std::vector<uint32_t> &hardwareAccelerationCandidates
     );
 

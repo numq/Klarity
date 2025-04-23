@@ -34,7 +34,6 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jint channels,
         jint width,
         jint height,
-        jdouble frameRate,
         jintArray hardwareAccelerationCandidates
 ) {
     return handleException<jlong>(env, [&] {
@@ -73,7 +72,6 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
                 channels,
                 width,
                 height,
-                frameRate,
                 candidates
         );
 

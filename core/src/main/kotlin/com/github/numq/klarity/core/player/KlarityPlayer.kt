@@ -79,8 +79,8 @@ interface KlarityPlayer {
      * Prepares the player for playback of the specified media.
      *
      * @param location The location of the media file to prepare.
-     * @param enableAudio Whether to enable audio playback.
-     * @param enableVideo Whether to enable video playback.
+     * @property audioBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the audio buffer size in frames. Default is 1.
+     * @property videoBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the video buffer size in frames. Default is 1.
      * @property audioSettings Desired audio settings for decoding.
      * @property videoSettings Desired video settings for decoding.
      *
@@ -88,8 +88,8 @@ interface KlarityPlayer {
      */
     suspend fun prepare(
         location: String,
-        enableAudio: Boolean,
-        enableVideo: Boolean,
+        audioBufferSize: Int = MIN_BUFFER_SIZE,
+        videoBufferSize: Int = MIN_BUFFER_SIZE,
         audioSettings: AudioSettings = AudioSettings(),
         videoSettings: VideoSettings = VideoSettings(),
     ): Result<Unit>
@@ -147,6 +147,8 @@ interface KlarityPlayer {
     suspend fun close(): Result<Unit>
 
     companion object {
+        const val MIN_BUFFER_SIZE = 1
+
         private var isLoaded = false
 
         /**

@@ -42,15 +42,15 @@ internal class DefaultKlarityPlayer(
 
     override suspend fun prepare(
         location: String,
-        enableAudio: Boolean,
-        enableVideo: Boolean,
+        audioBufferSize: Int,
+        videoBufferSize: Int,
         audioSettings: AudioSettings,
         videoSettings: VideoSettings,
     ) = playerController.execute(
         Command.Prepare(
             location = location,
-            audioBufferSize = if (enableAudio) settings.value.audioBufferSize else 0,
-            videoBufferSize = if (enableVideo) settings.value.videoBufferSize else 0,
+            audioBufferSize = audioBufferSize,
+            videoBufferSize = videoBufferSize,
             sampleRate = audioSettings.sampleRate,
             channels = audioSettings.channels,
             width = videoSettings.width,

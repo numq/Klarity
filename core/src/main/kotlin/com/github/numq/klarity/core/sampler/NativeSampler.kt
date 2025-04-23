@@ -43,11 +43,15 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
-        synchronized(lock) {
-            deleteNative(handle = nativeHandle)
+        runCatching {
+            synchronized(lock) {
+                if (nativeHandle != -1L) {
+                    deleteNative(handle = nativeHandle)
 
-            nativeHandle = -1L
-        }
+                    nativeHandle = -1L
+                }
+            }
+        }.getOrDefault(Unit)
     }
 
     fun setPlaybackSpeed(factor: Float) = synchronized(lock) {

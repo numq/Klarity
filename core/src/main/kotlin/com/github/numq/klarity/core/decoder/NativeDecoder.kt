@@ -17,7 +17,6 @@ internal class NativeDecoder(
     channels: Int? = null,
     width: Int? = null,
     height: Int? = null,
-    frameRate: Double? = null,
     hardwareAccelerationCandidates: IntArray? = null,
 ) : Closeable {
     companion object {
@@ -37,7 +36,6 @@ internal class NativeDecoder(
             channels: Int,
             width: Int,
             height: Int,
-            frameRate: Double,
             hardwareAccelerationCandidates: IntArray,
         ): Long
 
@@ -76,7 +74,6 @@ internal class NativeDecoder(
                 channels = channels ?: 0,
                 width = width ?: 0,
                 height = height ?: 0,
-                frameRate = frameRate ?: .0,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
             )
 
@@ -85,11 +82,15 @@ internal class NativeDecoder(
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
-        synchronized(lock) {
-            deleteNative(handle = nativeHandle)
+        runCatching {
+            synchronized(lock) {
+                if (nativeHandle != -1L) {
+                    deleteNative(handle = nativeHandle)
 
-            nativeHandle = -1L
-        }
+                    nativeHandle = -1L
+                }
+            }
+        }.getOrDefault(Unit)
     }
 
     val format = synchronized(lock) {

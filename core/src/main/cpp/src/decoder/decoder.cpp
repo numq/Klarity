@@ -215,7 +215,6 @@ Decoder::Decoder(
         const uint32_t channels,
         const uint32_t width,
         const uint32_t height,
-        const double frameRate,
         const std::vector<uint32_t> &hardwareAccelerationCandidates
 ) {
     std::unique_lock<std::shared_mutex> lock(mutex);
@@ -369,10 +368,6 @@ Decoder::Decoder(
 
                     if (height > 0) {
                         format.height = height;
-                    }
-
-                    if (frameRate > .0) {
-                        format.frameRate = frameRate;
                     }
 
                     if ((format.videoBufferSize = av_image_get_buffer_size(

@@ -16,7 +16,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     outputParameters.device = deviceIndex;
     outputParameters.channelCount = static_cast<int>(channels);
     outputParameters.sampleFormat = paFloat32;
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultHighOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 
     PaStream *rawStream = nullptr;
