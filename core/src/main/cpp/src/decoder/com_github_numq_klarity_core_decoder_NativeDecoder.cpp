@@ -164,28 +164,21 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jobject byteBuffer
+        jlong bufferHandle,
+        jint bufferSize
 ) {
     return handleException<jobject>(env, [&] {
-        if (!byteBuffer) {
-            throw std::runtime_error("Provided byte buffer is null");
+        if (bufferHandle < 0) {
+            throw std::runtime_error("Invalid buffer handle");
         }
 
-        auto buffer = env->GetDirectBufferAddress(byteBuffer);
-
-        if (!buffer) {
-            throw std::runtime_error("Could not get direct buffer address");
-        }
-
-        auto size = env->GetDirectBufferCapacity(byteBuffer);
-
-        if (size <= 0) {
+        if (bufferSize <= 0) {
             throw std::runtime_error("Invalid buffer size");
         }
 
         auto decoder = getDecoderPointer(handle);
 
-        auto frame = decoder->decodeVideo(static_cast<uint8_t *>(buffer), size);
+        auto frame = decoder->decodeVideo(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
 
         if (!frame) {
             return static_cast<jobject>(nullptr);

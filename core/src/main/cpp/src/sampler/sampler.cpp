@@ -57,7 +57,7 @@ void Sampler::setVolume(float value) {
 int Sampler::start() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr) {
+    if (!stretch || !stream) {
         throw SamplerException("Unable to start uninitialized sampler");
     }
 
@@ -82,7 +82,7 @@ int Sampler::start() {
 void Sampler::play(const uint8_t *samples, uint64_t size) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr || Pa_IsStreamActive(stream.get()) <= 0) {
+    if (!stretch || !stream || Pa_IsStreamActive(stream.get()) <= 0) {
         throw SamplerException("Unable to play uninitialized sampler");
     }
 
@@ -120,7 +120,7 @@ void Sampler::play(const uint8_t *samples, uint64_t size) {
 void Sampler::pause() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr) {
+    if (!stretch || !stream) {
         throw SamplerException("Unable to pause uninitialized sampler");
     }
 
@@ -140,7 +140,7 @@ void Sampler::pause() {
 void Sampler::stop() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!stretch || stream == nullptr) {
+    if (!stretch || !stream) {
         throw SamplerException("Unable to stop uninitialized sampler");
     }
 
@@ -154,15 +154,13 @@ void Sampler::stop() {
         }
     }
 
-    if (stretch) {
-        int outputSamples = stretch->outputLatency();
+    int outputSamples = stretch->outputLatency();
 
-        if (outputSamples > 0) {
-            std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
+    if (outputSamples > 0) {
+        std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
 
-            stretch->flush(outputBuffers, outputSamples);
-        }
-
-        stretch->reset();
+        stretch->flush(outputBuffers, outputSamples);
     }
+
+    stretch->reset();
 }
