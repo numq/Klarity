@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.17.5)
 project(klarity VERSION 1.1.0)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -14,6 +14,7 @@ add_library(klarity SHARED
         src/decoder/hwaccel.cpp
         src/sampler/sampler.cpp
         src/decoder/com_github_numq_klarity_core_decoder_NativeDecoder.cpp
+        src/memory/com_github_numq_klarity_core_memory_NativeMemory.cpp
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp
 )
 
@@ -30,6 +31,7 @@ target_include_directories(klarity PRIVATE
         include
         include/decoder
         include/decoder/ffmpeg
+        include/memory
         include/sampler
         include/sampler/dsp
         include/sampler/portaudio

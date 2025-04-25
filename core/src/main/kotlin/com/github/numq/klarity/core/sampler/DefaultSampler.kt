@@ -1,5 +1,6 @@
 package com.github.numq.klarity.core.sampler
 
+import com.github.numq.klarity.core.frame.Frame
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -20,9 +21,9 @@ internal class DefaultSampler(
         runCatching {
             require(factor > 0f) { "Speed factor should be positive" }
 
-            sampler.setPlaybackSpeed(factor)
-
-            playbackSpeedFactor = factor
+            sampler.setPlaybackSpeed(factor).map {
+                playbackSpeedFactor = factor
+            }.getOrThrow()
         }
     }
 
@@ -30,40 +31,36 @@ internal class DefaultSampler(
         runCatching {
             require(value in 0.0f..1.0f) { "Volume should be a value between 0.0f and 1.0f" }
 
-            sampler.setVolume(value)
-
-            currentVolume = value
+            sampler.setVolume(value).map {
+                currentVolume = value
+            }.getOrThrow()
         }
     }
 
     override suspend fun setMuted(state: Boolean) = mutex.withLock {
-        runCatching {
-            sampler.setVolume(if (state) 0f else currentVolume)
-        }
+        sampler.setVolume(if (state) 0f else currentVolume)
     }
 
     override suspend fun start() = mutex.withLock {
-        runCatching {
-            latency = sampler.start()
+        sampler.start().map {
+            latency = it
         }
     }
 
-    override suspend fun play(bytes: ByteArray) = mutex.withLock {
+    override suspend fun play(frame: Frame.Audio.Content) = mutex.withLock {
         runCatching {
-            sampler.play(bytes, bytes.size)
+            frame.use {
+                sampler.play(frame.bufferHandle, frame.bufferSize).getOrThrow()
+            }
         }
     }
 
     override suspend fun pause() = mutex.withLock {
-        runCatching {
-            sampler.pause()
-        }
+        sampler.pause()
     }
 
     override suspend fun stop() = mutex.withLock {
-        runCatching {
-            sampler.stop()
-        }
+        sampler.stop()
     }
 
     override suspend fun close() = mutex.withLock {

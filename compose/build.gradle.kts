@@ -16,7 +16,6 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.common)
-    implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.10")
     compileOnly(project(":core"))
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")

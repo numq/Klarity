@@ -14,26 +14,29 @@ internal class AudioDecoder(
     private val mutex = Mutex()
 
     override suspend fun decode() = mutex.withLock {
-        runCatching {
-            decoder.decodeAudio()?.run {
-                Frame.Audio.Content(
-                    timestamp = timestampMicros.microseconds,
-                    bytes = audioBytes
-                )
-            } ?: Frame.Audio.EndOfStream
+        decoder.decodeAudio().map { nativeFrame ->
+            when (nativeFrame) {
+                null -> Frame.Audio.EndOfStream
+
+                else -> with(nativeFrame) {
+                    Frame.Audio.Content(
+                        timestamp = timestampMicros.microseconds,
+                        bufferHandle = bufferHandle,
+                        bufferSize = bufferSize
+                    )
+                }
+            }
         }
     }
 
     override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
-        runCatching {
-            decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).microseconds
+        decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
+            timestampMicros.microseconds
         }
     }
 
     override suspend fun reset() = mutex.withLock {
-        runCatching {
-            decoder.reset()
-        }
+        decoder.reset()
     }
 
     override suspend fun close() = mutex.withLock {

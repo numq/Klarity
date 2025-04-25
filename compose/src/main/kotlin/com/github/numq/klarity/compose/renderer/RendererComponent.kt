@@ -25,14 +25,20 @@ fun RendererComponent(
     foreground: Foreground,
     background: Background = Background.Transparent
 ) {
+    val rendererContext = remember(foreground.renderer) {
+        RendererContext.create(renderer = foreground.renderer)
+    }
+
+    val generationId by rendererContext.generationId.collectAsState()
+
+    DisposableEffect(rendererContext) {
+        onDispose {
+            rendererContext.close()
+        }
+    }
+
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val rendererContext = remember(foreground.renderer) {
-                RendererContext.create(foreground.renderer)
-            }
-
-            val generationId by rendererContext.generationId.collectAsState(0)
-
             val boxSize = Size(maxWidth.value, maxHeight.value)
 
             val foregroundSize by remember(
@@ -67,12 +73,6 @@ fun RendererComponent(
             val backgroundOffset by remember(backgroundSize, boxSize) {
                 derivedStateOf {
                     calculateBackgroundOffset(backgroundSize, boxSize)
-                }
-            }
-
-            DisposableEffect(rendererContext) {
-                onDispose {
-                    rendererContext.close()
                 }
             }
 

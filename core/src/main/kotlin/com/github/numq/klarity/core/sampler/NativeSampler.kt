@@ -18,7 +18,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         private external fun startNative(handle: Long): Long
 
         @JvmStatic
-        private external fun playNative(handle: Long, bytes: ByteArray, size: Int)
+        private external fun playNative(handle: Long, bufferHandle: Long, bufferSize: Int)
 
         @JvmStatic
         private external fun pauseNative(handle: Long)
@@ -43,39 +43,51 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
-        runCatching {
-            synchronized(lock) {
+        synchronized(lock) {
+            runCatching {
                 if (nativeHandle != -1L) {
                     deleteNative(handle = nativeHandle)
 
                     nativeHandle = -1L
                 }
-            }
-        }.getOrDefault(Unit)
+            }.getOrDefault(Unit)
+        }
     }
 
     fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
-        setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
+        runCatching {
+            setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
+        }
     }
 
     fun setVolume(value: Float) = synchronized(lock) {
-        setVolumeNative(handle = nativeHandle, value = value)
+        runCatching {
+            setVolumeNative(handle = nativeHandle, value = value)
+        }
     }
 
     fun start() = synchronized(lock) {
-        startNative(handle = nativeHandle)
+        runCatching {
+            startNative(handle = nativeHandle)
+        }
     }
 
-    fun play(bytes: ByteArray, size: Int) = synchronized(lock) {
-        playNative(handle = nativeHandle, bytes = bytes, size = size)
+    fun play(bufferHandle: Long, bufferSize: Int) = synchronized(lock) {
+        runCatching {
+            playNative(handle = nativeHandle, bufferHandle = bufferHandle, bufferSize = bufferSize)
+        }
     }
 
     fun pause() = synchronized(lock) {
-        pauseNative(handle = nativeHandle)
+        runCatching {
+            pauseNative(handle = nativeHandle)
+        }
     }
 
     fun stop() = synchronized(lock) {
-        stopNative(handle = nativeHandle)
+        runCatching {
+            stopNative(handle = nativeHandle)
+        }
     }
 
     override fun close() = cleanable.clean()

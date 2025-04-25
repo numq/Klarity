@@ -14,8 +14,10 @@ internal class DefaultRenderer(override val format: VideoFormat) : Renderer {
     }
 
     override fun render(frame: Frame.Video.Content) {
-        if (isFormatValid(frame)) {
-            callbackRef.get()?.invoke(frame)
+        frame.use {
+            if (isFormatValid(frame)) {
+                callbackRef.get()?.invoke(frame)
+            }
         }
     }
 

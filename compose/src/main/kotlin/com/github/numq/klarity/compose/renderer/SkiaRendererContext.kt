@@ -1,45 +1,39 @@
 package com.github.numq.klarity.compose.renderer
 
+import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ContentChangeMode
-import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.Surface
 
 internal class SkiaRendererContext(
-    renderer: Renderer,
-    private val imageInfo: ImageInfo,
-    private val bitmap: Bitmap,
+    renderer: Renderer?,
     private val surface: Surface,
 ) : RendererContext {
     init {
-        renderer.onRender { frame ->
-            render(frame.bytes)
-        }
+        renderer?.onRender(::render)
     }
 
     private val lock = Any()
 
-    private val _generationId = MutableStateFlow(0)
+    private val minByteSize = surface.imageInfo.computeMinByteSize()
+
+    private val _generationId = MutableStateFlow(-1)
 
     override val generationId = _generationId.asStateFlow()
 
-    override fun withSurface(callback: (Surface) -> Unit) = synchronized(lock) {
-        if (!surface.isClosed) {
-            callback(surface)
-        }
-    }
-
-    override fun render(pixels: ByteArray) = synchronized(lock) {
+    private fun render(frame: Frame.Video.Content) = synchronized(lock) {
         when {
-            surface.isClosed || bitmap.isClosed || pixels.size < bitmap.computeByteSize() -> return
+            surface.isClosed || frame.isClosed || frame.bufferSize < minByteSize -> return
 
-            bitmap.installPixels(imageInfo, pixels, imageInfo.minRowBytes) -> {
+            else -> Pixmap.make(
+                info = surface.imageInfo, addr = frame.bufferHandle, rowBytes = surface.imageInfo.minRowBytes
+            ).use { pixmap ->
                 surface.notifyContentWillChange(ContentChangeMode.DISCARD)
 
-                surface.writePixels(bitmap, 0, 0)
+                surface.writePixels(pixmap, 0, 0)
 
                 surface.flushAndSubmit()
 
@@ -48,11 +42,13 @@ internal class SkiaRendererContext(
         }
     }
 
-    override fun close() = synchronized(lock) {
-        if (!bitmap.isClosed) {
-            bitmap.close()
+    override fun withSurface(callback: (Surface) -> Unit) = synchronized(lock) {
+        if (!surface.isClosed) {
+            callback(surface)
         }
+    }
 
+    override fun close() = synchronized(lock) {
         if (!surface.isClosed) {
             surface.close()
         }

@@ -40,7 +40,7 @@ public:
 
     int start();
 
-    void play(const uint8_t *samples, uint64_t size);
+    void play(const uint8_t *buffer, uint64_t size);
 
     void pause();
 

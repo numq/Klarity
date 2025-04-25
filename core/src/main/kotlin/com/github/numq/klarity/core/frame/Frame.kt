@@ -1,65 +1,69 @@
 package com.github.numq.klarity.core.frame
 
+import com.github.numq.klarity.core.cleaner.NativeCleaner
+import com.github.numq.klarity.core.memory.NativeMemory
+import java.io.Closeable
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 
-sealed interface Frame {
+sealed interface Frame : Closeable {
+    val isClosed: Boolean
+
     sealed interface Audio : Frame {
         data class Content(
+            val bufferHandle: Long,
+            val bufferSize: Int,
             val timestamp: Duration,
-            val bytes: ByteArray,
         ) : Audio {
-            override fun equals(other: Any?): Boolean {
-                if (this === other) return true
-                if (javaClass != other?.javaClass) return false
+            private val handle = AtomicLong(bufferHandle)
 
-                other as Content
+            private val cleanable = NativeCleaner.cleaner.register(this) {
+                if (!isClosed) {
+                    NativeMemory.free(handle.get())
 
-                if (timestamp != other.timestamp) return false
-                if (!bytes.contentEquals(other.bytes)) return false
-
-                return true
+                    handle.set(-1L)
+                }
             }
 
-            override fun hashCode(): Int {
-                var result = timestamp.hashCode()
-                result = 31 * result + bytes.contentHashCode()
-                return result
-            }
+            override val isClosed = handle.get() == -1L
+
+            override fun close() = cleanable.clean()
         }
 
-        data object EndOfStream : Audio
+        data object EndOfStream : Audio {
+            override val isClosed = true
+
+            override fun close() = Unit
+        }
     }
 
     sealed interface Video : Frame {
         data class Content(
+            val bufferHandle: Long,
+            val bufferSize: Int,
             val timestamp: Duration,
-            val bytes: ByteArray,
             val width: Int,
-            val height: Int,
+            val height: Int
         ) : Video {
-            override fun equals(other: Any?): Boolean {
-                if (this === other) return true
-                if (javaClass != other?.javaClass) return false
+            private val handle = AtomicLong(bufferHandle)
 
-                other as Content
+            private val cleanable = NativeCleaner.cleaner.register(this) {
+                if (!isClosed) {
+                    NativeMemory.free(handle.get())
 
-                if (width != other.width) return false
-                if (height != other.height) return false
-                if (timestamp != other.timestamp) return false
-                if (!bytes.contentEquals(other.bytes)) return false
-
-                return true
+                    handle.set(-1L)
+                }
             }
 
-            override fun hashCode(): Int {
-                var result = width
-                result = 31 * result + height
-                result = 31 * result + timestamp.hashCode()
-                result = 31 * result + bytes.contentHashCode()
-                return result
-            }
+            override val isClosed = handle.get() == -1L
+
+            override fun close() = cleanable.clean()
         }
 
-        data object EndOfStream : Video
+        data object EndOfStream : Video {
+            override val isClosed = true
+
+            override fun close() = Unit
+        }
     }
 }

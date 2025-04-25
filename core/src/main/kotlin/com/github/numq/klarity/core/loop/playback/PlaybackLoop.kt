@@ -2,12 +2,14 @@ package com.github.numq.klarity.core.loop.playback
 
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.timestamp.Timestamp
+import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Duration
 
 interface PlaybackLoop {
     suspend fun start(
+        coroutineScope: CoroutineScope,
         onException: suspend (PlaybackLoopException) -> Unit,
-        onTimestamp: suspend (Timestamp) -> Unit,
+        onTimestamp: suspend (Duration) -> Unit,
         onEndOfMedia: suspend () -> Unit,
     ): Result<Unit>
 
@@ -22,7 +24,9 @@ interface PlaybackLoop {
             getRenderer: () -> Renderer?
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
-                pipeline = pipeline, getPlaybackSpeedFactor = getPlaybackSpeedFactor, getRenderer = getRenderer
+                pipeline = pipeline,
+                getPlaybackSpeedFactor = getPlaybackSpeedFactor,
+                getRenderer = getRenderer
             )
         }
     }

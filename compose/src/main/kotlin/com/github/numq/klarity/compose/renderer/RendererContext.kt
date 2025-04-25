@@ -2,15 +2,16 @@ package com.github.numq.klarity.compose.renderer
 
 import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.flow.StateFlow
-import org.jetbrains.skia.*
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Surface
 import java.io.Closeable
 
 internal interface RendererContext : Closeable {
     val generationId: StateFlow<Int>
 
     fun withSurface(callback: (Surface) -> Unit)
-
-    fun render(pixels: ByteArray)
 
     companion object {
         fun create(renderer: Renderer): RendererContext {
@@ -21,17 +22,9 @@ internal interface RendererContext : Closeable {
                 alphaType = ColorAlphaType.UNPREMUL
             )
 
-            val bitmap = Bitmap()
+            val surface = Surface.makeRaster(imageInfo)
 
-            if (!bitmap.allocPixels(imageInfo)) {
-                bitmap.close()
-
-                error("Could not allocate bitmap pixels")
-            }
-
-            val surface = Surface.makeRaster(bitmap.imageInfo)
-
-            return SkiaRendererContext(renderer = renderer, imageInfo = imageInfo, bitmap = bitmap, surface = surface)
+            return SkiaRendererContext(renderer = renderer, surface = surface)
         }
     }
 }

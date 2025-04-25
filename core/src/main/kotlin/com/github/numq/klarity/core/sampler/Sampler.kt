@@ -1,5 +1,7 @@
 package com.github.numq.klarity.core.sampler
 
+import com.github.numq.klarity.core.frame.Frame
+
 interface Sampler {
     suspend fun getLatency(): Result<Long>
 
@@ -11,7 +13,7 @@ interface Sampler {
 
     suspend fun start(): Result<Unit>
 
-    suspend fun play(bytes: ByteArray): Result<Unit>
+    suspend fun play(frame: Frame.Audio.Content): Result<Unit>
 
     suspend fun pause(): Result<Unit>
 

@@ -137,9 +137,9 @@ namespace spectral {
 		\diagram{stft-aliasing-simulated.svg,Simulated bad-case aliasing (random phase-shift for each band) for overlapping ratios}
 
 		There is a "latest valid index", and you can read the output up to one `historyLength` behind this (see `.resize()`).  You can read up to one window-length _ahead_ to get partially-summed future output.
-		
+
 		\diagram{stft-buffer-validity.svg}
-		
+
 		You move the valid index along using `.ensureValid()`, passing in a functor which provides spectra (using `.analyse()` and/or direct modification through `.spectrum[c]`):
 
 		\code
@@ -164,7 +164,7 @@ namespace spectral {
 				stft += blockSize;
 			}
 		\endcode
-		
+
 		The index passed to this functor will be greater than the previous valid index, and `<=` the index you pass in.  Therefore, if you call `.ensureValid()` every sample, it can only ever be `0`.
 	*/
 	template<typename Sample>
@@ -181,17 +181,17 @@ namespace spectral {
 		public:
 			MultiSpectrum() : MultiSpectrum(0, 0) {}
 			MultiSpectrum(int channels, int bands) : channels(channels), stride(bands), buffer(channels*bands, 0) {}
-			
+
 			void resize(int nChannels, int nBands) {
 				channels = nChannels;
 				stride = nBands;
 				buffer.assign(channels*stride, 0);
 			}
-			
+
 			void reset() {
 				buffer.assign(buffer.size(), 0);
 			}
-			
+
 			void swap(MultiSpectrum &other) {
 				using std::swap;
 				swap(buffer, other.buffer);
@@ -213,13 +213,13 @@ namespace spectral {
 				+ historyLength);
 
 			int fftSize = fft.fastSizeAbove(windowSize + zeroPadding);
-			
+
 			this->channels = newChannels;
 			_windowSize = windowSize;
 			this->_fftSize = fftSize;
 			this->_interval = newInterval;
 			validUntilIndex = -1;
-			
+
 			setWindow(windowShape);
 
 			spectrum.resize(channels, fftSize/2);
@@ -232,7 +232,7 @@ namespace spectral {
 		// for convenience
 		static constexpr Window kaiser = Window::kaiser;
 		static constexpr Window acg = Window::acg;
-		
+
 		/** Swaps between the default (Kaiser) shape and Approximate Confined Gaussian (ACG).
 		\diagram{stft-windows.svg,Default (Kaiser) windows and partial cumulative sum}
 		The ACG has better rolloff since its edges go to 0:
@@ -255,17 +255,17 @@ namespace spectral {
 				confined.fill(window, _windowSize);
 			}
 			::signalsmith::windows::forcePerfectReconstruction(window, _windowSize, _interval);
-			
+
 			// TODO: fill extra bits of an input buffer with NaN/Infinity, to break this, and then fix by adding zero-padding to WindowedFFT (as opposed to zero-valued window sections)
 			for (int i = _windowSize; i < _fftSize; ++i) {
 				window[i] = 0;
 			}
 		}
-		
+
 		using Spectrum = MultiSpectrum;
 		Spectrum spectrum;
 		WindowedFFT<Sample> fft;
-		
+
 		STFT() {}
 		/// Parameters passed straight to `.resize()`
 		STFT(int channels, int windowSize, int interval, int historyLength=0, int zeroPadding=0) {
@@ -276,7 +276,7 @@ namespace spectral {
 		void resize(int nChannels, int windowSize, int interval, int historyLength=0, int zeroPadding=0) {
 			resizeInternal(nChannels, windowSize, interval, historyLength, zeroPadding);
 		}
-		
+
 		int windowSize() const {
 			return _windowSize;
 		}
@@ -303,18 +303,18 @@ namespace spectral {
 			}
 			return result;
 		}
-		
+
 		/// Resets everything - since we clear the output sum, it will take `windowSize` samples to get proper output.
 		void reset() {
 			Super::reset();
 			spectrum.reset();
 			validUntilIndex = -1;
 		}
-		
+
 		/** Generates valid output up to the specified index (or 0), using the callback as many times as needed.
-			
+
 			The callback should be a functor accepting a single integer argument, which is the index for which a spectrum is required.
-			
+
 			The block created from these spectra will start at this index in the output, plus `.latency()`.
 		*/
 		template<class AnalysisFn>
@@ -350,9 +350,9 @@ namespace spectral {
 		int nextInvalid() const {
 			return validUntilIndex + 1;
 		}
-		
+
 		/** Analyse a multi-channel input, for any type where `data[channel][index]` returns samples
- 
+
 		Results can be read/edited using `.spectrum`. */
 		template<class Data>
 		void analyse(Data &&data) {
@@ -381,12 +381,12 @@ namespace spectral {
 		}
 
 		/** Internal latency (between the block-index requested in `.ensureValid()` and its position in the output)
- 
+
 		Currently unused, but it's in here to allow for a future implementation which spreads the FFT calculations out across each interval.*/
 		int latency() {
 			return 0;
 		}
-		
+
 		// @name Shift the underlying buffer (moving the "valid" index accordingly)
 		// @{
 		STFT & operator ++() {

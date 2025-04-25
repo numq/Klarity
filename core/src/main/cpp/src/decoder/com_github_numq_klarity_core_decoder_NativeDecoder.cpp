@@ -105,8 +105,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 static_cast<jint>(format.width),
                 static_cast<jint>(format.height),
                 static_cast<jdouble>(format.frameRate),
-                static_cast<jint>(format.hwDeviceType),
-                static_cast<jint>(format.videoBufferSize)
+                static_cast<jint>(format.hwDeviceType)
         );
 
         env->DeleteLocalRef(location);
@@ -129,64 +128,35 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
             return static_cast<jobject>(nullptr);
         }
 
-        auto audioBytesSize = static_cast<jsize>(frame->audioBytes.size());
-
-        auto audioBytesBuf = reinterpret_cast<jbyte *>(frame->audioBytes.data());
-
-        auto byteArray = env->NewByteArray(audioBytesSize);
-
-        if (!byteArray) {
-            std::runtime_error("Unable to create byte array");
-        }
-
-        env->SetByteArrayRegion(byteArray, 0, audioBytesSize, audioBytesBuf);
-
-        jobject frameObject = nullptr;
-
-        try {
-            frameObject = env->NewObject(
-                    audioFrameClass,
-                    audioFrameConstructor,
-                    static_cast<jlong>(frame->timestampMicros),
-                    byteArray
-            );
-        } catch (...) {
-            env->DeleteLocalRef(byteArray);
-
-            throw;
-        }
-
-        return frameObject;
+        return env->NewObject(
+                frameClass,
+                frameConstructor,
+                frame->buffer,
+                frame->size,
+                static_cast<jlong>(frame->timestampMicros)
+        );
     }, nullptr);
 }
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeVideoNative(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
-        jlong bufferHandle,
-        jint bufferSize
+        jlong handle
 ) {
     return handleException<jobject>(env, [&] {
-        if (bufferHandle < 0) {
-            throw std::runtime_error("Invalid buffer handle");
-        }
-
-        if (bufferSize <= 0) {
-            throw std::runtime_error("Invalid buffer size");
-        }
-
         auto decoder = getDecoderPointer(handle);
 
-        auto frame = decoder->decodeVideo(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
+        auto frame = decoder->decodeVideo();
 
         if (!frame) {
             return static_cast<jobject>(nullptr);
         }
 
         return env->NewObject(
-                videoFrameClass,
-                videoFrameConstructor,
+                frameClass,
+                frameConstructor,
+                frame->buffer,
+                frame->size,
                 static_cast<jlong>(frame->timestampMicros)
         );
     }, nullptr);

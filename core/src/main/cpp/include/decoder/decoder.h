@@ -106,6 +106,10 @@ private:
 
     std::vector<uint8_t> audioBuffer;
 
+    std::vector<uint8_t> videoBuffer;
+
+    uint64_t videoBufferSize = 0;
+
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
@@ -123,7 +127,7 @@ private:
 
     void _processAudioFrame();
 
-    void _processVideoFrame(uint8_t *buffer, uint32_t bufferSize);
+    void _processVideoFrame();
 
 public:
     Format format;
@@ -143,9 +147,9 @@ public:
 
     ~Decoder();
 
-    std::unique_ptr<AudioFrame> decodeAudio();
+    std::unique_ptr<Frame> decodeAudio();
 
-    std::unique_ptr<VideoFrame> decodeVideo(uint8_t *buffer, uint32_t bufferSize);
+    std::unique_ptr<Frame> decodeVideo();
 
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 

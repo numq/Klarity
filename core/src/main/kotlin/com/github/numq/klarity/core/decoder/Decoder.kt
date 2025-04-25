@@ -32,20 +32,22 @@ interface Decoder<Media, Frame> {
                 decodeAudioStream = false,
                 decodeVideoStream = false
             ).use { decoder ->
-                val audioFormat = decoder.format.takeIf { format ->
-                    format.sampleRate > 0 && format.channels > 0
-                }?.let { format ->
-                    AudioFormat(sampleRate = format.sampleRate, channels = format.channels)
+                val format = decoder.format.getOrThrow()
+
+                val audioFormat = format.takeIf { fmt ->
+                    fmt.sampleRate > 0 && fmt.channels > 0
+                }?.let { fmt ->
+                    AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
                 }
 
-                val videoFormat = decoder.format.takeIf { format ->
-                    format.width > 0 && format.height > 0
-                }?.let { format ->
+                val videoFormat = format.takeIf { fmt ->
+                    fmt.width > 0 && fmt.height > 0
+                }?.let { fmt ->
                     VideoFormat(
-                        width = format.width,
-                        height = format.height,
-                        frameRate = format.frameRate,
-                        hardwareAcceleration = HardwareAcceleration.fromNative(format.hwDeviceType)
+                        width = fmt.width,
+                        height = fmt.height,
+                        frameRate = fmt.frameRate,
+                        hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
                     )
                 }
 
@@ -53,7 +55,7 @@ interface Decoder<Media, Frame> {
                     audioFormat != null && videoFormat != null -> Media.AudioVideo(
                         id = decoder.nativeHandle,
                         location = location,
-                        duration = decoder.format.durationMicros.microseconds,
+                        duration = format.durationMicros.microseconds,
                         audioFormat = audioFormat,
                         videoFormat = videoFormat
                     )
@@ -61,14 +63,14 @@ interface Decoder<Media, Frame> {
                     audioFormat != null -> Media.Audio(
                         id = decoder.nativeHandle,
                         location = location,
-                        duration = decoder.format.durationMicros.microseconds,
+                        duration = format.durationMicros.microseconds,
                         format = audioFormat
                     )
 
                     videoFormat != null -> Media.Video(
                         id = decoder.nativeHandle,
                         location = location,
-                        duration = decoder.format.durationMicros.microseconds,
+                        duration = format.durationMicros.microseconds,
                         format = videoFormat
                     )
 
@@ -92,10 +94,12 @@ interface Decoder<Media, Frame> {
                 channels = channels
             )
 
-            val audioFormat = decoder.format.takeIf { format ->
-                format.sampleRate > 0 && format.channels > 0
-            }?.let { format ->
-                AudioFormat(sampleRate = format.sampleRate, channels = format.channels)
+            val format = decoder.format.getOrThrow()
+
+            val audioFormat = format.takeIf { fmt ->
+                fmt.sampleRate > 0 && fmt.channels > 0
+            }?.let { fmt ->
+                AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
             }
 
             if (audioFormat == null) {
@@ -123,6 +127,10 @@ interface Decoder<Media, Frame> {
             frameRate: Double?,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
         ): Result<Decoder<Media.Video, Frame.Video>> = runCatching {
+            if (frameRate != null) {
+                require(frameRate > .0) { "Frame rate must be positive" }
+            }
+
             val decoder = NativeDecoder(
                 location = location,
                 findAudioStream = false,
@@ -131,20 +139,21 @@ interface Decoder<Media, Frame> {
                 decodeVideoStream = true,
                 width = width,
                 height = height,
-                frameRate = frameRate,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates?.map { candidate ->
                     candidate.native.ordinal
                 }?.toIntArray()
             )
 
-            val videoFormat = decoder.format.takeIf { format ->
-                format.width > 0 && format.height > 0
-            }?.let { format ->
+            val format = decoder.format.getOrThrow()
+
+            val videoFormat = format.takeIf { fmt ->
+                fmt.width > 0 && fmt.height > 0
+            }?.let { fmt ->
                 VideoFormat(
-                    width = format.width,
-                    height = format.height,
-                    frameRate = format.frameRate,
-                    hardwareAcceleration = HardwareAcceleration.fromNative(format.hwDeviceType)
+                    width = fmt.width,
+                    height = fmt.height,
+                    frameRate = frameRate ?: fmt.frameRate,
+                    hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
                 )
             }
 

@@ -58,31 +58,13 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_p
         JNIEnv *env,
         jclass thisClass,
         jlong handle,
-        jbyteArray bytes
+        jlong bufferHandle,
+        jint bufferSize
 ) {
     return handleException(env, [&] {
-        auto size = env->GetArrayLength(bytes);
-
-        if (size <= 0) {
-            return;
-        }
-
-        auto byteArray = env->GetByteArrayElements(bytes, nullptr);
-
-        if (!byteArray) {
-            throw std::runtime_error("Could not get byte array elements");
-        }
-
         auto sampler = getSamplerPointer(handle);
 
-        std::vector<uint8_t> samples(
-                reinterpret_cast<uint8_t *>(byteArray),
-                reinterpret_cast<uint8_t *>(byteArray) + size
-        );
-
-        env->ReleaseByteArrayElements(bytes, byteArray, JNI_ABORT);
-
-        sampler->play(samples.data(), samples.size());
+        sampler->play(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
     });
 }
 

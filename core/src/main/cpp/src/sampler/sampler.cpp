@@ -16,7 +16,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     outputParameters.device = deviceIndex;
     outputParameters.channelCount = static_cast<int>(channels);
     outputParameters.sampleFormat = paFloat32;
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultHighOutputLatency;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
     outputParameters.hostApiSpecificStreamInfo = nullptr;
 
     PaStream *rawStream = nullptr;
@@ -79,15 +79,19 @@ int Sampler::start() {
     return static_cast<int>((outputLatency + stretchLatency) * 1'000'000);
 }
 
-void Sampler::play(const uint8_t *samples, uint64_t size) {
+void Sampler::play(const uint8_t *buffer, uint64_t size) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream || Pa_IsStreamActive(stream.get()) <= 0) {
         throw SamplerException("Unable to play uninitialized sampler");
     }
 
+    if (!buffer) {
+        throw SamplerException("Invalid buffer");
+    }
+
     if (size <= 0) {
-        throw SamplerException("Unable to play empty samples");
+        throw SamplerException("Invalid buffer size");
     }
 
     int inputSamples = static_cast<int>((float) size / sizeof(float) / (float) channels);
@@ -99,7 +103,7 @@ void Sampler::play(const uint8_t *samples, uint64_t size) {
     std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples));
 
     for (int i = 0; i < inputSamples * channels; ++i) {
-        inputBuffers[i % channels][i / channels] = reinterpret_cast<const float *>(samples)[i];
+        inputBuffers[i % channels][i / channels] = reinterpret_cast<const float *>(buffer)[i];
     }
 
     stretch->process(inputBuffers, inputSamples, outputBuffers, outputSamples);

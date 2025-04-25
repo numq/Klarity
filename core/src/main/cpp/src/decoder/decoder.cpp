@@ -147,11 +147,7 @@ void Decoder::_processAudioFrame() {
     }
 }
 
-void Decoder::_processVideoFrame(uint8_t *buffer, const uint32_t bufferSize) {
-    if (format.videoBufferSize <= 0 || bufferSize < format.videoBufferSize) {
-        throw DecoderException("Invalid video buffer size");
-    }
-
+void Decoder::_processVideoFrame() {
     if (format.width <= 0 || format.height <= 0) {
         throw DecoderException("Invalid video format");
     }
@@ -180,13 +176,17 @@ void Decoder::_processVideoFrame(uint8_t *buffer, const uint32_t bufferSize) {
         throw DecoderException("Could not fill line sizes");
     }
 
+    if (videoBuffer.size() != videoBufferSize) {
+        videoBuffer.resize(videoBufferSize);
+    }
+
     std::vector<uint8_t *> dst(AV_NUM_DATA_POINTERS, nullptr);
 
     if (av_image_fill_pointers(
             dst.data(),
             targetPixelFormat,
             dstHeight,
-            buffer,
+            videoBuffer.data(),
             dstLineSize.data()
     ) <= 0) {
         throw DecoderException("Could not fill pointers");
@@ -359,8 +359,6 @@ Decoder::Decoder(
                     format.durationMicros = 0;
                 }
 
-                format.videoBufferSize += AV_INPUT_BUFFER_PADDING_SIZE;
-
                 if (decodeVideoStream) {
                     if (width > 0) {
                         format.width = width;
@@ -370,16 +368,18 @@ Decoder::Decoder(
                         format.height = height;
                     }
 
-                    if ((format.videoBufferSize = av_image_get_buffer_size(
+                    if ((videoBufferSize = av_image_get_buffer_size(
                             targetPixelFormat,
                             static_cast<int>(format.width),
                             static_cast<int>(format.height),
                             32
                     )) <= 0) {
                         throw DecoderException(
-                                "Could not get video buffer size, error: " + std::to_string(format.videoBufferSize)
+                                "Could not get video buffer size, error: " + std::to_string(videoBufferSize)
                         );
                     }
+
+                    videoBufferSize += AV_INPUT_BUFFER_PADDING_SIZE;
 
                     swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
                             sws_getContext(
@@ -432,6 +432,10 @@ Decoder::~Decoder() {
 
     audioBuffer.shrink_to_fit();
 
+    videoBuffer.clear();
+
+    videoBuffer.shrink_to_fit();
+
     hwVideoFrame.reset();
 
     swVideoFrame.reset();
@@ -451,7 +455,7 @@ Decoder::~Decoder() {
     formatContext.reset();
 }
 
-std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
+std::unique_ptr<Frame> Decoder::decodeAudio() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -489,7 +493,23 @@ std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
 
                     av_frame_unref(audioFrame.get());
 
-                    return std::make_unique<AudioFrame>(timestampMicros, std::move(audioBuffer));
+                    auto size = audioBuffer.size();
+
+                    auto buffer = malloc(size);
+
+                    if (!buffer) {
+                        throw DecoderException("Audio frame buffer allocation error");
+                    }
+
+                    memcpy(buffer, audioBuffer.data(), size);
+
+                    audioBuffer.clear();
+
+                    return std::make_unique<Frame>(
+                            buffer,
+                            size,
+                            timestampMicros
+                    );
                 }
 
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -514,15 +534,11 @@ std::unique_ptr<AudioFrame> Decoder::decodeAudio() {
     return nullptr;
 }
 
-std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t bufferSize) {
+std::unique_ptr<Frame> Decoder::decodeVideo() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
         throw DecoderException("Could not use uninitialized decoder");
-    }
-
-    if (_hasVideo() && bufferSize < format.videoBufferSize) {
-        throw DecoderException("Wrong video buffer size");
     }
 
     if (!_hasVideo()) {
@@ -583,7 +599,7 @@ std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t
                         ));
                     }
 
-                    _processVideoFrame(buffer, bufferSize);
+                    _processVideoFrame();
 
                     av_frame_unref(swVideoFrame.get());
 
@@ -593,7 +609,23 @@ std::unique_ptr<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, const uint32_t
                             AVRational{1, 1'000'000}
                     );
 
-                    return std::make_unique<VideoFrame>(timestampMicros);
+                    auto size = videoBuffer.size();
+
+                    auto buffer = malloc(size);
+
+                    if (!buffer) {
+                        throw DecoderException("Video frame buffer allocation error");
+                    }
+
+                    memcpy(buffer, videoBuffer.data(), size);
+
+                    videoBuffer.clear();
+
+                    return std::make_unique<Frame>(
+                            buffer,
+                            size,
+                            timestampMicros
+                    );
                 }
 
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -680,12 +712,12 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     if (_hasAudio()) {
         audioBuffer.clear();
 
-        audioBuffer.shrink_to_fit();
-
         avcodec_flush_buffers(audioCodecContext.get());
     }
 
     if (_hasVideo()) {
+        videoBuffer.clear();
+
         avcodec_flush_buffers(videoCodecContext.get());
     }
 
@@ -732,8 +764,8 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
         av_frame_free(&frame);
 
-        if (actualTimestamp == -1) {
-            throw DecoderException("Failed to determine actual seek position");
+        if (actualTimestamp < 0) {
+            return timestampMicros;
         }
 
         return actualTimestamp;
@@ -777,12 +809,12 @@ void Decoder::reset() {
     if (_hasAudio()) {
         audioBuffer.clear();
 
-        audioBuffer.shrink_to_fit();
-
         avcodec_flush_buffers(audioCodecContext.get());
     }
 
     if (_hasVideo()) {
+        videoBuffer.clear();
+
         avcodec_flush_buffers(videoCodecContext.get());
     }
 }

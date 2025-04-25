@@ -1,15 +1,11 @@
 #ifndef KLARITY_DECODER_FRAME_H
 #define KLARITY_DECODER_FRAME_H
 
-#include <cstdint>
 #include <vector>
 
-struct AudioFrame {
-    int64_t timestampMicros;
-    std::vector<uint8_t> audioBytes;
-};
-
-struct VideoFrame {
+struct Frame {
+    void *buffer;
+    size_t size;
     int64_t timestampMicros;
 };
 

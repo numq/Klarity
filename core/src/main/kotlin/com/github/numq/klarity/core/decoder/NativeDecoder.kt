@@ -2,10 +2,8 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.cleaner.NativeCleaner
 import com.github.numq.klarity.core.format.NativeFormat
-import com.github.numq.klarity.core.frame.NativeAudioFrame
-import com.github.numq.klarity.core.frame.NativeVideoFrame
+import com.github.numq.klarity.core.frame.NativeFrame
 import java.io.Closeable
-import java.nio.ByteBuffer
 
 internal class NativeDecoder(
     location: String,
@@ -43,10 +41,10 @@ internal class NativeDecoder(
         private external fun getFormatNative(handle: Long): NativeFormat
 
         @JvmStatic
-        private external fun decodeAudioNative(handle: Long): NativeAudioFrame?
+        private external fun decodeAudioNative(handle: Long): NativeFrame?
 
         @JvmStatic
-        private external fun decodeVideoNative(handle: Long, byteBuffer: ByteBuffer): NativeVideoFrame?
+        private external fun decodeVideoNative(handle: Long): NativeFrame?
 
         @JvmStatic
         private external fun seekToNative(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
@@ -82,40 +80,49 @@ internal class NativeDecoder(
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
-        runCatching {
-            synchronized(lock) {
+        synchronized(lock) {
+            runCatching {
                 if (nativeHandle != -1L) {
                     deleteNative(handle = nativeHandle)
 
                     nativeHandle = -1L
                 }
-            }
-        }.getOrDefault(Unit)
+            }.getOrDefault(Unit)
+        }
     }
 
     val format = synchronized(lock) {
-        check(nativeHandle != -1L) { "Decoder has been closed" }
+        runCatching {
+            check(nativeHandle != -1L) { "Decoder has been closed" }
 
-        getFormatNative(handle = nativeHandle)
+            getFormatNative(handle = nativeHandle)
+        }
     }
-
 
     fun decodeAudio() = synchronized(lock) {
-        decodeAudioNative(handle = nativeHandle)
+        runCatching {
+            decodeAudioNative(handle = nativeHandle)
+        }
     }
 
-    fun decodeVideo(byteBuffer: ByteBuffer) = synchronized(lock) {
-        decodeVideoNative(handle = nativeHandle, byteBuffer = byteBuffer)
+    fun decodeVideo() = synchronized(lock) {
+        runCatching {
+            decodeVideoNative(handle = nativeHandle)
+        }
     }
 
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
-        seekToNative(
-            handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
-        ).takeIf { it >= 0 } ?: timestampMicros
+        runCatching {
+            seekToNative(
+                handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
+            ).takeIf { it >= 0 } ?: timestampMicros
+        }
     }
 
     fun reset() = synchronized(lock) {
-        resetNative(handle = nativeHandle)
+        runCatching {
+            resetNative(handle = nativeHandle)
+        }
     }
 
     override fun close() = cleanable.clean()

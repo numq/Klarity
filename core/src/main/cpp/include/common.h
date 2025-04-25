@@ -22,13 +22,9 @@ extern jclass formatClass;
 
 extern jmethodID formatConstructor;
 
-extern jclass audioFrameClass;
+extern jclass frameClass;
 
-extern jmethodID audioFrameConstructor;
-
-extern jclass videoFrameClass;
-
-extern jmethodID videoFrameConstructor;
+extern jmethodID frameConstructor;
 
 extern Decoder *getDecoderPointer(jlong handle);
 

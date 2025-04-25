@@ -26,13 +26,13 @@ namespace delay {
 	*/
 
 	/** @brief Single-channel delay buffer
- 
+
 		Access is used with `buffer[]`, relative to the internal read/write position ("head").  This head is moved using `++buffer` (or `buffer += n`), such that `buffer[1] == (buffer + 1)[0]` in a similar way iterators/pointers.
-		
+
 		Operations like `buffer - 10` or `buffer++` return a View, which holds a fixed position in the buffer (based on the read/write position at the time).
-		
+
 		The capacity includes both positive and negative indices.  For example, a capacity of 100 would support using any of the ranges:
-		
+
 		* `buffer[-99]` to buffer[0]`
 		* `buffer[-50]` to buffer[49]`
 		* `buffer[0]` to buffer[99]`
@@ -81,7 +81,7 @@ namespace delay {
 				bufferIndex = other.bufferIndex;
 				return *this;
 			}
-			
+
 			CSample & operator[](int offset) {
 				return buffer->buffer[(bufferIndex + (unsigned)offset)&buffer->bufferMask];
 			}
@@ -113,7 +113,7 @@ namespace delay {
 		};
 		using MutableView = View<false>;
 		using ConstView = View<true>;
-		
+
 		MutableView view(int offset=0) {
 			return MutableView(*this, offset);
 		}
@@ -145,7 +145,7 @@ namespace delay {
 				data[i] = (*this)[i];
 			}
 		}
-		
+
 		Buffer & operator ++() {
 			++bufferIndex;
 			return *this;
@@ -190,7 +190,7 @@ namespace delay {
 	/** @brief Multi-channel delay buffer
 
 		This behaves similarly to the single-channel `Buffer`, with the following differences:
-		
+
 		* `buffer[c]` returns a view for a single channel, which behaves like the single-channel `Buffer::View`.
 		* The constructor and `.resize()` take an additional first `channel` argument.
 	*/
@@ -223,7 +223,7 @@ namespace delay {
 		public:
 			Stride(CChannel view, int channels, int stride) : view(view), channels(channels), stride(stride) {}
 			Stride(const Stride &other) : view(other.view), channels(other.channels), stride(other.stride) {}
-			
+
 			CSample & operator[](int channel) {
 				return view[channel*stride];
 			}
@@ -255,7 +255,7 @@ namespace delay {
 				return *this;
 			}
 		};
-		
+
 		Stride<false> at(int offset) {
 			return {buffer.view(offset), channels, stride};
 		}
@@ -271,7 +271,7 @@ namespace delay {
 			int channels, stride;
 		public:
 			View(CChannel view, int channels, int stride) : view(view), channels(channels), stride(stride) {}
-			
+
 			CChannel operator[](int channel) {
 				return view + channel*stride;
 			}
@@ -305,7 +305,7 @@ namespace delay {
 		ConstChannel operator[](int channel) const {
 			return buffer + channel*stride;
 		}
-		
+
 		MultiBuffer & operator ++() {
 			++buffer;
 			return *this;
@@ -341,7 +341,7 @@ namespace delay {
 			return ConstView(buffer - i, channels, stride);
 		}
 	};
-	
+
 	/** \defgroup Interpolators Interpolators
 		\ingroup Delay
 		@{ */
@@ -351,7 +351,7 @@ namespace delay {
 	struct InterpolatorNearest {
 		static constexpr int inputLength = 1;
 		static constexpr Sample latency = -0.5; // Because we're truncating, which rounds down too often
-	
+
 		template<class Data>
 		static Sample fractional(const Data &data, Sample) {
 			return data[0];
@@ -363,7 +363,7 @@ namespace delay {
 	struct InterpolatorLinear {
 		static constexpr int inputLength = 2;
 		static constexpr int latency = 0;
-	
+
 		template<class Data>
 		static Sample fractional(const Data &data, Sample fractional) {
 			Sample a = data[0], b = data[1];
@@ -376,7 +376,7 @@ namespace delay {
 	struct InterpolatorCubic {
 		static constexpr int inputLength = 4;
 		static constexpr int latency = 1;
-	
+
 		template<class Data>
 		static Sample fractional(const Data &data, Sample fractional) {
 			// Cubic interpolation
@@ -477,7 +477,7 @@ namespace delay {
 
 		int subSampleSteps;
 		std::vector<Sample> coefficients;
-		
+
 		InterpolatorKaiserSincN() : InterpolatorKaiserSincN(0.5 - 0.45/std::sqrt(n)) {}
 		InterpolatorKaiserSincN(double passFreq) : InterpolatorKaiserSincN(passFreq, 1 - passFreq) {}
 		InterpolatorKaiserSincN(double passFreq, double stopFreq) {
@@ -488,7 +488,7 @@ namespace delay {
 
 			double centreIndex = n*subSampleSteps*0.5, scaleFactor = 1.0/subSampleSteps;
 			std::vector<Sample> windowedSinc(subSampleSteps*n + 1);
-			
+
 			::signalsmith::windows::Kaiser::withBandwidth(kaiserBandwidth, false).fill(windowedSinc, windowedSinc.size());
 
 			for (size_t i = 0; i < windowedSinc.size(); ++i) {
@@ -502,7 +502,7 @@ namespace delay {
 					windowedSinc[i] *= std::sin(p)/p;
 				}
 			}
-			
+
 			if (minimumPhase) {
 				signalsmith::fft::FFT<Sample> fft(windowedSinc.size()*2, 1);
 				windowedSinc.resize(fft.size(), 0);
@@ -534,7 +534,7 @@ namespace delay {
 					windowedSinc[i] = cepstrum[i].real()*scaling;
 				}
 			}
-			
+
 			// Re-order into FIR fractional-delay blocks
 			coefficients.resize(n*(subSampleSteps + 1));
 			for (int k = 0; k <= subSampleSteps; ++k) {
@@ -543,7 +543,7 @@ namespace delay {
 				}
 			}
 		}
-		
+
 		template<class Data>
 		Sample fractional(const Data &data, Sample fractional) const {
 			Sample subSampleDelay = fractional*subSampleSteps;
@@ -551,7 +551,7 @@ namespace delay {
 			if (lowIndex >= subSampleSteps) lowIndex = subSampleSteps - 1;
 			Sample subSampleFractional = subSampleDelay - lowIndex;
 			int highIndex = lowIndex + 1;
-			
+
 			Sample sumLow = 0, sumHigh = 0;
 			const Sample *coeffLow = coefficients.data() + lowIndex*n;
 			const Sample *coeffHigh = coefficients.data() + highIndex*n;
@@ -577,9 +577,9 @@ namespace delay {
 	template<typename Sample>
 	using InterpolatorKaiserSinc4Min = InterpolatorKaiserSincN<Sample, 4, true>;
 	///  @}
-	
+
 	/** @brief A delay-line reader which uses an external buffer
- 
+
 		This is useful if you have multiple delay-lines reading from the same buffer.
 	*/
 	template<class Sample, template<typename> class Interpolator=InterpolatorLinear>
@@ -589,12 +589,12 @@ namespace delay {
 		Reader () {}
 		/// Pass in a configured interpolator
 		Reader (const Interpolator<Sample> &interpolator) : Super(interpolator) {}
-	
+
 		template<typename Buffer>
 		Sample read(const Buffer &buffer, Sample delaySamples) const {
 			int startIndex = delaySamples;
 			Sample remainder = delaySamples - startIndex;
-			
+
 			// Delay buffers use negative indices, but interpolators use positive ones
 			using View = decltype(buffer - startIndex);
 			struct Flipped {
@@ -618,14 +618,14 @@ namespace delay {
 		Delay(int capacity=0) : buffer(1 + capacity + Super::inputLength) {}
 		/// Pass in a configured interpolator
 		Delay(const Interpolator<Sample> &interp, int capacity=0) : Super(interp), buffer(1 + capacity + Super::inputLength) {}
-		
+
 		void reset(Sample value=Sample()) {
 			buffer.reset(value);
 		}
 		void resize(int minCapacity, Sample value=Sample()) {
 			buffer.resize(minCapacity + Super::inputLength, value);
 		}
-		
+
 		/** Read a sample from `delaySamples` >= 0 in the past.
 		The interpolator may add its own latency on top of this (see `Delay::latency`).  The default interpolation (linear) has 0 latency.
 		*/

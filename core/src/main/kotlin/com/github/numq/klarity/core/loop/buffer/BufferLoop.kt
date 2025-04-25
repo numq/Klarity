@@ -1,14 +1,16 @@
 package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.pipeline.Pipeline
-import com.github.numq.klarity.core.timestamp.Timestamp
+import kotlinx.coroutines.CoroutineScope
+import kotlin.time.Duration
 
 interface BufferLoop {
     val isBuffering: Boolean
 
     suspend fun start(
+        coroutineScope: CoroutineScope,
         onException: suspend (BufferLoopException) -> Unit,
-        onTimestamp: suspend (Timestamp) -> Unit,
+        onTimestamp: suspend (Duration) -> Unit,
         onEndOfMedia: suspend () -> Unit
     ): Result<Unit>
 
@@ -17,9 +19,7 @@ interface BufferLoop {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun create(
-            pipeline: Pipeline,
-        ): Result<BufferLoop> = runCatching {
+        internal fun create(pipeline: Pipeline): Result<BufferLoop> = runCatching {
             DefaultBufferLoop(pipeline = pipeline)
         }
     }

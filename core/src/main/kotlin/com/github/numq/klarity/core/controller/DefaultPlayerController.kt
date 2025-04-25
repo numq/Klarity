@@ -72,9 +72,7 @@ internal class DefaultPlayerController(
      */
 
     private val defaultSettings = PlayerSettings(
-        playbackSpeedFactor = 1f,
-        isMuted = false,
-        volume = 1f
+        playbackSpeedFactor = 1f, isMuted = false, volume = 1f
     )
 
     override val settings = MutableStateFlow(initialSettings ?: defaultSettings)
@@ -245,9 +243,7 @@ internal class DefaultPlayerController(
         updateState(InternalPlayerState.Preparing)
 
         val media = Decoder.probe(
-            location = location,
-            findAudioStream = audioBufferSize > 0,
-            findVideoStream = videoBufferSize > 0
+            location = location, findAudioStream = audioBufferSize > 0, findVideoStream = videoBufferSize > 0
         ).getOrThrow()
 
         val pipeline = when (media) {
@@ -339,8 +335,7 @@ internal class DefaultPlayerController(
             parameters = PlaybackLoopFactory.Parameters(
                 pipeline = pipeline,
                 getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
-                getRenderer = { renderer }
-            )
+                getRenderer = { renderer })
         ).getOrThrow()
 
         updateState(
@@ -367,15 +362,13 @@ internal class DefaultPlayerController(
             coroutineScope = playbackScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            onEndOfMedia = { handlePlaybackCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
 
         bufferLoop.start(
             coroutineScope = bufferScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onEndOfMedia = { handleBufferCompletion() }
-        ).getOrThrow()
+            onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PLAYING))
     }
