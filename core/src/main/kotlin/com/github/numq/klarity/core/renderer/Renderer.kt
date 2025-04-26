@@ -2,16 +2,15 @@ package com.github.numq.klarity.core.renderer
 
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.frame.Frame
+import kotlinx.coroutines.flow.Flow
 import java.io.Closeable
 
 /**
- * Interface representing a video frame renderer that allows frame rendering through callbacks.
+ * Interface representing a video frame renderer that allows frame rendering.
  *
  * The renderer validates that frames match its configured video format before processing them.
  *
- * Clients can register a callback to handle rendered frames.
- *
- * The renderer must be properly closed to release resources and clear the callback.
+ * The renderer must be properly closed to release resources.
  */
 interface Renderer : Closeable {
     /**
@@ -22,31 +21,18 @@ interface Renderer : Closeable {
     val format: VideoFormat
 
     /**
-     * Registers a callback to be invoked when frames are rendered.
-     *
-     * Only one callback can be registered at a time.
-     *
-     * Subsequent calls will replace the previous callback.
-     *
-     * The callback will only be invoked for frames that match the renderer's format.
-     *
-     * @param callback The function to invoke when a valid frame is rendered, or `null`
-     *                 to remove the current callback. The callback receives the rendered
-     *                 video frame content.
+     * A flow containing the current frame with video content
      */
-    fun onRender(callback: (Frame.Video.Content) -> Unit)
+    val frame: Flow<Frame.Content.Video>
 
     /**
      * Renders the given video frame if it matches the renderer's format.
-     *
-     * If the frame's dimensions match the renderer's format and a callback is registered,
-     * the callback will be invoked with the frame content.
      *
      * Invalid frames are silently ignored.
      *
      * @param frame The video frame content to render.
      */
-    fun render(frame: Frame.Video.Content)
+    fun render(frame: Frame.Content.Video)
 
     companion object {
         /**
@@ -58,7 +44,7 @@ interface Renderer : Closeable {
          *         creation fails.
          */
         fun create(format: VideoFormat): Result<Renderer> = runCatching {
-            DefaultRenderer(format = format)
+            ChannelRenderer(format = format)
         }
     }
 }

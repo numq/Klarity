@@ -107,7 +107,8 @@ fun PlaylistDrawer(
                                 ), contentAlignment = Alignment.Center
                             ) {
                                 when (item) {
-                                    is PlaylistItem.Pending -> PendingPlaylistItem(playlistItem = item,
+                                    is PlaylistItem.Pending -> PendingPlaylistItem(
+                                        playlistItem = item,
                                         delete = { delete(item) })
 
                                     is PlaylistItem.Uploaded -> {

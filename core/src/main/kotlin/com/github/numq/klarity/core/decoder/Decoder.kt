@@ -8,7 +8,7 @@ import com.github.numq.klarity.core.media.Media
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
-interface Decoder<Media, Frame> {
+interface Decoder<Media> {
     val media: Media
 
     suspend fun decode(): Result<Frame>
@@ -83,7 +83,7 @@ interface Decoder<Media, Frame> {
             location: String,
             sampleRate: Int?,
             channels: Int?,
-        ): Result<Decoder<Media.Audio, Frame.Audio>> = runCatching {
+        ): Result<Decoder<Media.Audio>> = runCatching {
             val decoder = NativeDecoder(
                 location = location,
                 findAudioStream = true,
@@ -126,11 +126,7 @@ interface Decoder<Media, Frame> {
             height: Int?,
             frameRate: Double?,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-        ): Result<Decoder<Media.Video, Frame.Video>> = runCatching {
-            if (frameRate != null) {
-                require(frameRate > .0) { "Frame rate must be positive" }
-            }
-
+        ): Result<Decoder<Media.Video>> = runCatching {
             val decoder = NativeDecoder(
                 location = location,
                 findAudioStream = false,
@@ -173,6 +169,68 @@ interface Decoder<Media, Frame> {
             }
 
             VideoDecoder(decoder = decoder, media = media)
+        }
+
+        internal fun createMediaDecoder(
+            location: String,
+            sampleRate: Int?,
+            channels: Int?,
+            width: Int?,
+            height: Int?,
+            frameRate: Double?,
+            hardwareAccelerationCandidates: List<HardwareAcceleration>?,
+        ): Result<Decoder<Media.AudioVideo>> = runCatching {
+            val decoder = NativeDecoder(
+                location = location,
+                findAudioStream = true,
+                findVideoStream = true,
+                decodeAudioStream = true,
+                decodeVideoStream = true,
+                sampleRate = sampleRate,
+                channels = channels,
+                width = width,
+                height = height,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates?.map { candidate ->
+                    candidate.native.ordinal
+                }?.toIntArray()
+            )
+
+            val format = decoder.format.getOrThrow()
+
+            val audioFormat = format.takeIf { fmt ->
+                fmt.sampleRate > 0 && fmt.channels > 0
+            }?.let { fmt ->
+                AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
+            }
+
+            val videoFormat = format.takeIf { fmt ->
+                fmt.width > 0 && fmt.height > 0
+            }?.let { fmt ->
+                VideoFormat(
+                    width = fmt.width,
+                    height = fmt.height,
+                    frameRate = frameRate ?: fmt.frameRate,
+                    hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
+                )
+            }
+
+            if (audioFormat == null || videoFormat == null) {
+                decoder.close()
+
+                error("Could not create media decoder for $location")
+            }
+
+            val media = with(decoder) {
+                Media.AudioVideo(
+                    id = nativeHandle,
+                    location = location,
+                    duration = format.durationMicros.microseconds,
+                    audioFormat = audioFormat,
+                    videoFormat = videoFormat
+                )
+            }
+
+            MediaDecoder(decoder = decoder, media = media)
         }
     }
 }

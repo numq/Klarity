@@ -47,6 +47,9 @@ internal class NativeDecoder(
         private external fun decodeVideoNative(handle: Long): NativeFrame?
 
         @JvmStatic
+        private external fun decodeMediaNative(handle: Long): NativeFrame?
+
+        @JvmStatic
         private external fun seekToNative(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
 
         @JvmStatic
@@ -108,6 +111,12 @@ internal class NativeDecoder(
     fun decodeVideo() = synchronized(lock) {
         runCatching {
             decodeVideoNative(handle = nativeHandle)
+        }
+    }
+
+    fun decodeMedia() = synchronized(lock) {
+        runCatching {
+            decodeMediaNative(handle = nativeHandle)
         }
     }
 

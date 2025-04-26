@@ -131,9 +131,10 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         return env->NewObject(
                 frameClass,
                 frameConstructor,
-                frame->buffer,
-                frame->size,
-                static_cast<jlong>(frame->timestampMicros)
+                reinterpret_cast<jlong>(frame->buffer),
+                static_cast<jint>(frame->size),
+                static_cast<jlong>(frame->timestampMicros),
+                static_cast<jint>(frame->type)
         );
     }, nullptr);
 }
@@ -155,9 +156,35 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         return env->NewObject(
                 frameClass,
                 frameConstructor,
-                frame->buffer,
-                frame->size,
-                static_cast<jlong>(frame->timestampMicros)
+                reinterpret_cast<jlong>(frame->buffer),
+                static_cast<jint>(frame->size),
+                static_cast<jlong>(frame->timestampMicros),
+                static_cast<jint>(frame->type)
+        );
+    }, nullptr);
+}
+
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeMediaNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+) {
+    return handleException<jobject>(env, [&] {
+        auto decoder = getDecoderPointer(handle);
+
+        auto frame = decoder->decodeMedia();
+
+        if (!frame) {
+            return static_cast<jobject>(nullptr);
+        }
+
+        return env->NewObject(
+                frameClass,
+                frameConstructor,
+                reinterpret_cast<jlong>(frame->buffer),
+                static_cast<jint>(frame->size),
+                static_cast<jlong>(frame->timestampMicros),
+                static_cast<jint>(frame->type)
         );
     }, nullptr);
 }

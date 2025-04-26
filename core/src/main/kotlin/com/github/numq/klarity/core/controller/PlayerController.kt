@@ -1,11 +1,11 @@
 package com.github.numq.klarity.core.controller
 
-import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.buffer.VideoBufferFactory
+import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.MediaDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
@@ -50,10 +50,10 @@ interface PlayerController {
     companion object {
         internal fun create(
             initialSettings: PlayerSettings?,
-            audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
-            videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
-            audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
-            videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
+            audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,
+            videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>>,
+            mediaDecoderFactory: Factory<MediaDecoderFactory.Parameters, Decoder<Media.AudioVideo>>,
+            bufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame>>,
             bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
             playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
             samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
@@ -62,8 +62,8 @@ interface PlayerController {
                 initialSettings = initialSettings,
                 audioDecoderFactory = audioDecoderFactory,
                 videoDecoderFactory = videoDecoderFactory,
-                audioBufferFactory = audioBufferFactory,
-                videoBufferFactory = videoBufferFactory,
+                mediaDecoderFactory = mediaDecoderFactory,
+                bufferFactory = bufferFactory,
                 bufferLoopFactory = bufferLoopFactory,
                 playbackLoopFactory = playbackLoopFactory,
                 samplerFactory = samplerFactory

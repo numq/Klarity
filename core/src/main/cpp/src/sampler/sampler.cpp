@@ -7,6 +7,10 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
 
     this->channels = channels;
 
+    stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
+
+    stretch->presetDefault(static_cast<int>(channels), static_cast<float>(sampleRate));
+
     PaDeviceIndex deviceIndex = Pa_GetDefaultOutputDevice();
     if (deviceIndex == paNoDevice) {
         throw SamplerException("Error: No default output device");
@@ -28,7 +32,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
             &outputParameters,
             sampleRate,
             paFramesPerBufferUnspecified,
-            paNoFlag,
+            paClipOff | paDitherOff,
             nullptr,
             nullptr
     ) != paNoError) || !rawStream) {
@@ -36,10 +40,6 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     }
 
     stream = std::unique_ptr<PaStream, PaStreamDeleter>(rawStream);
-
-    stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
-
-    stretch->presetDefault(static_cast<int>(channels), static_cast<float>(sampleRate));
 }
 
 void Sampler::setPlaybackSpeed(float factor) {
@@ -73,10 +73,13 @@ int Sampler::start() {
 
     double outputLatency = Pa_GetStreamInfo(stream.get())->outputLatency;
 
-    double stretchLatency =
-            (stretch->inputLatency() + stretch->outputLatency()) / static_cast<double>(this->sampleRate);
+    double stretchInputLatency = stretch->inputLatency() / static_cast<double>(sampleRate);
 
-    return static_cast<int>((outputLatency + stretchLatency) * 1'000'000);
+    double stretchOutputLatency = stretch->outputLatency() / static_cast<double>(sampleRate);
+
+    double totalLatency = outputLatency + stretchInputLatency + stretchOutputLatency;
+
+    return static_cast<int>(totalLatency * 1'000'000);
 }
 
 void Sampler::play(const uint8_t *buffer, uint64_t size) {

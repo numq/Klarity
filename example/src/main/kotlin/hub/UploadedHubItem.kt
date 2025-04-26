@@ -123,6 +123,7 @@ fun UploadedHubItem(
 
             runBlocking {
                 hubItem.previewManager?.close()
+
                 hubItem.player.close()
             }
         }

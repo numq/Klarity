@@ -7,17 +7,11 @@ import java.util.concurrent.LinkedBlockingQueue
 internal class BlockingBuffer<T : Closeable>(override val capacity: Int) : Buffer<T> {
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private val items by lazy {
-        LinkedBlockingQueue<T>(capacity)
-    }
+    private val items by lazy { LinkedBlockingQueue<T>(capacity) }
 
-    override suspend fun poll() = runCatching {
-        runInterruptible(Dispatchers.IO) { items.take() }
-    }
+    override suspend fun poll() = runCatching { runInterruptible(Dispatchers.IO) { items.take() } }
 
-    override suspend fun put(item: T) = runCatching {
-        runInterruptible(Dispatchers.IO) { items.put(item) }
-    }
+    override suspend fun put(item: T) = runCatching { runInterruptible(Dispatchers.IO) { items.put(item) } }
 
     override suspend fun flush() = runCatching {
         awaitAll(

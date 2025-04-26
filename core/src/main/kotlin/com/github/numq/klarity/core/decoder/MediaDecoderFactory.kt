@@ -4,9 +4,11 @@ import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 
-class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>> {
+class MediaDecoderFactory : Factory<MediaDecoderFactory.Parameters, Decoder<Media.AudioVideo>> {
     data class Parameters(
         val location: String,
+        val sampleRate: Int?,
+        val channels: Int?,
         val width: Int?,
         val height: Int?,
         val frameRate: Double?,
@@ -14,8 +16,10 @@ class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Medi
     )
 
     override fun create(parameters: Parameters) = with(parameters) {
-        Decoder.createVideoDecoder(
+        Decoder.createMediaDecoder(
             location = location,
+            sampleRate = sampleRate,
+            channels = channels,
             width = width,
             height = height,
             frameRate = frameRate,

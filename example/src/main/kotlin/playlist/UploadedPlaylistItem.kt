@@ -15,8 +15,6 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,7 +24,6 @@ import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.RendererComponent
 import com.github.numq.klarity.compose.scale.ImageScale
 import com.github.numq.klarity.core.media.Media
-import com.github.numq.klarity.core.renderer.Renderer
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -36,19 +33,9 @@ fun UploadedPlaylistItem(
     select: () -> Unit,
     delete: () -> Unit,
 ) {
-    val renderer = remember(playlistItem.id) {
-        playlistItem.media.videoFormat?.let(Renderer::create)?.getOrThrow()
-    }
-
-    LaunchedEffect(playlistItem.id) {
-        playlistItem.snapshot?.let { frame ->
-            renderer?.render(frame)
-        }
-    }
-
     DisposableEffect(Unit) {
         onDispose {
-            renderer?.close()
+            playlistItem.renderer?.close()
         }
     }
 
@@ -71,7 +58,7 @@ fun UploadedPlaylistItem(
                     when (playlistItem.media) {
                         is Media.Audio -> Icon(Icons.Default.AudioFile, null)
 
-                        else -> renderer?.let {
+                        else -> playlistItem.renderer?.let {
                             RendererComponent(
                                 modifier = Modifier.aspectRatio(1f).clip(CircleShape),
                                 foreground = Foreground(renderer = it, imageScale = ImageScale.Crop),

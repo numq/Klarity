@@ -97,7 +97,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    frameConstructor = env->GetMethodID(frameClass, "<init>", "(JIJ)V");
+    frameConstructor = env->GetMethodID(frameClass, "<init>", "(JIJI)V");
 
     if (frameConstructor == nullptr) {
         return JNI_ERR;

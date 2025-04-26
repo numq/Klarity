@@ -51,6 +51,12 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         jlong handle
 );
 
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeMediaNative(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong handle
+);
+
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
         JNIEnv *env,
         jclass thisClass,

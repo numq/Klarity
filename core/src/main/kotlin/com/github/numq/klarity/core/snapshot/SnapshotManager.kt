@@ -44,7 +44,7 @@ object SnapshotManager {
                 }.mapNotNull { timestamp ->
                     decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrNull()
 
-                    decoder.decode().getOrNull() as? Frame.Video.Content
+                    decoder.decode().getOrNull() as? Frame.Content.Video
                 }
             } finally {
                 decoder.close().getOrThrow()
@@ -81,5 +81,5 @@ object SnapshotManager {
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,
         timestamps = { duration ->
             listOf(timestamp(duration))
-        }).map(List<Frame.Video.Content?>::firstOrNull)
+        }).map(List<Frame.Content.Video?>::firstOrNull)
 }

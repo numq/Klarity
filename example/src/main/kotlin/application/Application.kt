@@ -76,7 +76,8 @@ fun main() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                DecorationBox(window = window,
+                DecorationBox(
+                    window = window,
                     isDarkTheme = isDarkTheme,
                     changeTheme = setIsDarkTheme,
                     close = { exitProcess(0) }) {

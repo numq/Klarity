@@ -508,7 +508,8 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
                     return std::make_unique<Frame>(
                             buffer,
                             size,
-                            timestampMicros
+                            timestampMicros,
+                            FrameType::AUDIO
                     );
                 }
 
@@ -624,7 +625,8 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                     return std::make_unique<Frame>(
                             buffer,
                             size,
-                            timestampMicros
+                            timestampMicros,
+                            FrameType::VIDEO
                     );
                 }
 
@@ -638,6 +640,177 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
     } catch (...) {
         if (packet) {
             av_packet_unref(packet.get());
+        }
+
+        if (hwVideoFrame) {
+            av_frame_unref(hwVideoFrame.get());
+        }
+
+        if (swVideoFrame) {
+            av_frame_unref(swVideoFrame.get());
+        }
+
+        throw;
+    }
+
+    return nullptr;
+}
+
+std::unique_ptr<Frame> Decoder::decodeMedia() {
+    std::unique_lock<std::shared_mutex> lock(mutex);
+
+    if (!_isValid()) {
+        throw DecoderException("Could not use uninitialized decoder");
+    }
+
+    if (!_hasAudio() && !_hasVideo()) {
+        throw DecoderException("Unable to find media stream");
+    }
+
+    av_packet_unref(packet.get());
+
+    try {
+        while (av_read_frame(formatContext.get(), packet.get()) == 0) {
+            if (packet->stream_index == audioStream->index) {
+                if (avcodec_send_packet(audioCodecContext.get(), packet.get()) < 0) {
+                    continue;
+                }
+
+                av_packet_unref(packet.get());
+
+                int ret;
+
+                while ((ret = avcodec_receive_frame(audioCodecContext.get(), audioFrame.get())) == 0) {
+                    const auto frameTimestampMicros = audioFrame->best_effort_timestamp
+                                                      ? audioFrame->best_effort_timestamp : audioFrame->pts;
+
+                    const auto timestampMicros = av_rescale_q(
+                            frameTimestampMicros,
+                            audioStream->time_base,
+                            AVRational{1, 1'000'000}
+                    );
+
+                    _processAudioFrame();
+
+                    av_frame_unref(audioFrame.get());
+
+                    auto size = audioBuffer.size();
+
+                    auto buffer = malloc(size);
+
+                    if (!buffer) {
+                        throw DecoderException("Audio frame buffer allocation error");
+                    }
+
+                    memcpy(buffer, audioBuffer.data(), size);
+
+                    audioBuffer.clear();
+
+                    return std::make_unique<Frame>(
+                            buffer,
+                            size,
+                            timestampMicros,
+                            FrameType::AUDIO
+                    );
+                }
+
+                if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                    throw DecoderException("Error while receiving audio frame");
+                }
+            } else {
+                if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
+                    continue;
+                }
+
+                av_packet_unref(packet.get());
+
+                int ret;
+
+                while ((ret = avcodec_receive_frame(
+                        videoCodecContext.get(),
+                        _isHardwareAccelerated() ? hwVideoFrame.get() : swVideoFrame.get()
+                )) == 0) {
+                    if (_isHardwareAccelerated()) {
+                        if (av_hwframe_transfer_data(swVideoFrame.get(), hwVideoFrame.get(), 0) < 0) {
+                            throw DecoderException("Error transferring frame to system memory");
+                        }
+
+                        if (swVideoFrame->format == AV_PIX_FMT_NONE || !swVideoFrame->data[0]) {
+                            throw DecoderException("Failed to transfer frame data");
+                        }
+
+                        swVideoFrame->best_effort_timestamp = hwVideoFrame->best_effort_timestamp;
+
+                        swVideoFrame->pts = hwVideoFrame->pts;
+
+                        av_frame_unref(hwVideoFrame.get());
+                    }
+
+                    const auto frameTimestampMicros = swVideoFrame->best_effort_timestamp
+                                                      ? swVideoFrame->best_effort_timestamp : swVideoFrame->pts;
+
+                    if (swVideoFrame->width != videoCodecContext->width ||
+                        swVideoFrame->height != videoCodecContext->height ||
+                        swVideoFrame->format != videoCodecContext->pix_fmt) {
+                        swsContext.reset(sws_getCachedContext(
+                                swsContext.release(),
+                                swVideoFrame->width,
+                                swVideoFrame->height,
+                                static_cast<AVPixelFormat>(swVideoFrame->format),
+                                static_cast<int>(format.width),
+                                static_cast<int>(format.height),
+                                targetPixelFormat,
+                                swsFlags,
+                                nullptr,
+                                nullptr,
+                                nullptr
+                        ));
+                    }
+
+                    _processVideoFrame();
+
+                    av_frame_unref(swVideoFrame.get());
+
+                    const auto timestampMicros = av_rescale_q(
+                            frameTimestampMicros,
+                            videoStream->time_base,
+                            AVRational{1, 1'000'000}
+                    );
+
+                    auto size = videoBuffer.size();
+
+                    auto buffer = malloc(size);
+
+                    if (!buffer) {
+                        throw DecoderException("Video frame buffer allocation error");
+                    }
+
+                    memcpy(buffer, videoBuffer.data(), size);
+
+                    videoBuffer.clear();
+
+                    return std::make_unique<Frame>(
+                            buffer,
+                            size,
+                            timestampMicros,
+                            FrameType::VIDEO
+                    );
+                }
+
+                if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                    throw DecoderException("Error while receiving video frame");
+                }
+            }
+
+            av_packet_unref(packet.get());
+        }
+    } catch (...) {
+        if (packet) {
+            av_packet_unref(packet.get());
+        }
+
+        if (audioFrame) {
+            av_frame_unref(audioFrame.get());
         }
 
         if (hwVideoFrame) {

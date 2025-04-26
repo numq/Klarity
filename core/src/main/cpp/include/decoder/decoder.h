@@ -151,6 +151,8 @@ public:
 
     std::unique_ptr<Frame> decodeVideo();
 
+    std::unique_ptr<Frame> decodeMedia();
+
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();

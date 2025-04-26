@@ -8,7 +8,7 @@ import kotlinx.coroutines.*
 import kotlin.time.Duration
 
 internal class DefaultPreviewManager(
-    private val videoDecoder: Decoder<Media.Video, Frame.Video>,
+    private val videoDecoder: Decoder<Media.Video>,
 ) : PreviewManager {
     private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -36,7 +36,7 @@ internal class DefaultPreviewManager(
 
             videoDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
 
-            (videoDecoder.decode().getOrNull() as? Frame.Video.Content)?.let { frame ->
+            (videoDecoder.decode().getOrNull() as? Frame.Content.Video)?.let { frame ->
                 renderer?.render(frame)
             }
         }

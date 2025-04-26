@@ -1,7 +1,7 @@
 package playlist
 
-import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.renderer.Renderer
 import java.util.*
 
 sealed class PlaylistItem private constructor(open val id: Long) {
@@ -9,7 +9,7 @@ sealed class PlaylistItem private constructor(open val id: Long) {
         UUID.randomUUID().mostSignificantBits and Long.MAX_VALUE
     )
 
-    data class Uploaded(val media: Media, val snapshot: Frame.Video.Content?) : PlaylistItem(
+    data class Uploaded(val media: Media, val renderer: Renderer?) : PlaylistItem(
         UUID.randomUUID().mostSignificantBits and Long.MAX_VALUE
     )
 }

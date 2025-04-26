@@ -105,7 +105,14 @@ fun PlaylistScreenSuccess(
                 queue.add(pendingItem)
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
                     val uploadedItem = PlaylistItem.Uploaded(
-                        media = media, snapshot = SnapshotManager.snapshot(location = media.location).getOrNull()
+                        media = media,
+                        renderer = SnapshotManager.snapshot(location = media.location).getOrNull()?.let { snapshot ->
+                            media.videoFormat?.let(Renderer::create)?.onFailure {
+                                snapshot.close()
+                            }?.getOrNull()?.apply {
+                                render(snapshot)
+                            }
+                        }
                     )
                     queue.replace(pendingItem, uploadedItem)
                 }.onFailure(::handleException).onFailure {

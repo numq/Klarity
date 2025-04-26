@@ -7,15 +7,23 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 
 sealed interface Frame : Closeable {
-    val isClosed: Boolean
+    sealed interface Content : Frame {
+        val bufferHandle: Long
 
-    sealed interface Audio : Frame {
-        data class Content(
-            val bufferHandle: Long,
-            val bufferSize: Int,
-            val timestamp: Duration,
-        ) : Audio {
+        val bufferSize: Int
+
+        val timestamp: Duration
+
+        val isClosed: Boolean
+
+        data class Audio(
+            override val bufferHandle: Long,
+            override val bufferSize: Int,
+            override val timestamp: Duration,
+        ) : Content {
             private val handle = AtomicLong(bufferHandle)
+
+            override val isClosed = handle.get() == -1L
 
             private val cleanable = NativeCleaner.cleaner.register(this) {
                 if (!isClosed) {
@@ -25,45 +33,33 @@ sealed interface Frame : Closeable {
                 }
             }
 
-            override val isClosed = handle.get() == -1L
-
             override fun close() = cleanable.clean()
         }
 
-        data object EndOfStream : Audio {
-            override val isClosed = true
+        data class Video(
+            override val bufferHandle: Long,
+            override val bufferSize: Int,
+            override val timestamp: Duration,
+            val width: Int,
+            val height: Int
+        ) : Content {
+            private val handle = AtomicLong(bufferHandle)
 
-            override fun close() = Unit
+            override val isClosed = handle.get() == -1L
+
+            private val cleanable = NativeCleaner.cleaner.register(this) {
+                if (!isClosed) {
+                    NativeMemory.free(handle.get())
+
+                    handle.set(-1L)
+                }
+            }
+
+            override fun close() = cleanable.clean()
         }
     }
 
-    sealed interface Video : Frame {
-        data class Content(
-            val bufferHandle: Long,
-            val bufferSize: Int,
-            val timestamp: Duration,
-            val width: Int,
-            val height: Int
-        ) : Video {
-            private val handle = AtomicLong(bufferHandle)
-
-            private val cleanable = NativeCleaner.cleaner.register(this) {
-                if (!isClosed) {
-                    NativeMemory.free(handle.get())
-
-                    handle.set(-1L)
-                }
-            }
-
-            override val isClosed = handle.get() == -1L
-
-            override fun close() = cleanable.clean()
-        }
-
-        data object EndOfStream : Video {
-            override val isClosed = true
-
-            override fun close() = Unit
-        }
+    data object EndOfStream : Frame {
+        override fun close() = Unit
     }
 }

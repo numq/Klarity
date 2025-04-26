@@ -2,17 +2,16 @@ package com.github.numq.klarity.core.loop.playback
 
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.Sampler
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
@@ -25,40 +24,48 @@ internal class DefaultPlaybackLoop(
 
     private var isPlaying = false
 
+    private val audioClockTime = AtomicReference(Duration.INFINITE)
+
+    private val videoClockTime = AtomicReference(Duration.INFINITE)
+
     private suspend fun handleAudioPlayback(
-        media: Media.Audio,
-        buffer: Buffer<Frame.Audio>,
+        mediaDuration: Duration,
+        buffer: Buffer<Frame>,
         sampler: Sampler,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
-        var lastFrameTime = Duration.INFINITE
-
         while (currentCoroutineContext().isActive) {
             val frame = buffer.poll().getOrThrow()
 
             try {
                 when (frame) {
-                    is Frame.Audio.Content -> {
+                    is Frame.Content.Audio -> {
                         currentCoroutineContext().ensureActive()
-
-                        onTimestamp(lastFrameTime)
 
                         sampler.play(frame).getOrThrow()
 
-                        lastFrameTime = frame.timestamp
+                        val frameTime = frame.timestamp
+
+                        onTimestamp(frameTime)
+
+                        audioClockTime.set(frameTime)
                     }
 
-                    is Frame.Audio.EndOfStream -> {
+                    is Frame.EndOfStream -> {
                         currentCoroutineContext().ensureActive()
 
                         withContext(Dispatchers.IO) { frame.close() }
 
-                        if (lastFrameTime.isFinite()) {
-                            delay((media.duration - lastFrameTime) / getPlaybackSpeedFactor())
+                        if (audioClockTime.get().isFinite()) {
+                            delay((mediaDuration - audioClockTime.get()) / getPlaybackSpeedFactor())
                         }
+
+                        audioClockTime.set(Duration.INFINITE)
 
                         break
                     }
+
+                    else -> error("Unsupported frame type: ${frame::class}")
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.IO) { frame.close() }
@@ -71,167 +78,65 @@ internal class DefaultPlaybackLoop(
     }
 
     private suspend fun handleVideoPlayback(
-        media: Media.Video,
-        buffer: Buffer<Frame.Video>,
+        mediaDuration: Duration,
+        buffer: Buffer<Frame>,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
-        var lastFrameTime = Duration.INFINITE
+        val playbackStartTime = System.nanoTime().nanoseconds
 
         while (currentCoroutineContext().isActive) {
             val frame = buffer.poll().getOrThrow()
 
             try {
                 when (frame) {
-                    is Frame.Video.Content -> {
+                    is Frame.Content.Video -> {
                         currentCoroutineContext().ensureActive()
 
                         val frameTime = frame.timestamp
 
-                        if (lastFrameTime.isFinite()) {
-                            val diffTime = frameTime - lastFrameTime
+                        while (currentCoroutineContext().isActive) {
+                            val elapsedTime = System.nanoTime().nanoseconds - playbackStartTime
 
-                            delay(diffTime / getPlaybackSpeedFactor())
+                            val clockTime = audioClockTime.get().takeIf(Duration::isFinite)
+                                ?: (videoClockTime.get() + elapsedTime * getPlaybackSpeedFactor())
+
+                            val diffTime = frame.timestamp - clockTime
+
+                            if (diffTime <= Duration.ZERO) break
+
+                            delay(500.microseconds)
                         }
 
-                        onTimestamp(frame.timestamp)
+                        currentCoroutineContext().ensureActive()
 
                         getRenderer()?.render(frame)
 
-                        lastFrameTime = frame.timestamp
+                        onTimestamp(frame.timestamp)
+
+                        videoClockTime.set(frameTime)
                     }
 
-                    is Frame.Video.EndOfStream -> {
+                    is Frame.EndOfStream -> {
                         currentCoroutineContext().ensureActive()
 
                         withContext(Dispatchers.IO) { frame.close() }
 
-                        if (lastFrameTime.isFinite()) {
-                            delay((media.duration - lastFrameTime) / getPlaybackSpeedFactor())
+                        if (videoClockTime.get().isFinite()) {
+                            delay((mediaDuration - videoClockTime.get()) / getPlaybackSpeedFactor())
                         }
+
+                        videoClockTime.set(Duration.INFINITE)
+
+                        break
                     }
+
+                    else -> error("Unsupported frame type: ${frame::class}")
                 }
             } catch (t: Throwable) {
                 withContext(Dispatchers.IO) { frame.close() }
-
                 throw t
             }
-
-            delay(500.microseconds)
         }
-    }
-
-    @OptIn(DelicateCoroutinesApi::class)
-    private suspend fun handleMediaPlayback(
-        media: Media.AudioVideo,
-        audioBuffer: Buffer<Frame.Audio>,
-        videoBuffer: Buffer<Frame.Video>,
-        sampler: Sampler,
-        onAudioTimestamp: suspend (Duration) -> Unit,
-        onVideoTimestamp: suspend (Duration) -> Unit,
-    ) = coroutineScope {
-        val latencyTime = sampler.getLatency().getOrThrow().microseconds
-
-        val syncTime = Channel<Duration>(Channel.CONFLATED)
-
-        val audioJob = launch {
-            var lastFrameTime = Duration.INFINITE
-
-            while (isActive) {
-                val frame = audioBuffer.poll().getOrThrow()
-
-                try {
-                    when (frame) {
-                        is Frame.Audio.Content -> {
-                            ensureActive()
-
-                            val frameTime = frame.timestamp - latencyTime
-
-                            syncTime.trySend(frameTime)
-
-                            onAudioTimestamp(frame.timestamp)
-
-                            sampler.play(frame).getOrThrow()
-
-                            lastFrameTime = frame.timestamp
-                        }
-
-                        is Frame.Audio.EndOfStream -> {
-                            ensureActive()
-
-                            withContext(Dispatchers.IO) { frame.close() }
-
-                            if (lastFrameTime.isFinite()) {
-                                delay((media.duration - lastFrameTime) / this@DefaultPlaybackLoop.getPlaybackSpeedFactor())
-                            }
-
-                            syncTime.close()
-
-                            break
-                        }
-                    }
-                } catch (t: Throwable) {
-                    withContext(Dispatchers.IO) { frame.close() }
-                }
-            }
-        }
-
-        val videoJob = launch {
-            val thresholdTime = 5.milliseconds
-
-            var lastFrameTime = Duration.INFINITE
-
-            while (isActive) {
-                val frame = videoBuffer.poll().getOrThrow()
-
-                try {
-                    when (frame) {
-                        is Frame.Video.Content -> {
-                            ensureActive()
-
-                            val targetTime = if (syncTime.isClosedForReceive) {
-                                lastFrameTime.takeIf(Duration::isFinite) ?: Duration.ZERO
-                            } else {
-                                syncTime.receive()
-                            }
-
-                            val frameTime = frame.timestamp
-
-                            val diffTime = frameTime - targetTime
-
-                            if (diffTime > thresholdTime) {
-                                delay(diffTime / getPlaybackSpeedFactor())
-                            } else if (diffTime < -thresholdTime) {
-                                withContext(Dispatchers.IO) { frame.close() }
-
-                                continue
-                            }
-
-                            getRenderer()?.render(frame)
-
-                            onVideoTimestamp(frame.timestamp)
-
-                            lastFrameTime = frame.timestamp
-                        }
-
-                        is Frame.Video.EndOfStream -> {
-                            ensureActive()
-
-                            withContext(Dispatchers.IO) { frame.close() }
-
-                            if (lastFrameTime.isFinite()) {
-                                delay((media.duration - lastFrameTime) / this@DefaultPlaybackLoop.getPlaybackSpeedFactor())
-                            }
-
-                            break
-                        }
-                    }
-                } catch (t: Throwable) {
-                    withContext(Dispatchers.IO) { frame.close() }
-                }
-            }
-        }
-
-        joinAll(audioJob, videoJob)
     }
 
     override suspend fun start(
@@ -258,14 +163,14 @@ internal class DefaultPlaybackLoop(
                     with(pipeline) {
                         when (this) {
                             is Pipeline.Audio -> handleAudioPlayback(
-                                media = media,
+                                mediaDuration = media.duration,
                                 buffer = buffer,
                                 sampler = sampler,
                                 onTimestamp = onTimestamp
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                media = media,
+                                mediaDuration = media.duration,
                                 buffer = buffer,
                                 onTimestamp = onTimestamp
                             )
@@ -273,25 +178,67 @@ internal class DefaultPlaybackLoop(
                             is Pipeline.AudioVideo -> {
                                 var lastFrameTimestamp = Duration.ZERO
 
-                                handleMediaPlayback(
-                                    media = media,
-                                    audioBuffer = audioBuffer,
-                                    videoBuffer = videoBuffer,
-                                    sampler = sampler,
-                                    onAudioTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
+                                val audioJob = launch {
+                                    handleAudioPlayback(
+                                        mediaDuration = media.duration,
+                                        buffer = audioBuffer,
+                                        sampler = sampler,
+                                        onTimestamp = { frameTimestamp ->
+                                            if (frameTimestamp > lastFrameTimestamp) {
+                                                onTimestamp(frameTimestamp)
 
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    },
-                                    onVideoTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
+                                                lastFrameTimestamp = frameTimestamp
+                                            }
+                                        })
+                                }
 
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    })
+                                val videoJob = launch {
+                                    handleVideoPlayback(
+                                        mediaDuration = media.duration,
+                                        buffer = videoBuffer,
+                                        onTimestamp = { frameTimestamp ->
+                                            if (frameTimestamp > lastFrameTimestamp) {
+                                                onTimestamp(frameTimestamp)
+
+                                                lastFrameTimestamp = frameTimestamp
+                                            }
+                                        })
+                                }
+
+                                joinAll(audioJob, videoJob)
+                            }
+
+                            is Pipeline.AudioVideoSingleDecoder -> {
+                                var lastFrameTimestamp = Duration.ZERO
+
+                                val audioJob = launch {
+                                    handleAudioPlayback(
+                                        mediaDuration = media.duration,
+                                        buffer = audioBuffer,
+                                        sampler = sampler,
+                                        onTimestamp = { frameTimestamp ->
+                                            if (frameTimestamp > lastFrameTimestamp) {
+                                                onTimestamp(frameTimestamp)
+
+                                                lastFrameTimestamp = frameTimestamp
+                                            }
+                                        })
+                                }
+
+                                val videoJob = launch {
+                                    handleVideoPlayback(
+                                        mediaDuration = media.duration,
+                                        buffer = videoBuffer,
+                                        onTimestamp = { frameTimestamp ->
+                                            if (frameTimestamp > lastFrameTimestamp) {
+                                                onTimestamp(frameTimestamp)
+
+                                                lastFrameTimestamp = frameTimestamp
+                                            }
+                                        })
+                                }
+
+                                joinAll(audioJob, videoJob)
                             }
                         }
                     }
@@ -301,6 +248,10 @@ internal class DefaultPlaybackLoop(
                     onEndOfMedia()
                 } finally {
                     isPlaying = false
+
+                    audioClockTime.set(Duration.INFINITE)
+
+                    videoClockTime.set(Duration.INFINITE)
                 }
             }
         }
@@ -309,10 +260,15 @@ internal class DefaultPlaybackLoop(
     override suspend fun stop() = mutex.withLock {
         runCatching {
             try {
-                job?.cancelAndJoin()
+                job?.cancel()
+
                 job = null
             } finally {
                 isPlaying = false
+
+                audioClockTime.set(Duration.INFINITE)
+
+                videoClockTime.set(Duration.INFINITE)
             }
         }
     }
@@ -321,9 +277,14 @@ internal class DefaultPlaybackLoop(
         runCatching {
             try {
                 job?.cancel()
+
                 job = null
             } finally {
                 isPlaying = false
+
+                audioClockTime.set(Duration.INFINITE)
+
+                videoClockTime.set(Duration.INFINITE)
             }
         }
     }

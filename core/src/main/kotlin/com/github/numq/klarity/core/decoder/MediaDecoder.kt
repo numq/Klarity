@@ -8,15 +8,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
-internal class VideoDecoder(
+internal class MediaDecoder(
     private val decoder: NativeDecoder,
-    override val media: Media.Video,
-) : Decoder<Media.Video> {
+    override val media: Media.AudioVideo,
+) : Decoder<Media.AudioVideo> {
     private val mutex = Mutex()
 
     override suspend fun decode() = mutex.withLock {
         decoder.format.mapCatching { format ->
-            decoder.decodeVideo().map { nativeFrame ->
+            decoder.decodeMedia().map { nativeFrame ->
                 when (nativeFrame) {
                     null -> Frame.EndOfStream
 
@@ -24,7 +24,11 @@ internal class VideoDecoder(
                         when (getType()) {
                             null -> error("Unknown frame type")
 
-                            NativeFrame.Type.AUDIO -> error("Audio frame is not supported by decoder")
+                            NativeFrame.Type.AUDIO -> Frame.Content.Audio(
+                                timestamp = timestampMicros.microseconds,
+                                bufferHandle = bufferHandle,
+                                bufferSize = bufferSize
+                            )
 
                             NativeFrame.Type.VIDEO -> Frame.Content.Video(
                                 timestamp = timestampMicros.microseconds,

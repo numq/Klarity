@@ -1,10 +1,10 @@
 package com.github.numq.klarity.core.controller
 
-import com.github.numq.klarity.core.buffer.AudioBufferFactory
 import com.github.numq.klarity.core.buffer.Buffer
-import com.github.numq.klarity.core.buffer.VideoBufferFactory
+import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.MediaDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.frame.Frame
@@ -20,10 +20,10 @@ import com.github.numq.klarity.core.settings.PlayerSettings
 class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
         val initialSettings: PlayerSettings?,
-        val audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio, Frame.Audio>>,
-        val videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video, Frame.Video>>,
-        val audioBufferFactory: Factory<AudioBufferFactory.Parameters, Buffer<Frame.Audio>>,
-        val videoBufferFactory: Factory<VideoBufferFactory.Parameters, Buffer<Frame.Video>>,
+        val audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,
+        val videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>>,
+        val mediaDecoderFactory: Factory<MediaDecoderFactory.Parameters, Decoder<Media.AudioVideo>>,
+        val bufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame>>,
         val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
         val playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
         val samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
@@ -34,8 +34,8 @@ class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, Play
             initialSettings = initialSettings,
             audioDecoderFactory = audioDecoderFactory,
             videoDecoderFactory = videoDecoderFactory,
-            audioBufferFactory = audioBufferFactory,
-            videoBufferFactory = videoBufferFactory,
+            mediaDecoderFactory = mediaDecoderFactory,
+            bufferFactory = bufferFactory,
             bufferLoopFactory = bufferLoopFactory,
             playbackLoopFactory = playbackLoopFactory,
             samplerFactory = samplerFactory
