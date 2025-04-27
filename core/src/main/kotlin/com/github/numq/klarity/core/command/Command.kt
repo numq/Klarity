@@ -18,7 +18,6 @@ sealed interface Command {
         val channels: Int?,
         val width: Int?,
         val height: Int?,
-        val frameRate: Double?,
         val hardwareAccelerationCandidates: List<HardwareAcceleration>?
     ) : Command {
         override val descriptor = Descriptor.PREPARE

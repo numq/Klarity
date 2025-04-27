@@ -124,7 +124,6 @@ interface Decoder<Media> {
             location: String,
             width: Int?,
             height: Int?,
-            frameRate: Double?,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
         ): Result<Decoder<Media.Video>> = runCatching {
             val decoder = NativeDecoder(
@@ -148,7 +147,7 @@ interface Decoder<Media> {
                 VideoFormat(
                     width = fmt.width,
                     height = fmt.height,
-                    frameRate = frameRate ?: fmt.frameRate,
+                    frameRate = fmt.frameRate,
                     hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
                 )
             }
@@ -177,7 +176,6 @@ interface Decoder<Media> {
             channels: Int?,
             width: Int?,
             height: Int?,
-            frameRate: Double?,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
         ): Result<Decoder<Media.AudioVideo>> = runCatching {
             val decoder = NativeDecoder(
@@ -209,7 +207,7 @@ interface Decoder<Media> {
                 VideoFormat(
                     width = fmt.width,
                     height = fmt.height,
-                    frameRate = frameRate ?: fmt.frameRate,
+                    frameRate = fmt.frameRate,
                     hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
                 )
             }

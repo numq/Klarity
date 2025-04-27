@@ -55,7 +55,6 @@ internal class DefaultKlarityPlayer(
             channels = audioSettings.channels,
             width = videoSettings.width,
             height = videoSettings.height,
-            frameRate = videoSettings.frameRate,
             hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates
         )
     ).recoverCatching { t ->

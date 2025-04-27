@@ -241,7 +241,6 @@ internal class DefaultPlayerController(
         channels: Int?,
         width: Int?,
         height: Int?,
-        frameRate: Double?,
         hardwareAccelerationCandidates: List<HardwareAcceleration>?
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
@@ -275,7 +274,6 @@ internal class DefaultPlayerController(
                         location = location,
                         width = width,
                         height = height,
-                        frameRate = frameRate,
                         hardwareAccelerationCandidates = hardwareAccelerationCandidates
                     )
                 ).getOrThrow()
@@ -299,7 +297,6 @@ internal class DefaultPlayerController(
                         location = location,
                         width = width,
                         height = height,
-                        frameRate = frameRate,
                         hardwareAccelerationCandidates = hardwareAccelerationCandidates
                     )
                 ).getOrThrow()
@@ -338,7 +335,6 @@ internal class DefaultPlayerController(
                         channels = channels,
                         width = width,
                         height = height,
-                        frameRate = frameRate,
                         hardwareAccelerationCandidates = hardwareAccelerationCandidates
                     )
                 ).getOrThrow()
@@ -643,7 +639,6 @@ internal class DefaultPlayerController(
                             channels = channels,
                             width = width,
                             height = height,
-                            frameRate = frameRate,
                             hardwareAccelerationCandidates = hardwareAccelerationCandidates
                         )
                     }

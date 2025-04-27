@@ -9,7 +9,6 @@ class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Medi
         val location: String,
         val width: Int?,
         val height: Int?,
-        val frameRate: Double?,
         val hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     )
 
@@ -18,7 +17,6 @@ class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Medi
             location = location,
             width = width,
             height = height,
-            frameRate = frameRate,
             hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     }

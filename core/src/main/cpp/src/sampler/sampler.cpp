@@ -1,6 +1,8 @@
 #include "sampler.h"
 
 Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
+    std::unique_lock<std::shared_mutex> lock(mutex);
+
     this->sampleRate = sampleRate;
 
     this->channels = channels;
@@ -41,7 +43,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
 }
 
 void Sampler::setPlaybackSpeed(float factor) {
-    std::unique_lock<std::shared_mutex> lock(mutex);
+    std::shared_lock<std::shared_mutex> lock(mutex);
 
     if (factor < 0.5 || factor > 2) {
         throw SamplerException("Playback speed factor out of range (0.5, 2)");
@@ -51,7 +53,7 @@ void Sampler::setPlaybackSpeed(float factor) {
 }
 
 void Sampler::setVolume(float value) {
-    std::unique_lock<std::shared_mutex> lock(mutex);
+    std::shared_lock<std::shared_mutex> lock(mutex);
 
     if (value < 0 || value > 1) {
         throw SamplerException("Volume out of range (0, 1)");
@@ -76,22 +78,6 @@ int Sampler::start() {
     if (err != paNoError) {
         throw SamplerException("Failed to start PortAudio stream: " + std::string(Pa_GetErrorText(err)));
     }
-
-//    int preRollSamples = stretch->inputLatency();
-//
-//    if (preRollSamples > 0) {
-//        std::vector<std::vector<float>> silentInput(channels, std::vector<float>(preRollSamples, 0.0f));
-//
-//        std::vector<std::vector<float>> silentOutput(channels, std::vector<float>(preRollSamples));
-//
-//        stretch->process(silentInput, preRollSamples, silentOutput, preRollSamples);
-//
-//        for (int i = 0; i < preRollSamples; ++i) {
-//            for (int ch = 0; ch < channels; ++ch) {
-//                samples.push_back(std::clamp(silentOutput[ch][i] * volume, -1.0f, 1.0f));
-//            }
-//        }
-//    }
 
     double outputLatency = Pa_GetStreamInfo(stream.get())->outputLatency;
 

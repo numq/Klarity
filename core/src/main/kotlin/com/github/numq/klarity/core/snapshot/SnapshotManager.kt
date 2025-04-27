@@ -34,7 +34,6 @@ object SnapshotManager {
                 location = location,
                 width = width,
                 height = height,
-                frameRate = null,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates
             )
         ).mapCatching { decoder ->

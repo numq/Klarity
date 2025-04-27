@@ -11,7 +11,6 @@ class MediaDecoderFactory : Factory<MediaDecoderFactory.Parameters, Decoder<Medi
         val channels: Int?,
         val width: Int?,
         val height: Int?,
-        val frameRate: Double?,
         val hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     )
 
@@ -22,7 +21,6 @@ class MediaDecoderFactory : Factory<MediaDecoderFactory.Parameters, Decoder<Medi
             channels = channels,
             width = width,
             height = height,
-            frameRate = frameRate,
             hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     }

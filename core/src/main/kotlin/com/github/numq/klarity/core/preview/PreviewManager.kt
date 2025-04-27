@@ -75,7 +75,6 @@ interface PreviewManager {
                     location = location,
                     width = width,
                     height = height,
-                    frameRate = null,
                     hardwareAccelerationCandidates = hardwareAccelerationCandidates
                 )
             ).mapCatching { decoder ->
