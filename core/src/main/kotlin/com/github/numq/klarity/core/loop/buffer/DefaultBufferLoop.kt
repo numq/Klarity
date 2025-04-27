@@ -49,8 +49,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             } catch (t: Throwable) {
                 withContext(Dispatchers.IO) { frame.close() }
             }
-
-            delay(500.microseconds)
         }
     }
 
@@ -85,8 +83,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             } catch (t: Throwable) {
                 withContext(Dispatchers.IO) { frame.close() }
             }
-
-            delay(500.microseconds)
         }
     }
 

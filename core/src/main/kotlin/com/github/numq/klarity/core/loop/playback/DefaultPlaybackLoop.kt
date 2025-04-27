@@ -10,8 +10,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.microseconds
-import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
@@ -24,9 +22,9 @@ internal class DefaultPlaybackLoop(
 
     private var isPlaying = false
 
-    private val audioClockTime = AtomicReference(Duration.INFINITE)
+    private val audioClock = AtomicReference(Duration.INFINITE)
 
-    private val videoClockTime = AtomicReference(Duration.INFINITE)
+    private val videoClock = AtomicReference(Duration.INFINITE)
 
     private suspend fun handleAudioPlayback(
         mediaDuration: Duration,
@@ -42,13 +40,13 @@ internal class DefaultPlaybackLoop(
                     is Frame.Content.Audio -> {
                         currentCoroutineContext().ensureActive()
 
-                        sampler.play(frame).getOrThrow()
-
                         val frameTime = frame.timestamp
 
                         onTimestamp(frameTime)
 
-                        audioClockTime.set(frameTime)
+                        audioClock.set(frameTime)
+
+                        sampler.play(frame).getOrThrow()
                     }
 
                     is Frame.EndOfStream -> {
@@ -56,11 +54,13 @@ internal class DefaultPlaybackLoop(
 
                         withContext(Dispatchers.IO) { frame.close() }
 
-                        if (audioClockTime.get().isFinite()) {
-                            delay((mediaDuration - audioClockTime.get()) / getPlaybackSpeedFactor())
+                        val audioClockTime = audioClock.get()
+
+                        if (audioClockTime.isFinite()) {
+                            delay((mediaDuration - audioClockTime) / getPlaybackSpeedFactor())
                         }
 
-                        audioClockTime.set(Duration.INFINITE)
+                        audioClock.set(Duration.INFINITE)
 
                         break
                     }
@@ -72,18 +72,15 @@ internal class DefaultPlaybackLoop(
 
                 throw t
             }
-
-            delay(500.microseconds)
         }
     }
 
-    private suspend fun handleVideoPlayback(
+    /*private suspend fun handleVideoPlayback(
+        frameRate: Double,
         mediaDuration: Duration,
         buffer: Buffer<Frame>,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
-        val playbackStartTime = System.nanoTime().nanoseconds
-
         while (currentCoroutineContext().isActive) {
             val frame = buffer.poll().getOrThrow()
 
@@ -92,28 +89,63 @@ internal class DefaultPlaybackLoop(
                     is Frame.Content.Video -> {
                         currentCoroutineContext().ensureActive()
 
+                        var renderingRequested = false
+
                         val frameTime = frame.timestamp
 
+                        val audioClockTime = audioClock.get()
+
+                        val videoClockTime = videoClock.get()
+
+                        val initialTime = System.nanoTime().nanoseconds
+
                         while (currentCoroutineContext().isActive) {
-                            val elapsedTime = System.nanoTime().nanoseconds - playbackStartTime
+                            val playbackSpeedFactor = getPlaybackSpeedFactor()
 
-                            val clockTime = audioClockTime.get().takeIf(Duration::isFinite)
-                                ?: (videoClockTime.get() + elapsedTime * getPlaybackSpeedFactor())
+                            val masterClockTime = when {
+                                audioClockTime.isFinite() -> audioClock.get()
 
-                            val diffTime = frame.timestamp - clockTime
+                                videoClockTime.isFinite() -> videoClock.get()
 
-                            if (diffTime <= Duration.ZERO) break
+                                else -> Duration.ZERO
+                            }
+
+                            val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
+
+                            println(deltaTime)
+
+                            val renderTime = 1.seconds / frameRate / playbackSpeedFactor * 2
+
+                            println(renderTime)
+
+                            if (deltaTime < -renderTime) {
+                                break
+                            }
+
+                            if ((System.nanoTime().nanoseconds - initialTime) / playbackSpeedFactor > deltaTime) {
+                                renderingRequested = true
+
+                                break
+                            }
 
                             delay(500.microseconds)
                         }
 
+                        if (!renderingRequested) {
+                            println("skipping frame")
+
+                            withContext(Dispatchers.IO) { frame.close() }
+
+                            continue
+                        }
+
                         currentCoroutineContext().ensureActive()
+
+                        onTimestamp(frameTime)
 
                         getRenderer()?.render(frame)
 
-                        onTimestamp(frame.timestamp)
-
-                        videoClockTime.set(frameTime)
+                        videoClock.set(frameTime)
                     }
 
                     is Frame.EndOfStream -> {
@@ -121,11 +153,80 @@ internal class DefaultPlaybackLoop(
 
                         withContext(Dispatchers.IO) { frame.close() }
 
-                        if (videoClockTime.get().isFinite()) {
-                            delay((mediaDuration - videoClockTime.get()) / getPlaybackSpeedFactor())
+                        val videoClockTime = videoClock.get()
+
+                        if (videoClockTime.isFinite()) {
+                            delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor())
                         }
 
-                        videoClockTime.set(Duration.INFINITE)
+                        videoClock.set(Duration.INFINITE)
+
+                        break
+                    }
+
+                    else -> error("Unsupported frame type: ${frame::class}")
+                }
+            } catch (t: Throwable) {
+                withContext(Dispatchers.IO) { frame.close() }
+                throw t
+            }
+        }
+    }*/
+
+    private suspend fun handleVideoPlayback(
+        mediaDuration: Duration,
+        buffer: Buffer<Frame>,
+        onTimestamp: suspend (Duration) -> Unit,
+    ) {
+        while (currentCoroutineContext().isActive) {
+            val frame = buffer.poll().getOrThrow()
+
+            try {
+                when (frame) {
+                    is Frame.Content.Video -> {
+                        currentCoroutineContext().ensureActive()
+
+                        val audioClockTime = audioClock.get()
+
+                        val videoClockTime = videoClock.get()
+
+                        val masterClockTime = when {
+                            audioClockTime.isFinite() -> audioClockTime
+
+                            videoClockTime.isFinite() -> videoClockTime
+
+                            else -> Duration.ZERO
+                        }
+
+                        val frameTime = frame.timestamp
+
+                        val playbackSpeedFactor = getPlaybackSpeedFactor()
+
+                        val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
+
+                        delay(deltaTime)
+
+                        currentCoroutineContext().ensureActive()
+
+                        getRenderer()?.render(frame)
+
+                        onTimestamp(frameTime)
+
+                        videoClock.set(frameTime)
+                    }
+
+                    is Frame.EndOfStream -> {
+                        currentCoroutineContext().ensureActive()
+
+                        withContext(Dispatchers.IO) { frame.close() }
+
+                        val videoClockTime = videoClock.get()
+
+                        if (videoClockTime.isFinite()) {
+                            delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor())
+                        }
+
+                        videoClock.set(Duration.INFINITE)
 
                         break
                     }
@@ -170,9 +271,7 @@ internal class DefaultPlaybackLoop(
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                mediaDuration = media.duration,
-                                buffer = buffer,
-                                onTimestamp = onTimestamp
+                                mediaDuration = media.duration, buffer = buffer, onTimestamp = onTimestamp
                             )
 
                             is Pipeline.AudioVideo -> {
@@ -249,9 +348,9 @@ internal class DefaultPlaybackLoop(
                 } finally {
                     isPlaying = false
 
-                    audioClockTime.set(Duration.INFINITE)
+                    audioClock.set(Duration.INFINITE)
 
-                    videoClockTime.set(Duration.INFINITE)
+                    videoClock.set(Duration.INFINITE)
                 }
             }
         }
@@ -266,9 +365,9 @@ internal class DefaultPlaybackLoop(
             } finally {
                 isPlaying = false
 
-                audioClockTime.set(Duration.INFINITE)
+                audioClock.set(Duration.INFINITE)
 
-                videoClockTime.set(Duration.INFINITE)
+                videoClock.set(Duration.INFINITE)
             }
         }
     }
@@ -282,9 +381,9 @@ internal class DefaultPlaybackLoop(
             } finally {
                 isPlaying = false
 
-                audioClockTime.set(Duration.INFINITE)
+                audioClock.set(Duration.INFINITE)
 
-                videoClockTime.set(Duration.INFINITE)
+                videoClock.set(Duration.INFINITE)
             }
         }
     }

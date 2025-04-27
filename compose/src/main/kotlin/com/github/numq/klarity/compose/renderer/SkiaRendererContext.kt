@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.collectLatest
 import org.jetbrains.skia.ContentChangeMode
 import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.Surface
+import kotlin.time.Duration.Companion.nanoseconds
 
 internal class SkiaRendererContext(
     renderer: Renderer,
@@ -34,18 +35,28 @@ internal class SkiaRendererContext(
 
     private fun render(frame: Frame.Content.Video) = synchronized(lock) {
         when {
-            surface.isClosed || frame.isClosed || frame.bufferSize < minByteSize -> return
+            surface.isClosed || frame.isClosed || frame.bufferSize < minByteSize -> Unit
 
-            else -> Pixmap.make(
-                info = surface.imageInfo, addr = frame.bufferHandle, rowBytes = surface.imageInfo.minRowBytes
-            ).use { pixmap ->
-                surface.notifyContentWillChange(ContentChangeMode.DISCARD)
+            else -> {
+                frame.onRenderStart?.invoke()
 
-                surface.writePixels(pixmap, 0, 0)
+                val startTime = System.nanoTime().nanoseconds
 
-                surface.flushAndSubmit()
+                Pixmap.make(
+                    info = surface.imageInfo, addr = frame.bufferHandle, rowBytes = surface.imageInfo.minRowBytes
+                ).use { pixmap ->
+                    surface.notifyContentWillChange(ContentChangeMode.DISCARD)
 
-                _generationId.value = surface.generationId
+                    surface.writePixels(pixmap, 0, 0)
+
+                    surface.flushAndSubmit()
+
+                    _generationId.value = surface.generationId
+                }
+
+                val renderTime = System.nanoTime().nanoseconds - startTime
+
+                frame.onRenderComplete?.invoke(renderTime)
             }
         }
     }

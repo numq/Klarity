@@ -23,8 +23,6 @@ sealed interface Frame : Closeable {
         ) : Content {
             private val handle = AtomicLong(bufferHandle)
 
-            override val isClosed = handle.get() == -1L
-
             private val cleanable = NativeCleaner.cleaner.register(this) {
                 if (!isClosed) {
                     NativeMemory.free(handle.get())
@@ -32,6 +30,8 @@ sealed interface Frame : Closeable {
                     handle.set(-1L)
                 }
             }
+
+            override val isClosed = handle.get() == -1L
 
             override fun close() = cleanable.clean()
         }
@@ -41,11 +41,11 @@ sealed interface Frame : Closeable {
             override val bufferSize: Int,
             override val timestamp: Duration,
             val width: Int,
-            val height: Int
+            val height: Int,
+            val onRenderStart: (() -> Unit)? = null,
+            val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
         ) : Content {
             private val handle = AtomicLong(bufferHandle)
-
-            override val isClosed = handle.get() == -1L
 
             private val cleanable = NativeCleaner.cleaner.register(this) {
                 if (!isClosed) {
@@ -54,6 +54,8 @@ sealed interface Frame : Closeable {
                     handle.set(-1L)
                 }
             }
+
+            override val isClosed = handle.get() == -1L
 
             override fun close() = cleanable.clean()
         }

@@ -100,7 +100,7 @@ void Decoder::_processAudioFrame() {
         throw DecoderException("Could not get buffer size, error: " + std::to_string(bufferSize));
     }
 
-    if (audioBuffer.size() != bufferSize) {
+    if (audioBuffer.size() < bufferSize) {
         audioBuffer.resize(bufferSize);
     }
 
@@ -176,7 +176,7 @@ void Decoder::_processVideoFrame() {
         throw DecoderException("Could not fill line sizes");
     }
 
-    if (videoBuffer.size() != videoBufferSize) {
+    if (videoBuffer.size() < videoBufferSize) {
         videoBuffer.resize(videoBufferSize);
     }
 

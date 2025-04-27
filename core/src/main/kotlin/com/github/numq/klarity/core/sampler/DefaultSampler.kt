@@ -19,8 +19,6 @@ internal class DefaultSampler(
 
     override suspend fun setPlaybackSpeed(factor: Float) = mutex.withLock {
         runCatching {
-            require(factor > 0f) { "Speed factor should be positive" }
-
             sampler.setPlaybackSpeed(factor).map {
                 playbackSpeedFactor = factor
             }.getOrThrow()
@@ -29,8 +27,6 @@ internal class DefaultSampler(
 
     override suspend fun setVolume(value: Float) = mutex.withLock {
         runCatching {
-            require(value in 0.0f..1.0f) { "Volume should be a value between 0.0f and 1.0f" }
-
             sampler.setVolume(value).map {
                 currentVolume = value
             }.getOrThrow()

@@ -1,8 +1,6 @@
 #include "sampler.h"
 
 Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
-    std::unique_lock<std::shared_mutex> lock(mutex);
-
     this->sampleRate = sampleRate;
 
     this->channels = channels;
@@ -17,7 +15,7 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     }
 
     PaStreamParameters outputParameters;
-    outputParameters.device = deviceIndex;
+    outputParameters.device = Pa_GetDefaultOutputDevice();
     outputParameters.channelCount = static_cast<int>(channels);
     outputParameters.sampleFormat = paFloat32;
     outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
@@ -32,10 +30,10 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
             &outputParameters,
             sampleRate,
             paFramesPerBufferUnspecified,
-            paClipOff | paDitherOff,
+            paNoFlag,
             nullptr,
             nullptr
-    ) != paNoError) || !rawStream) {
+    )) != paNoError || !rawStream) {
         throw SamplerException(std::string(Pa_GetErrorText(err)));
     }
 
@@ -45,11 +43,19 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
 void Sampler::setPlaybackSpeed(float factor) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
+    if (factor < 0.5 || factor > 2) {
+        throw SamplerException("Playback speed factor out of range (0.5, 2)");
+    }
+
     playbackSpeedFactor = factor;
 }
 
 void Sampler::setVolume(float value) {
     std::unique_lock<std::shared_mutex> lock(mutex);
+
+    if (value < 0 || value > 1) {
+        throw SamplerException("Volume out of range (0, 1)");
+    }
 
     volume = value;
 }
@@ -71,6 +77,22 @@ int Sampler::start() {
         throw SamplerException("Failed to start PortAudio stream: " + std::string(Pa_GetErrorText(err)));
     }
 
+//    int preRollSamples = stretch->inputLatency();
+//
+//    if (preRollSamples > 0) {
+//        std::vector<std::vector<float>> silentInput(channels, std::vector<float>(preRollSamples, 0.0f));
+//
+//        std::vector<std::vector<float>> silentOutput(channels, std::vector<float>(preRollSamples));
+//
+//        stretch->process(silentInput, preRollSamples, silentOutput, preRollSamples);
+//
+//        for (int i = 0; i < preRollSamples; ++i) {
+//            for (int ch = 0; ch < channels; ++ch) {
+//                samples.push_back(std::clamp(silentOutput[ch][i] * volume, -1.0f, 1.0f));
+//            }
+//        }
+//    }
+
     double outputLatency = Pa_GetStreamInfo(stream.get())->outputLatency;
 
     double stretchInputLatency = stretch->inputLatency() / static_cast<double>(sampleRate);
@@ -89,39 +111,41 @@ void Sampler::play(const uint8_t *buffer, uint64_t size) {
         throw SamplerException("Unable to play uninitialized sampler");
     }
 
-    if (!buffer) {
-        throw SamplerException("Invalid buffer");
+    if (!buffer || size <= 0) {
+        throw SamplerException("Invalid buffer or size");
     }
 
-    if (size <= 0) {
-        throw SamplerException("Invalid buffer size");
-    }
+    int inputSamples = static_cast<int>(static_cast<float>(size) / sizeof(float) / static_cast<float>(channels));
 
-    int inputSamples = static_cast<int>((float) size / sizeof(float) / (float) channels);
-
-    int outputSamples = static_cast<int>((float) inputSamples / playbackSpeedFactor);
+    int outputSamples = static_cast<int>(static_cast<float>(inputSamples) / playbackSpeedFactor);
 
     std::vector<std::vector<float>> inputBuffers(channels, std::vector<float>(inputSamples));
 
     std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples));
 
-    for (int i = 0; i < inputSamples * channels; ++i) {
-        inputBuffers[i % channels][i / channels] = reinterpret_cast<const float *>(buffer)[i];
+    auto floatBuffer = reinterpret_cast<const float *>(buffer);
+
+    for (int sample = 0; sample < inputSamples; ++sample) {
+        for (int channel = 0; channel < channels; ++channel) {
+            inputBuffers[channel][sample] = std::clamp(floatBuffer[sample * channels + channel], -1.0f, 1.0f);
+        }
     }
 
     stretch->process(inputBuffers, inputSamples, outputBuffers, outputSamples);
 
-    std::vector<float> output;
+    if (samples.size() < outputSamples * channels) {
+        samples.resize(outputSamples * channels);
+    }
 
-    output.reserve(outputSamples * channels);
-
-    for (int i = 0; i < outputSamples; ++i) {
-        for (int ch = 0; ch < channels; ++ch) {
-            output.push_back(std::clamp(outputBuffers[ch][i] * volume, -1.0f, 1.0f));
+    for (int sample = 0; sample < outputSamples; sample++) {
+        for (int channel = 0; channel < channels; channel++) {
+            samples[sample * channels + channel] = std::clamp(outputBuffers[channel][sample] * volume, -1.0f, 1.0f);
         }
     }
 
-    Pa_WriteStream(stream.get(), output.data(), outputSamples);
+    Pa_WriteStream(stream.get(), samples.data(), samples.size() / channels);
+
+    samples.clear();
 }
 
 void Sampler::pause() {
@@ -137,7 +161,7 @@ void Sampler::pause() {
         PaError err = Pa_AbortStream(stream.get());
 
         if (err != paNoError) {
-            throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+            throw SamplerException("Failed to abort PortAudio stream: " + std::string(Pa_GetErrorText(err)));
         }
     } else if (isStreamActive < 0) {
         throw SamplerException("Failed to check stream status: " + std::string(Pa_GetErrorText(isStreamActive)));
@@ -157,7 +181,7 @@ void Sampler::stop() {
         PaError err = Pa_StopStream(stream.get());
 
         if (err != paNoError) {
-            throw SamplerException("Failed to abort PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+            throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
         }
     }
 
@@ -170,4 +194,8 @@ void Sampler::stop() {
     }
 
     stretch->reset();
+
+    samples.clear();
+
+    samples.shrink_to_fit();
 }

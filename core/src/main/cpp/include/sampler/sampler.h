@@ -1,7 +1,6 @@
 #ifndef KLARITY_SAMPLER_H
 #define KLARITY_SAMPLER_H
 
-#include <atomic>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -27,9 +26,11 @@ private:
 
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> stretch;
 
-    std::atomic<float> playbackSpeedFactor = 1.0f;
+    std::vector<float> samples;
 
-    std::atomic<float> volume = 1.0f;
+    float playbackSpeedFactor = 1.0f;
+
+    float volume = 1.0f;
 
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
