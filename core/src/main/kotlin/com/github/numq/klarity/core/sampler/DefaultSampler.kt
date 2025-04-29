@@ -45,9 +45,7 @@ internal class DefaultSampler(
 
     override suspend fun play(frame: Frame.Content.Audio) = mutex.withLock {
         runCatching {
-            frame.use {
-                sampler.play(frame.bufferHandle, frame.bufferSize).getOrThrow()
-            }
+            sampler.play(frame.buffer, frame.size).getOrThrow()
         }
     }
 

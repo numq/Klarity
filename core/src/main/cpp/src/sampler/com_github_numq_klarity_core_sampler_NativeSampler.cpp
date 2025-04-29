@@ -1,6 +1,6 @@
 #include "com_github_numq_klarity_core_sampler_NativeSampler.h"
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_createNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_create(
         JNIEnv *env,
         jclass thisClass,
         jint sampleRate,
@@ -16,88 +16,88 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
     }, -1);
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setPlaybackSpeedNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_setPlaybackSpeed(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jfloat factor
 ) {
     return handleException(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->setPlaybackSpeed(static_cast<float>(factor));
     });
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setVolumeNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_setVolume(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jfloat value
 ) {
     return handleException(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->setVolume(static_cast<float>(value));
     });
 }
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_start(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 ) {
     return handleException<jlong>(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         return static_cast<jlong>(sampler->start());
     }, 0);
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_playNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_play(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jlong bufferHandle,
         jint bufferSize
 ) {
     return handleException(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->play(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
     });
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_pauseNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_pause(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 ) {
     return handleException(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->pause();
     });
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_stop(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 ) {
     return handleException(env, [&] {
-        auto sampler = getSamplerPointer(handle);
+        auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->stop();
     });
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_deleteNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_delete(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 ) {
     return handleException(env, [&] {
-        delete getSamplerPointer(handle);
+        delete getSamplerPointer(samplerHandle);
     });
 }

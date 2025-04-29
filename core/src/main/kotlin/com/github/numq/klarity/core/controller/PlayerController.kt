@@ -5,7 +5,6 @@ import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.MediaDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.factory.Factory
@@ -52,7 +51,6 @@ interface PlayerController {
             initialSettings: PlayerSettings?,
             audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,
             videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>>,
-            mediaDecoderFactory: Factory<MediaDecoderFactory.Parameters, Decoder<Media.AudioVideo>>,
             bufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame>>,
             bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
             playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
@@ -62,7 +60,6 @@ interface PlayerController {
                 initialSettings = initialSettings,
                 audioDecoderFactory = audioDecoderFactory,
                 videoDecoderFactory = videoDecoderFactory,
-                mediaDecoderFactory = mediaDecoderFactory,
                 bufferFactory = bufferFactory,
                 bufferLoopFactory = bufferLoopFactory,
                 playbackLoopFactory = playbackLoopFactory,

@@ -4,30 +4,30 @@ import com.github.numq.klarity.core.cleaner.NativeCleaner
 import java.io.Closeable
 
 internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
-    companion object {
+    private object Native {
         @JvmStatic
-        private external fun createNative(sampleRate: Int, channels: Int): Long
+        external fun create(sampleRate: Int, channels: Int): Long
 
         @JvmStatic
-        private external fun setPlaybackSpeedNative(handle: Long, factor: Float)
+        external fun setPlaybackSpeed(handle: Long, factor: Float)
 
         @JvmStatic
-        private external fun setVolumeNative(handle: Long, value: Float)
+        external fun setVolume(handle: Long, value: Float)
 
         @JvmStatic
-        private external fun startNative(handle: Long): Long
+        external fun start(handle: Long): Long
 
         @JvmStatic
-        private external fun playNative(handle: Long, bufferHandle: Long, bufferSize: Int)
+        external fun play(handle: Long, buffer: Long, size: Int)
 
         @JvmStatic
-        private external fun pauseNative(handle: Long)
+        external fun pause(handle: Long)
 
         @JvmStatic
-        private external fun stopNative(handle: Long)
+        external fun stop(handle: Long)
 
         @JvmStatic
-        private external fun deleteNative(handle: Long)
+        external fun delete(handle: Long)
     }
 
     private val lock = Any()
@@ -36,7 +36,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     init {
         synchronized(lock) {
-            nativeHandle = createNative(sampleRate = sampleRate, channels = channels)
+            nativeHandle = Native.create(sampleRate = sampleRate, channels = channels)
 
             require(nativeHandle != -1L) { "Could not instantiate native sampler" }
         }
@@ -46,7 +46,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         synchronized(lock) {
             runCatching {
                 if (nativeHandle != -1L) {
-                    deleteNative(handle = nativeHandle)
+                    Native.delete(handle = nativeHandle)
 
                     nativeHandle = -1L
                 }
@@ -56,37 +56,37 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
         runCatching {
-            setPlaybackSpeedNative(handle = nativeHandle, factor = factor)
+            Native.setPlaybackSpeed(handle = nativeHandle, factor = factor)
         }
     }
 
     fun setVolume(value: Float) = synchronized(lock) {
         runCatching {
-            setVolumeNative(handle = nativeHandle, value = value)
+            Native.setVolume(handle = nativeHandle, value = value)
         }
     }
 
     fun start() = synchronized(lock) {
         runCatching {
-            startNative(handle = nativeHandle)
+            Native.start(handle = nativeHandle)
         }
     }
 
-    fun play(bufferHandle: Long, bufferSize: Int) = synchronized(lock) {
+    fun play(buffer: Long, size: Int) = synchronized(lock) {
         runCatching {
-            playNative(handle = nativeHandle, bufferHandle = bufferHandle, bufferSize = bufferSize)
+            Native.play(handle = nativeHandle, buffer = buffer, size = size)
         }
     }
 
     fun pause() = synchronized(lock) {
         runCatching {
-            pauseNative(handle = nativeHandle)
+            Native.pause(handle = nativeHandle)
         }
     }
 
     fun stop() = synchronized(lock) {
         runCatching {
-            stopNative(handle = nativeHandle)
+            Native.stop(handle = nativeHandle)
         }
     }
 

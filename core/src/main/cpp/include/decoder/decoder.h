@@ -1,17 +1,16 @@
 #ifndef KLARITY_DECODER_DECODER_H
 #define KLARITY_DECODER_DECODER_H
 
-#include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <shared_mutex>
 #include <string>
+#include "deleter.h"
 #include "exception.h"
 #include "format.h"
 #include "frame.h"
 #include "hwaccel.h"
+#include "pool.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -24,59 +23,27 @@ extern "C" {
 
 class Decoder {
 private:
-    struct AVFormatContextDeleter {
-        void operator()(AVFormatContext *p) const {
-            avformat_close_input(&p);
-        }
-    };
-
-    struct AVCodecContextDeleter {
-        void operator()(AVCodecContext *p) const {
-            p->get_format = nullptr;
-
-            p->opaque = nullptr;
-
-            if (p->hw_device_ctx) {
-                av_buffer_unref(&p->hw_device_ctx);
-
-                p->hw_device_ctx = nullptr;
-            }
-
-            avcodec_free_context(&p);
-        }
-    };
-
-    struct SwrContextDeleter {
-        void operator()(SwrContext *p) const {
-            swr_free(&p);
-        }
-    };
-
-    struct SwsContextDeleter {
-        void operator()(SwsContext *p) const {
-            sws_freeContext(p);
-        }
-    };
-
-    struct AVPacketDeleter {
-        void operator()(AVPacket *p) const {
-            av_packet_free(&p);
-        }
-    };
-
-    struct AVFrameDeleter {
-        void operator()(AVFrame *p) const {
-            av_frame_free(&p);
-        }
-    };
-
     std::shared_mutex mutex;
 
     const AVSampleFormat targetSampleFormat = AV_SAMPLE_FMT_FLT;
 
-    const AVPixelFormat targetPixelFormat = AV_PIX_FMT_RGBA;
+    const AVPixelFormat targetPixelFormat = AV_PIX_FMT_BGRA;
 
-    const int swsFlags = SWS_BILINEAR;
+    int targetSampleRate;
+
+    AVChannelLayout targetChannelLayout = AVChannelLayout{};
+
+    int targetWidth;
+
+    int targetHeight;
+
+    const int swsFlags = SWS_FAST_BILINEAR;
+
+    AVPixelFormat swsPixelFormat = AV_PIX_FMT_NONE;
+
+    int swsWidth = -1;
+
+    int swsHeight = -1;
 
     std::unique_ptr<AVFormatContext, AVFormatContextDeleter> formatContext;
 
@@ -102,14 +69,15 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> swVideoFrame;
 
+    std::unique_ptr<AVFrame, AVFrameDeleter> dstVideoFrame;
+
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    std::vector<uint8_t> audioBuffer;
+    std::unique_ptr<FramePool> audioFramePool;
 
-    std::vector<uint8_t> videoBuffer;
+    std::unique_ptr<FramePool> videoFramePool;
 
-    uint64_t videoBufferSize = 0;
-
+public:
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
@@ -125,33 +93,29 @@ private:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _processAudioFrame();
+    void _processAudioFrame(AVFrame *dst);
 
-    void _processVideoFrame();
+    void _processVideoFrame(AVFrame *dst);
 
 public:
-    Format format;
-
     Decoder(
             const std::string &location,
-            bool findAudioStream,
-            bool findVideoStream,
-            bool decodeAudioStream,
-            bool decodeVideoStream,
-            uint32_t sampleRate,
-            uint32_t channels,
-            uint32_t width,
-            uint32_t height,
+            int audioFramePoolCapacity,
+            int videoFramePoolCapacity,
+            int sampleRate,
+            int channels,
+            int width,
+            int height,
             const std::vector<uint32_t> &hardwareAccelerationCandidates
     );
 
     ~Decoder();
 
+    Format format;
+
     std::unique_ptr<Frame> decodeAudio();
 
     std::unique_ptr<Frame> decodeVideo();
-
-    std::unique_ptr<Frame> decodeMedia();
 
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 

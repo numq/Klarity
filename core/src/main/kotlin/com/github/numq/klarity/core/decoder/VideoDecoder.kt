@@ -9,27 +9,27 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
 internal class VideoDecoder(
-    private val decoder: NativeDecoder,
+    private val nativeDecoder: NativeDecoder,
     override val media: Media.Video,
 ) : Decoder<Media.Video> {
     private val mutex = Mutex()
 
     override suspend fun decode() = mutex.withLock {
-        decoder.format.mapCatching { format ->
-            decoder.decodeVideo().map { nativeFrame ->
-                when (nativeFrame) {
+        nativeDecoder.format.mapCatching { format ->
+            nativeDecoder.decodeVideo().mapCatching { nativeFrameInfo ->
+                when (nativeFrameInfo) {
                     null -> Frame.EndOfStream
 
-                    else -> with(nativeFrame) {
+                    else -> with(nativeFrameInfo) {
                         when (getType()) {
                             null -> error("Unknown frame type")
 
                             NativeFrame.Type.AUDIO -> error("Audio frame is not supported by decoder")
 
                             NativeFrame.Type.VIDEO -> Frame.Content.Video(
+                                buffer = buffer,
+                                size = size,
                                 timestamp = timestampMicros.microseconds,
-                                bufferHandle = bufferHandle,
-                                bufferSize = bufferSize,
                                 width = format.width,
                                 height = format.height
                             )
@@ -41,18 +41,18 @@ internal class VideoDecoder(
     }
 
     override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
-        decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
+        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
             timestampMicros.microseconds
         }
     }
 
     override suspend fun reset() = mutex.withLock {
-        decoder.reset()
+        nativeDecoder.reset()
     }
 
     override suspend fun close() = mutex.withLock {
         runCatching {
-            decoder.close()
+            nativeDecoder.close()
         }
     }
 }

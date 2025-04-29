@@ -7,29 +7,23 @@ import java.io.Closeable
 
 internal class NativeDecoder(
     location: String,
-    findAudioStream: Boolean,
-    findVideoStream: Boolean,
-    decodeAudioStream: Boolean,
-    decodeVideoStream: Boolean,
+    audioFramePoolCapacity: Int,
+    videoFramePoolCapacity: Int,
     sampleRate: Int? = null,
     channels: Int? = null,
     width: Int? = null,
     height: Int? = null,
     hardwareAccelerationCandidates: IntArray? = null,
 ) : Closeable {
-    companion object {
-        fun getAvailableHardwareAcceleration() = getAvailableHardwareAccelerationNative() ?: intArrayOf()
+    private object Native {
+        @JvmStatic
+        external fun getAvailableHardwareAcceleration(): IntArray?
 
         @JvmStatic
-        private external fun getAvailableHardwareAccelerationNative(): IntArray?
-
-        @JvmStatic
-        private external fun createNative(
+        external fun create(
             location: String,
-            findAudioStream: Boolean,
-            findVideoStream: Boolean,
-            decodeAudioStream: Boolean,
-            decodeVideoStream: Boolean,
+            audioFramePoolCapacity: Int,
+            videoFramePoolCapacity: Int,
             sampleRate: Int,
             channels: Int,
             width: Int,
@@ -38,39 +32,41 @@ internal class NativeDecoder(
         ): Long
 
         @JvmStatic
-        private external fun getFormatNative(handle: Long): NativeFormat
+        external fun getFormat(handle: Long): NativeFormat
 
         @JvmStatic
-        private external fun decodeAudioNative(handle: Long): NativeFrame?
+        external fun decodeAudio(handle: Long): NativeFrame?
 
         @JvmStatic
-        private external fun decodeVideoNative(handle: Long): NativeFrame?
+        external fun decodeVideo(handle: Long): NativeFrame?
 
         @JvmStatic
-        private external fun decodeMediaNative(handle: Long): NativeFrame?
+        external fun seekTo(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
 
         @JvmStatic
-        private external fun seekToNative(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
+        external fun reset(handle: Long)
 
         @JvmStatic
-        private external fun resetNative(handle: Long)
+        external fun delete(handle: Long)
+    }
 
-        @JvmStatic
-        private external fun deleteNative(handle: Long)
+    companion object {
+        fun getAvailableHardwareAcceleration() = Native.getAvailableHardwareAcceleration() ?: intArrayOf()
     }
 
     private val lock = Any()
 
     internal var nativeHandle = -1L
+        private set
 
     init {
+        require(audioFramePoolCapacity >= 0 || videoFramePoolCapacity >= 0) { "Empty decoder is useless" }
+
         synchronized(lock) {
-            nativeHandle = createNative(
+            nativeHandle = Native.create(
                 location = location,
-                findAudioStream = findAudioStream,
-                findVideoStream = findVideoStream,
-                decodeAudioStream = decodeAudioStream,
-                decodeVideoStream = decodeVideoStream,
+                audioFramePoolCapacity = audioFramePoolCapacity,
+                videoFramePoolCapacity = videoFramePoolCapacity,
                 sampleRate = sampleRate ?: 0,
                 channels = channels ?: 0,
                 width = width ?: 0,
@@ -86,7 +82,7 @@ internal class NativeDecoder(
         synchronized(lock) {
             runCatching {
                 if (nativeHandle != -1L) {
-                    deleteNative(handle = nativeHandle)
+                    Native.delete(handle = nativeHandle)
 
                     nativeHandle = -1L
                 }
@@ -98,31 +94,25 @@ internal class NativeDecoder(
         runCatching {
             check(nativeHandle != -1L) { "Decoder has been closed" }
 
-            getFormatNative(handle = nativeHandle)
+            Native.getFormat(handle = nativeHandle)
         }
     }
 
     fun decodeAudio() = synchronized(lock) {
         runCatching {
-            decodeAudioNative(handle = nativeHandle)
+            Native.decodeAudio(handle = nativeHandle)
         }
     }
 
     fun decodeVideo() = synchronized(lock) {
         runCatching {
-            decodeVideoNative(handle = nativeHandle)
-        }
-    }
-
-    fun decodeMedia() = synchronized(lock) {
-        runCatching {
-            decodeMediaNative(handle = nativeHandle)
+            Native.decodeVideo(handle = nativeHandle)
         }
     }
 
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
         runCatching {
-            seekToNative(
+            Native.seekTo(
                 handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
             ).takeIf { it >= 0 } ?: timestampMicros
         }
@@ -130,7 +120,7 @@ internal class NativeDecoder(
 
     fun reset() = synchronized(lock) {
         runCatching {
-            resetNative(handle = nativeHandle)
+            Native.reset(handle = nativeHandle)
         }
     }
 

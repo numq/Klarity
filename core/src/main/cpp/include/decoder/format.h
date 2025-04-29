@@ -9,11 +9,11 @@ extern "C" {
 
 struct Format {
     std::string location;
-    uint64_t durationMicros;
-    uint32_t sampleRate = 0;
-    uint32_t channels = 0;
-    uint32_t width = 0;
-    uint32_t height = 0;
+    int64_t durationMicros;
+    int32_t sampleRate = 0;
+    int32_t channels = 0;
+    int32_t width = 0;
+    int32_t height = 0;
     double frameRate = 0.0;
     AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
 };

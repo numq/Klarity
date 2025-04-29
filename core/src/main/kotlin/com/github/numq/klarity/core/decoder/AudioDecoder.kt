@@ -9,13 +9,13 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
 internal class AudioDecoder(
-    private val decoder: NativeDecoder,
+    private val nativeDecoder: NativeDecoder,
     override val media: Media.Audio,
 ) : Decoder<Media.Audio> {
     private val mutex = Mutex()
 
     override suspend fun decode() = mutex.withLock {
-        decoder.decodeAudio().map { nativeFrame ->
+        nativeDecoder.decodeAudio().mapCatching { nativeFrame ->
             when (nativeFrame) {
                 null -> Frame.EndOfStream
 
@@ -24,9 +24,9 @@ internal class AudioDecoder(
                         null -> error("Unknown frame type")
 
                         NativeFrame.Type.AUDIO -> Frame.Content.Audio(
-                            timestamp = timestampMicros.microseconds,
-                            bufferHandle = bufferHandle,
-                            bufferSize = bufferSize
+                            buffer = buffer,
+                            size = size,
+                            timestamp = timestampMicros.microseconds
                         )
 
                         NativeFrame.Type.VIDEO -> error("Video frame is not supported by decoder")
@@ -37,18 +37,18 @@ internal class AudioDecoder(
     }
 
     override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
-        decoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
+        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
             timestampMicros.microseconds
         }
     }
 
     override suspend fun reset() = mutex.withLock {
-        decoder.reset()
+        nativeDecoder.reset()
     }
 
     override suspend fun close() = mutex.withLock {
         runCatching {
-            decoder.close()
+            nativeDecoder.close()
         }
     }
 }

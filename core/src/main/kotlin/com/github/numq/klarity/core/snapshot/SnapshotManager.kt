@@ -9,10 +9,13 @@ import kotlin.time.Duration
  * Provides frame capture functionality for video media at specified timestamps.
  */
 object SnapshotManager {
+    private const val MIN_FRAME_POOL_CAPACITY = 1
+
     /**
      * Captures multiple video frames at specified timestamps.
      *
      * @param location Media file path or URI
+     * @param framePoolCapacity Capacity of the pool of frames pre-allocated by the decoder
      * @param width Optional target width (keeps original if null)
      * @param height Optional target height (keeps original if null)
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
@@ -23,6 +26,7 @@ object SnapshotManager {
      */
     suspend fun snapshots(
         location: String,
+        framePoolCapacity: Int = MIN_FRAME_POOL_CAPACITY,
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
@@ -32,6 +36,7 @@ object SnapshotManager {
         VideoDecoderFactory().create(
             parameters = VideoDecoderFactory.Parameters(
                 location = location,
+                framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
                 width = width,
                 height = height,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates
@@ -57,6 +62,7 @@ object SnapshotManager {
      * Captures a single video frame at specified timestamp.
      *
      * @param location Media file path or URI
+     * @param framePoolCapacity Capacity of the pool of frames pre-allocated by the decoder
      * @param width Optional target width (maintains aspect ratio if null)
      * @param height Optional target height (maintains aspect ratio if null)
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
@@ -67,6 +73,7 @@ object SnapshotManager {
      */
     suspend fun snapshot(
         location: String,
+        framePoolCapacity: Int = 2,
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
@@ -74,6 +81,7 @@ object SnapshotManager {
         timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
     ) = snapshots(
         location = location,
+        framePoolCapacity = framePoolCapacity,
         width = width,
         height = height,
         keyframesOnly = keyframesOnly,

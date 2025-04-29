@@ -19,7 +19,6 @@ sealed interface Pipeline {
     ) : Pipeline {
         override suspend fun close() = runCatching {
             sampler.close().getOrThrow()
-            buffer.close().getOrThrow()
             decoder.close().getOrThrow()
         }
     }
@@ -30,7 +29,6 @@ sealed interface Pipeline {
         val buffer: Buffer<Frame>
     ) : Pipeline {
         override suspend fun close() = runCatching {
-            buffer.close().getOrThrow()
             decoder.close().getOrThrow()
         }
     }
@@ -45,25 +43,8 @@ sealed interface Pipeline {
     ) : Pipeline {
         override suspend fun close() = runCatching {
             sampler.close().getOrThrow()
-            audioBuffer.close().getOrThrow()
-            videoBuffer.close().getOrThrow()
             audioDecoder.close().getOrThrow()
             videoDecoder.close().getOrThrow()
-        }
-    }
-
-    data class AudioVideoSingleDecoder(
-        override val media: Media.AudioVideo,
-        val decoder: Decoder<Media.AudioVideo>,
-        val audioBuffer: Buffer<Frame>,
-        val videoBuffer: Buffer<Frame>,
-        val sampler: Sampler
-    ) : Pipeline {
-        override suspend fun close() = runCatching {
-            sampler.close().getOrThrow()
-            audioBuffer.close().getOrThrow()
-            videoBuffer.close().getOrThrow()
-            decoder.close().getOrThrow()
         }
     }
 }

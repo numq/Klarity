@@ -27,10 +27,8 @@ interface Decoder<Media> {
         ) = runCatching {
             NativeDecoder(
                 location = location,
-                findAudioStream = findAudioStream,
-                findVideoStream = findVideoStream,
-                decodeAudioStream = false,
-                decodeVideoStream = false
+                audioFramePoolCapacity = if (findAudioStream) 0 else -1,
+                videoFramePoolCapacity = if (findVideoStream) 0 else -1
             ).use { decoder ->
                 val format = decoder.format.getOrThrow()
 
@@ -81,20 +79,21 @@ interface Decoder<Media> {
 
         internal fun createAudioDecoder(
             location: String,
+            framePoolCapacity: Int,
             sampleRate: Int?,
             channels: Int?,
         ): Result<Decoder<Media.Audio>> = runCatching {
-            val decoder = NativeDecoder(
+            require(framePoolCapacity >= 0) { "Invalid audio frame pool capacity" }
+
+            val nativeDecoder = NativeDecoder(
                 location = location,
-                findAudioStream = true,
-                findVideoStream = false,
-                decodeAudioStream = true,
-                decodeVideoStream = false,
+                audioFramePoolCapacity = framePoolCapacity,
+                videoFramePoolCapacity = -1,
                 sampleRate = sampleRate,
                 channels = channels
             )
 
-            val format = decoder.format.getOrThrow()
+            val format = nativeDecoder.format.getOrThrow()
 
             val audioFormat = format.takeIf { fmt ->
                 fmt.sampleRate > 0 && fmt.channels > 0
@@ -103,12 +102,12 @@ interface Decoder<Media> {
             }
 
             if (audioFormat == null) {
-                decoder.close()
+                nativeDecoder.close()
 
                 error("Could not create audio decoder for $location")
             }
 
-            val media = with(decoder) {
+            val media = with(nativeDecoder) {
                 Media.Audio(
                     id = nativeHandle,
                     location = location,
@@ -117,21 +116,22 @@ interface Decoder<Media> {
                 )
             }
 
-            AudioDecoder(decoder = decoder, media = media)
+            AudioDecoder(nativeDecoder = nativeDecoder, media = media)
         }
 
         internal fun createVideoDecoder(
             location: String,
+            framePoolCapacity: Int,
             width: Int?,
             height: Int?,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
         ): Result<Decoder<Media.Video>> = runCatching {
-            val decoder = NativeDecoder(
+            require(framePoolCapacity >= 0) { "Invalid video frame pool capacity" }
+
+            val nativeDecoder = NativeDecoder(
                 location = location,
-                findAudioStream = false,
-                findVideoStream = true,
-                decodeAudioStream = false,
-                decodeVideoStream = true,
+                audioFramePoolCapacity = -1,
+                videoFramePoolCapacity = framePoolCapacity,
                 width = width,
                 height = height,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates?.map { candidate ->
@@ -139,7 +139,7 @@ interface Decoder<Media> {
                 }?.toIntArray()
             )
 
-            val format = decoder.format.getOrThrow()
+            val format = nativeDecoder.format.getOrThrow()
 
             val videoFormat = format.takeIf { fmt ->
                 fmt.width > 0 && fmt.height > 0
@@ -153,12 +153,12 @@ interface Decoder<Media> {
             }
 
             if (videoFormat == null) {
-                decoder.close()
+                nativeDecoder.close()
 
                 error("Could not create video decoder for $location")
             }
 
-            val media = with(decoder) {
+            val media = with(nativeDecoder) {
                 Media.Video(
                     id = nativeHandle,
                     location = location,
@@ -167,68 +167,7 @@ interface Decoder<Media> {
                 )
             }
 
-            VideoDecoder(decoder = decoder, media = media)
-        }
-
-        internal fun createMediaDecoder(
-            location: String,
-            sampleRate: Int?,
-            channels: Int?,
-            width: Int?,
-            height: Int?,
-            hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-        ): Result<Decoder<Media.AudioVideo>> = runCatching {
-            val decoder = NativeDecoder(
-                location = location,
-                findAudioStream = true,
-                findVideoStream = true,
-                decodeAudioStream = true,
-                decodeVideoStream = true,
-                sampleRate = sampleRate,
-                channels = channels,
-                width = width,
-                height = height,
-                hardwareAccelerationCandidates = hardwareAccelerationCandidates?.map { candidate ->
-                    candidate.native.ordinal
-                }?.toIntArray()
-            )
-
-            val format = decoder.format.getOrThrow()
-
-            val audioFormat = format.takeIf { fmt ->
-                fmt.sampleRate > 0 && fmt.channels > 0
-            }?.let { fmt ->
-                AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
-            }
-
-            val videoFormat = format.takeIf { fmt ->
-                fmt.width > 0 && fmt.height > 0
-            }?.let { fmt ->
-                VideoFormat(
-                    width = fmt.width,
-                    height = fmt.height,
-                    frameRate = fmt.frameRate,
-                    hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
-                )
-            }
-
-            if (audioFormat == null || videoFormat == null) {
-                decoder.close()
-
-                error("Could not create media decoder for $location")
-            }
-
-            val media = with(decoder) {
-                Media.AudioVideo(
-                    id = nativeHandle,
-                    location = location,
-                    duration = format.durationMicros.microseconds,
-                    audioFormat = audioFormat,
-                    videoFormat = videoFormat
-                )
-            }
-
-            MediaDecoder(decoder = decoder, media = media)
+            VideoDecoder(nativeDecoder = nativeDecoder, media = media)
         }
     }
 }

@@ -2,8 +2,8 @@
 #include <shared_mutex>
 #include <string>
 #include "common.h"
-#include "exception.h"
 #include "decoder.h"
+#include "exception.h"
 #include "hwaccel.h"
 
 #ifndef _Included_com_github_numq_klarity_core_decoder_NativeDecoder
@@ -13,19 +13,17 @@ extern "C" {
 #endif
 
 JNIEXPORT jintArray
-JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getAvailableHardwareAccelerationNative(
+JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_getAvailableHardwareAcceleration(
         JNIEnv *env,
         jclass thisClass
 );
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_createNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_create(
         JNIEnv *env,
         jclass thisClass,
         jstring location,
-        jboolean findAudioStream,
-        jboolean findVideoStream,
-        jboolean decodeAudioStream,
-        jboolean decodeVideoStream,
+        jint audioFramePoolCapacity,
+        jint videoFramePoolCapacity,
         jint sampleRate,
         jint channels,
         jint width,
@@ -33,48 +31,48 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         jintArray hardwareAccelerationCandidates
 );
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_getFormatNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_getFormat(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeAudioNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeAudio(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeVideoNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeVideo(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_decodeMediaNative(
+JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeMedia(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_seekToNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_seekTo(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong decoderHandle,
         jlong timestampMicros,
         jboolean keyframesOnly
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_resetNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_reset(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_deleteNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_delete(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong decoderHandle
 );
 
 #ifdef __cplusplus

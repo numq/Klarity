@@ -107,9 +107,7 @@ fun PlaylistScreenSuccess(
                     val uploadedItem = PlaylistItem.Uploaded(
                         media = media,
                         renderer = SnapshotManager.snapshot(location = media.location).getOrNull()?.let { snapshot ->
-                            media.videoFormat?.let(Renderer::create)?.onFailure {
-                                snapshot.close()
-                            }?.getOrNull()?.apply {
+                            media.videoFormat?.let(Renderer::create)?.getOrNull()?.apply {
                                 render(snapshot)
                             }
                         }

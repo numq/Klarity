@@ -18,7 +18,7 @@ internal interface RendererContext : Closeable {
             val imageInfo = ImageInfo(
                 width = renderer.format.width,
                 height = renderer.format.height,
-                colorType = ColorType.RGBA_8888,
+                colorType = ColorType.BGRA_8888,
                 alphaType = ColorAlphaType.UNPREMUL
             )
 

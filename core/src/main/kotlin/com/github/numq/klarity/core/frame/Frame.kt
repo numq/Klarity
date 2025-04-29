@@ -1,67 +1,31 @@
 package com.github.numq.klarity.core.frame
 
-import com.github.numq.klarity.core.cleaner.NativeCleaner
-import com.github.numq.klarity.core.memory.NativeMemory
-import java.io.Closeable
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 
-sealed interface Frame : Closeable {
+sealed interface Frame {
     sealed interface Content : Frame {
-        val bufferHandle: Long
+        val buffer: Long
 
-        val bufferSize: Int
+        val size: Int
 
         val timestamp: Duration
 
-        val isClosed: Boolean
-
         data class Audio(
-            override val bufferHandle: Long,
-            override val bufferSize: Int,
-            override val timestamp: Duration,
-        ) : Content {
-            private val handle = AtomicLong(bufferHandle)
-
-            private val cleanable = NativeCleaner.cleaner.register(this) {
-                if (!isClosed) {
-                    NativeMemory.free(handle.get())
-
-                    handle.set(-1L)
-                }
-            }
-
-            override val isClosed = handle.get() == -1L
-
-            override fun close() = cleanable.clean()
-        }
+            override val buffer: Long,
+            override val size: Int,
+            override val timestamp: Duration
+        ) : Content
 
         data class Video(
-            override val bufferHandle: Long,
-            override val bufferSize: Int,
+            override val buffer: Long,
+            override val size: Int,
             override val timestamp: Duration,
             val width: Int,
             val height: Int,
             val onRenderStart: (() -> Unit)? = null,
             val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
-        ) : Content {
-            private val handle = AtomicLong(bufferHandle)
-
-            private val cleanable = NativeCleaner.cleaner.register(this) {
-                if (!isClosed) {
-                    NativeMemory.free(handle.get())
-
-                    handle.set(-1L)
-                }
-            }
-
-            override val isClosed = handle.get() == -1L
-
-            override fun close() = cleanable.clean()
-        }
+        ) : Content
     }
 
-    data object EndOfStream : Frame {
-        override fun close() = Unit
-    }
+    data object EndOfStream : Frame
 }

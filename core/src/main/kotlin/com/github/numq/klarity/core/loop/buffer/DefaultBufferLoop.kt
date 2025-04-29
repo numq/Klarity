@@ -9,7 +9,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.microseconds
 
 internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     private val mutex = Mutex()
@@ -22,32 +21,26 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         decoder: Decoder<Media.Audio>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
-            val frame = decoder.decode().getOrThrow()
+            when (val frame = decoder.decode().getOrThrow()) {
+                is Frame.Content.Audio -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Audio -> {
-                        currentCoroutineContext().ensureActive()
+                    buffer.put(frame).getOrThrow()
 
-                        buffer.put(frame).getOrThrow()
+                    currentCoroutineContext().ensureActive()
 
-                        currentCoroutineContext().ensureActive()
-
-                        onTimestamp(frame.timestamp)
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        buffer.put(frame).getOrThrow()
-
-                        break
-                    }
-
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    onTimestamp(frame.timestamp)
                 }
-            } catch (t: Throwable) {
-                withContext(Dispatchers.IO) { frame.close() }
+
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
+
+                    buffer.put(frame).getOrThrow()
+
+                    break
+                }
+
+                else -> error("Unsupported frame type: ${frame::class}")
             }
         }
     }
@@ -56,82 +49,27 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         decoder: Decoder<Media.Video>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
-            val frame = decoder.decode().getOrThrow()
+            when (val frame = decoder.decode().getOrThrow()) {
+                is Frame.Content.Video -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Video -> {
-                        currentCoroutineContext().ensureActive()
+                    buffer.put(frame).getOrThrow()
 
-                        buffer.put(frame).getOrThrow()
+                    currentCoroutineContext().ensureActive()
 
-                        currentCoroutineContext().ensureActive()
-
-                        onTimestamp(frame.timestamp)
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        buffer.put(frame).getOrThrow()
-
-                        break
-                    }
-
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    onTimestamp(frame.timestamp)
                 }
-            } catch (t: Throwable) {
-                withContext(Dispatchers.IO) { frame.close() }
-            }
-        }
-    }
 
-    private suspend fun handleAudioVideoBuffer(
-        decoder: Decoder<Media.AudioVideo>,
-        audioBuffer: Buffer<Frame>,
-        videoBuffer: Buffer<Frame>,
-        onTimestamp: suspend (Duration) -> Unit
-    ) {
-        while (currentCoroutineContext().isActive) {
-            val frame = decoder.decode().getOrThrow()
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Audio -> {
-                        currentCoroutineContext().ensureActive()
+                    buffer.put(frame).getOrThrow()
 
-                        audioBuffer.put(frame).getOrThrow()
-
-                        currentCoroutineContext().ensureActive()
-
-                        onTimestamp(frame.timestamp)
-                    }
-
-                    is Frame.Content.Video -> {
-                        currentCoroutineContext().ensureActive()
-
-                        videoBuffer.put(frame).getOrThrow()
-
-                        currentCoroutineContext().ensureActive()
-
-                        onTimestamp(frame.timestamp)
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        audioBuffer.put(frame).getOrThrow()
-
-                        videoBuffer.put(frame).getOrThrow()
-
-                        break
-                    }
+                    break
                 }
-            } catch (t: Throwable) {
-                withContext(Dispatchers.IO) { frame.close() }
-            }
 
-            delay(500.microseconds)
+                else -> error("Unsupported frame type: ${frame::class}")
+            }
         }
     }
 
@@ -191,15 +129,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                                         }
                                     })
                             })
-                        }
-
-                        is Pipeline.AudioVideoSingleDecoder -> with(pipeline) {
-                            handleAudioVideoBuffer(
-                                decoder = decoder,
-                                audioBuffer = audioBuffer,
-                                videoBuffer = videoBuffer,
-                                onTimestamp = onTimestamp
-                            )
                         }
                     }
 

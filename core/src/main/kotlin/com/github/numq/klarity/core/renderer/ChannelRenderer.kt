@@ -6,19 +6,13 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 
 internal class ChannelRenderer(override val format: VideoFormat) : Renderer {
-    private val _frame = Channel<Frame.Content.Video>(Channel.CONFLATED, onUndeliveredElement = { frame ->
-        frame.close()
-    })
+    private val _frame = Channel<Frame.Content.Video>(Channel.CONFLATED)
 
     override val frame = _frame.receiveAsFlow()
 
     override fun render(frame: Frame.Content.Video) {
-        runCatching {
-            check(frame.width == format.width && frame.height == format.height) { "Invalid video frame dimensions" }
-
+        if (frame.width == format.width && frame.height == format.height) {
             _frame.trySend(frame).getOrThrow()
-        }.onFailure {
-            frame.close()
         }
     }
 

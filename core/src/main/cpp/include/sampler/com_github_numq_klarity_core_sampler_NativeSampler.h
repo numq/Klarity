@@ -11,57 +11,57 @@
 extern "C" {
 #endif
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_createNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_create(
         JNIEnv *env,
         jclass thisClass,
         jint sampleRate,
         jint channels
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setPlaybackSpeedNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_setPlaybackSpeed(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jfloat factor
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_setVolumeNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_setVolume(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jfloat value
 );
 
-JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_startNative(
+JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_start(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_playNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_play(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle,
+        jlong samplerHandle,
         jlong bufferHandle,
         jint bufferSize
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_pauseNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_pause(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_stopNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_stop(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_deleteNative(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_delete(
         JNIEnv *env,
         jclass thisClass,
-        jlong handle
+        jlong samplerHandle
 );
 
 #ifdef __cplusplus

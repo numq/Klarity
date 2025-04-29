@@ -3,7 +3,6 @@ package com.github.numq.klarity.core.player
 import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
-import com.github.numq.klarity.core.decoder.MediaDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
@@ -210,7 +209,6 @@ interface KlarityPlayer {
                     initialSettings = null,
                     audioDecoderFactory = AudioDecoderFactory(),
                     videoDecoderFactory = VideoDecoderFactory(),
-                    mediaDecoderFactory = MediaDecoderFactory(),
                     bufferFactory = BufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),

@@ -33,44 +33,34 @@ internal class DefaultPlaybackLoop(
         onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
-            val frame = buffer.poll().getOrThrow()
+            when (val frame = buffer.poll().getOrThrow()) {
+                is Frame.Content.Audio -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Audio -> {
-                        currentCoroutineContext().ensureActive()
+                    val frameTime = frame.timestamp
 
-                        val frameTime = frame.timestamp
+                    onTimestamp(frameTime)
 
-                        onTimestamp(frameTime)
+                    audioClock.set(frameTime)
 
-                        audioClock.set(frameTime)
-
-                        sampler.play(frame).getOrThrow()
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        withContext(Dispatchers.IO) { frame.close() }
-
-                        val audioClockTime = audioClock.get()
-
-                        if (audioClockTime.isFinite()) {
-                            delay((mediaDuration - audioClockTime) / getPlaybackSpeedFactor())
-                        }
-
-                        audioClock.set(Duration.INFINITE)
-
-                        break
-                    }
-
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    sampler.play(frame).getOrThrow()
                 }
-            } catch (t: Throwable) {
-                withContext(Dispatchers.IO) { frame.close() }
 
-                throw t
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
+
+                    val audioClockTime = audioClock.get()
+
+                    if (audioClockTime.isFinite()) {
+                        delay((mediaDuration - audioClockTime) / getPlaybackSpeedFactor())
+                    }
+
+                    audioClock.set(Duration.INFINITE)
+
+                    break
+                }
+
+                else -> error("Unsupported frame type: ${frame::class}")
             }
         }
     }
@@ -81,63 +71,58 @@ internal class DefaultPlaybackLoop(
         onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
-            val frame = buffer.poll().getOrThrow()
+            when (val frame = buffer.poll().getOrThrow()) {
+                is Frame.Content.Video -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Video -> {
-                        currentCoroutineContext().ensureActive()
+                    val audioClockTime = audioClock.get()
 
-                        val audioClockTime = audioClock.get()
+                    val videoClockTime = videoClock.get()
 
-                        val videoClockTime = videoClock.get()
+                    val masterClockTime = when {
+                        audioClockTime.isFinite() -> audioClockTime
 
-                        val masterClockTime = when {
-                            audioClockTime.isFinite() -> audioClockTime
+                        videoClockTime.isFinite() -> videoClockTime
 
-                            videoClockTime.isFinite() -> videoClockTime
-
-                            else -> Duration.ZERO
-                        }
-
-                        val frameTime = frame.timestamp
-
-                        val playbackSpeedFactor = getPlaybackSpeedFactor()
-
-                        val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
-
-                        delay(deltaTime)
-
-                        currentCoroutineContext().ensureActive()
-
-                        getRenderer()?.render(frame)
-
-                        onTimestamp(frameTime)
-
-                        videoClock.set(frameTime)
+                        else -> Duration.ZERO
                     }
 
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
+                    val frameTime = frame.timestamp
 
-                        withContext(Dispatchers.IO) { frame.close() }
+                    val playbackSpeedFactor = getPlaybackSpeedFactor()
 
-                        val videoClockTime = videoClock.get()
+                    val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
 
-                        if (videoClockTime.isFinite()) {
-                            delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor())
-                        }
+                    delay(deltaTime)
 
-                        videoClock.set(Duration.INFINITE)
+                    currentCoroutineContext().ensureActive()
 
-                        break
+                    CompletableDeferred<Unit>().apply{
+                        getRenderer()?.render(frame.copy {
+                            complete(Unit)
+                        })
                     }
 
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    onTimestamp(frameTime)
+
+                    videoClock.set(frameTime)
                 }
-            } catch (t: Throwable) {
-                withContext(Dispatchers.IO) { frame.close() }
-                throw t
+
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
+
+                    val videoClockTime = videoClock.get()
+
+                    if (videoClockTime.isFinite()) {
+                        delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor())
+                    }
+
+                    videoClock.set(Duration.INFINITE)
+
+                    break
+                }
+
+                else -> error("Unsupported frame type: ${frame::class}")
             }
         }
     }
@@ -173,43 +158,12 @@ internal class DefaultPlaybackLoop(
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                mediaDuration = media.duration, buffer = buffer, onTimestamp = onTimestamp
+                                mediaDuration = media.duration,
+                                buffer = buffer,
+                                onTimestamp = onTimestamp
                             )
 
                             is Pipeline.AudioVideo -> {
-                                var lastFrameTimestamp = Duration.ZERO
-
-                                val audioJob = launch {
-                                    handleAudioPlayback(
-                                        mediaDuration = media.duration,
-                                        buffer = audioBuffer,
-                                        sampler = sampler,
-                                        onTimestamp = { frameTimestamp ->
-                                            if (frameTimestamp > lastFrameTimestamp) {
-                                                onTimestamp(frameTimestamp)
-
-                                                lastFrameTimestamp = frameTimestamp
-                                            }
-                                        })
-                                }
-
-                                val videoJob = launch {
-                                    handleVideoPlayback(
-                                        mediaDuration = media.duration,
-                                        buffer = videoBuffer,
-                                        onTimestamp = { frameTimestamp ->
-                                            if (frameTimestamp > lastFrameTimestamp) {
-                                                onTimestamp(frameTimestamp)
-
-                                                lastFrameTimestamp = frameTimestamp
-                                            }
-                                        })
-                                }
-
-                                joinAll(audioJob, videoJob)
-                            }
-
-                            is Pipeline.AudioVideoSingleDecoder -> {
                                 var lastFrameTimestamp = Duration.ZERO
 
                                 val audioJob = launch {
