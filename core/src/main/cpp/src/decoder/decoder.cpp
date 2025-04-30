@@ -288,6 +288,10 @@ Decoder::Decoder(
                 format.channels = targetChannelLayout.nb_channels;
 
                 if (decodeAudioStream) {
+                    audioCodecContext->thread_count = 0;
+
+                    audioCodecContext->thread_type = FF_THREAD_FRAME;
+
                     if (sampleRate > 0) {
                         targetSampleRate = sampleRate;
 
@@ -380,6 +384,10 @@ Decoder::Decoder(
                 }
 
                 if (decodeVideoStream) {
+                    videoCodecContext->thread_count = 0;
+
+                    videoCodecContext->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+
                     if (width > 0) {
                         targetWidth = width;
 
