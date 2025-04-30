@@ -26,7 +26,10 @@ internal class AudioDecoder(
                         NativeFrame.Type.AUDIO -> Frame.Content.Audio(
                             buffer = buffer,
                             size = size,
-                            timestamp = timestampMicros.microseconds
+                            timestamp = timestampMicros.microseconds,
+                            isClosed = {
+                                nativeDecoder.isClosed() || buffer < 0L || size <= 0
+                            }
                         )
 
                         NativeFrame.Type.VIDEO -> error("Video frame is not supported by decoder")

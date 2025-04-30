@@ -12,7 +12,6 @@ add_library(klarity SHARED
         src/common.cpp
         src/decoder/decoder.cpp
         src/decoder/hwaccel.cpp
-        src/decoder/pool.cpp
         src/sampler/sampler.cpp
         src/decoder/com_github_numq_klarity_core_decoder_NativeDecoder.cpp
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp

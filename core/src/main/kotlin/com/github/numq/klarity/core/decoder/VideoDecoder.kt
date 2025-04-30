@@ -30,6 +30,9 @@ internal class VideoDecoder(
                                 buffer = buffer,
                                 size = size,
                                 timestamp = timestampMicros.microseconds,
+                                isClosed = {
+                                    nativeDecoder.isClosed() || buffer < 0L || size <= 0
+                                },
                                 width = format.width,
                                 height = format.height
                             )

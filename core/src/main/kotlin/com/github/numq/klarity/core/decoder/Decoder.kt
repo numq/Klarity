@@ -51,7 +51,7 @@ interface Decoder<Media> {
 
                 when {
                     audioFormat != null && videoFormat != null -> Media.AudioVideo(
-                        id = decoder.nativeHandle,
+                        id = decoder.nativeHandle.get(),
                         location = location,
                         duration = format.durationMicros.microseconds,
                         audioFormat = audioFormat,
@@ -59,14 +59,14 @@ interface Decoder<Media> {
                     )
 
                     audioFormat != null -> Media.Audio(
-                        id = decoder.nativeHandle,
+                        id = decoder.nativeHandle.get(),
                         location = location,
                         duration = format.durationMicros.microseconds,
                         format = audioFormat
                     )
 
                     videoFormat != null -> Media.Video(
-                        id = decoder.nativeHandle,
+                        id = decoder.nativeHandle.get(),
                         location = location,
                         duration = format.durationMicros.microseconds,
                         format = videoFormat
@@ -93,30 +93,32 @@ interface Decoder<Media> {
                 channels = channels
             )
 
-            val format = nativeDecoder.format.getOrThrow()
+            try {
+                val format = nativeDecoder.format.getOrThrow()
 
-            val audioFormat = format.takeIf { fmt ->
-                fmt.sampleRate > 0 && fmt.channels > 0
-            }?.let { fmt ->
-                AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
-            }
+                val audioFormat = format.takeIf { fmt ->
+                    fmt.sampleRate > 0 && fmt.channels > 0
+                }?.let { fmt ->
+                    AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
+                }
 
-            if (audioFormat == null) {
+                requireNotNull(audioFormat) { "Could not create audio decoder for $location" }
+
+                val media = with(nativeDecoder) {
+                    Media.Audio(
+                        id = nativeHandle.get(),
+                        location = location,
+                        duration = format.durationMicros.microseconds,
+                        format = audioFormat
+                    )
+                }
+
+                AudioDecoder(nativeDecoder = nativeDecoder, media = media)
+            } catch (t: Throwable) {
                 nativeDecoder.close()
 
-                error("Could not create audio decoder for $location")
+                throw t
             }
-
-            val media = with(nativeDecoder) {
-                Media.Audio(
-                    id = nativeHandle,
-                    location = location,
-                    duration = format.durationMicros.microseconds,
-                    format = audioFormat
-                )
-            }
-
-            AudioDecoder(nativeDecoder = nativeDecoder, media = media)
         }
 
         internal fun createVideoDecoder(
@@ -139,35 +141,37 @@ interface Decoder<Media> {
                 }?.toIntArray()
             )
 
-            val format = nativeDecoder.format.getOrThrow()
+            try {
+                val format = nativeDecoder.format.getOrThrow()
 
-            val videoFormat = format.takeIf { fmt ->
-                fmt.width > 0 && fmt.height > 0
-            }?.let { fmt ->
-                VideoFormat(
-                    width = fmt.width,
-                    height = fmt.height,
-                    frameRate = fmt.frameRate,
-                    hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
-                )
-            }
+                val videoFormat = format.takeIf { fmt ->
+                    fmt.width > 0 && fmt.height > 0
+                }?.let { fmt ->
+                    VideoFormat(
+                        width = fmt.width,
+                        height = fmt.height,
+                        frameRate = fmt.frameRate,
+                        hardwareAcceleration = HardwareAcceleration.fromNative(fmt.hwDeviceType)
+                    )
+                }
 
-            if (videoFormat == null) {
+                requireNotNull(videoFormat) { "Could not create video decoder for $location" }
+
+                val media = with(nativeDecoder) {
+                    Media.Video(
+                        id = nativeHandle.get(),
+                        location = location,
+                        duration = format.durationMicros.microseconds,
+                        format = videoFormat
+                    )
+                }
+
+                VideoDecoder(nativeDecoder = nativeDecoder, media = media)
+            } catch (t: Throwable) {
                 nativeDecoder.close()
 
-                error("Could not create video decoder for $location")
+                throw t
             }
-
-            val media = with(nativeDecoder) {
-                Media.Video(
-                    id = nativeHandle,
-                    location = location,
-                    duration = format.durationMicros.microseconds,
-                    format = videoFormat
-                )
-            }
-
-            VideoDecoder(nativeDecoder = nativeDecoder, media = media)
         }
     }
 }

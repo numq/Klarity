@@ -10,16 +10,20 @@ sealed interface Frame {
 
         val timestamp: Duration
 
+        val isClosed: () -> Boolean
+
         data class Audio(
             override val buffer: Long,
             override val size: Int,
-            override val timestamp: Duration
+            override val timestamp: Duration,
+            override val isClosed: () -> Boolean
         ) : Content
 
         data class Video(
             override val buffer: Long,
             override val size: Int,
             override val timestamp: Duration,
+            override val isClosed: () -> Boolean,
             val width: Int,
             val height: Int,
             val onRenderStart: (() -> Unit)? = null,

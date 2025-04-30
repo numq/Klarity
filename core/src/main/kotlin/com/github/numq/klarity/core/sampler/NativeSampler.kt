@@ -2,6 +2,7 @@ package com.github.numq.klarity.core.sampler
 
 import com.github.numq.klarity.core.cleaner.NativeCleaner
 import java.io.Closeable
+import java.util.concurrent.atomic.AtomicLong
 
 internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
     private object Native {
@@ -32,23 +33,23 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     private val lock = Any()
 
-    private var nativeHandle = -1L
+    private var nativeHandle = AtomicLong(-1L)
 
     init {
         synchronized(lock) {
-            nativeHandle = Native.create(sampleRate = sampleRate, channels = channels)
+            nativeHandle.set(Native.create(sampleRate = sampleRate, channels = channels))
 
-            require(nativeHandle != -1L) { "Could not instantiate native sampler" }
+            require(nativeHandle.get() != -1L) { "Could not instantiate native sampler" }
         }
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
         synchronized(lock) {
             runCatching {
-                if (nativeHandle != -1L) {
-                    Native.delete(handle = nativeHandle)
+                if (nativeHandle.get() != -1L) {
+                    Native.delete(handle = nativeHandle.get())
 
-                    nativeHandle = -1L
+                    nativeHandle.set(-1L)
                 }
             }.getOrDefault(Unit)
         }
@@ -56,37 +57,37 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
         runCatching {
-            Native.setPlaybackSpeed(handle = nativeHandle, factor = factor)
+            Native.setPlaybackSpeed(handle = nativeHandle.get(), factor = factor)
         }
     }
 
     fun setVolume(value: Float) = synchronized(lock) {
         runCatching {
-            Native.setVolume(handle = nativeHandle, value = value)
+            Native.setVolume(handle = nativeHandle.get(), value = value)
         }
     }
 
     fun start() = synchronized(lock) {
         runCatching {
-            Native.start(handle = nativeHandle)
+            Native.start(handle = nativeHandle.get())
         }
     }
 
     fun play(buffer: Long, size: Int) = synchronized(lock) {
         runCatching {
-            Native.play(handle = nativeHandle, buffer = buffer, size = size)
+            Native.play(handle = nativeHandle.get(), buffer = buffer, size = size)
         }
     }
 
     fun pause() = synchronized(lock) {
         runCatching {
-            Native.pause(handle = nativeHandle)
+            Native.pause(handle = nativeHandle.get())
         }
     }
 
     fun stop() = synchronized(lock) {
         runCatching {
-            Native.stop(handle = nativeHandle)
+            Native.stop(handle = nativeHandle.get())
         }
     }
 

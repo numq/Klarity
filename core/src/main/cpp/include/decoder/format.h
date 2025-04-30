@@ -15,7 +15,7 @@ struct Format {
     int32_t width = 0;
     int32_t height = 0;
     double frameRate = 0.0;
-    AVHWDeviceType hwDeviceType = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
+    AVHWDeviceType hwDeviceType = AV_HWDEVICE_TYPE_NONE;
 };
 
 #endif //KLARITY_DECODER_FORMAT_H

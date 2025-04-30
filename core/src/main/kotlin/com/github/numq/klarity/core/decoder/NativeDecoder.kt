@@ -4,6 +4,7 @@ import com.github.numq.klarity.core.cleaner.NativeCleaner
 import com.github.numq.klarity.core.format.NativeFormat
 import com.github.numq.klarity.core.frame.NativeFrame
 import java.io.Closeable
+import java.util.concurrent.atomic.AtomicLong
 
 internal class NativeDecoder(
     location: String,
@@ -56,35 +57,39 @@ internal class NativeDecoder(
 
     private val lock = Any()
 
-    internal var nativeHandle = -1L
+    internal var nativeHandle = AtomicLong(-1L)
         private set
+
+    internal fun isClosed() = nativeHandle.get() == -1L
 
     init {
         require(audioFramePoolCapacity >= 0 || videoFramePoolCapacity >= 0) { "Empty decoder is useless" }
 
         synchronized(lock) {
-            nativeHandle = Native.create(
-                location = location,
-                audioFramePoolCapacity = audioFramePoolCapacity,
-                videoFramePoolCapacity = videoFramePoolCapacity,
-                sampleRate = sampleRate ?: 0,
-                channels = channels ?: 0,
-                width = width ?: 0,
-                height = height ?: 0,
-                hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
+            nativeHandle.set(
+                Native.create(
+                    location = location,
+                    audioFramePoolCapacity = audioFramePoolCapacity,
+                    videoFramePoolCapacity = videoFramePoolCapacity,
+                    sampleRate = sampleRate ?: 0,
+                    channels = channels ?: 0,
+                    width = width ?: 0,
+                    height = height ?: 0,
+                    hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
+                )
             )
 
-            require(nativeHandle != -1L) { "Could not instantiate native decoder" }
+            require(nativeHandle.get() != -1L) { "Could not instantiate native decoder" }
         }
     }
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
         synchronized(lock) {
             runCatching {
-                if (nativeHandle != -1L) {
-                    Native.delete(handle = nativeHandle)
+                if (nativeHandle.get() != -1L) {
+                    Native.delete(handle = nativeHandle.get())
 
-                    nativeHandle = -1L
+                    nativeHandle.set(-1L)
                 }
             }.getOrDefault(Unit)
         }
@@ -92,35 +97,35 @@ internal class NativeDecoder(
 
     val format = synchronized(lock) {
         runCatching {
-            check(nativeHandle != -1L) { "Decoder has been closed" }
+            check(nativeHandle.get() != -1L) { "Decoder has been closed" }
 
-            Native.getFormat(handle = nativeHandle)
+            Native.getFormat(handle = nativeHandle.get())
         }
     }
 
     fun decodeAudio() = synchronized(lock) {
         runCatching {
-            Native.decodeAudio(handle = nativeHandle)
+            Native.decodeAudio(handle = nativeHandle.get())
         }
     }
 
     fun decodeVideo() = synchronized(lock) {
         runCatching {
-            Native.decodeVideo(handle = nativeHandle)
+            Native.decodeVideo(handle = nativeHandle.get())
         }
     }
 
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
         runCatching {
             Native.seekTo(
-                handle = nativeHandle, timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
+                handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
             ).takeIf { it >= 0 } ?: timestampMicros
         }
     }
 
     fun reset() = synchronized(lock) {
         runCatching {
-            Native.reset(handle = nativeHandle)
+            Native.reset(handle = nativeHandle.get())
         }
     }
 

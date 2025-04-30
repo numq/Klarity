@@ -73,15 +73,17 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    std::unique_ptr<FramePool> audioFramePool;
+    std::unique_ptr<AudioBufferPool> audioBufferPool;
 
-    std::unique_ptr<FramePool> videoFramePool;
+    std::unique_ptr<VideoBufferPool> videoBufferPool;
 
 public:
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
     );
+
+    static bool _isStreamSeekable(const AVStream *stream);
 
     bool _hasAudio();
 
@@ -93,9 +95,9 @@ public:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _processAudioFrame(AVFrame *dst);
+    void _processAudio(AudioBufferPoolItem *poolItem);
 
-    void _processVideoFrame(AVFrame *dst);
+    void _processVideo(VideoBufferPoolItem *poolItem);
 
 public:
     Decoder(
@@ -110,6 +112,10 @@ public:
     );
 
     ~Decoder();
+
+    Decoder(const Decoder &) = delete;
+
+    Decoder &operator=(const Decoder &) = delete;
 
     Format format;
 

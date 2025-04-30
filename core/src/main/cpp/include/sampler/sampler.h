@@ -35,6 +35,10 @@ private:
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
 
+    Sampler(const Sampler &) = delete;
+
+    Sampler &operator=(const Sampler &) = delete;
+
     void setPlaybackSpeed(float factor);
 
     void setVolume(float value);

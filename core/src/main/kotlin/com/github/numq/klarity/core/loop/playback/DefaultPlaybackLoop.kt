@@ -97,11 +97,7 @@ internal class DefaultPlaybackLoop(
 
                     currentCoroutineContext().ensureActive()
 
-                    CompletableDeferred<Unit>().apply{
-                        getRenderer()?.render(frame.copy {
-                            complete(Unit)
-                        })
-                    }
+                    getRenderer()?.render(frame)
 
                     onTimestamp(frameTime)
 

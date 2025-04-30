@@ -5,6 +5,8 @@ import com.github.numq.klarity.core.renderer.Renderer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNot
 import org.jetbrains.skia.ContentChangeMode
 import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.Surface
@@ -22,7 +24,9 @@ internal class SkiaRendererContext(
 
     init {
         coroutineScope.launch {
-            renderer.frame.collect(::render)
+            renderer.frame.filterNot { frame ->
+                frame.isClosed()
+            }.collectLatest(::render)
         }
     }
 
@@ -34,29 +38,39 @@ internal class SkiaRendererContext(
 
     override val generationId = _generationId.asStateFlow()
 
-    private fun render(frame: Frame.Content.Video) = when {
-        isClosed.get() || surface.isClosed || frame.buffer < 0 || frame.size < minByteSize -> Unit
+    private fun render(frame: Frame.Content.Video) {
+        when {
+            isClosed.get() || surface.isClosed || frame.isClosed() || frame.size < minByteSize -> return
 
-        else -> {
-            frame.onRenderStart?.invoke()
+            else -> {
+                frame.onRenderStart?.invoke()
 
-            val startTime = System.nanoTime().nanoseconds
+                val startTime = System.nanoTime().nanoseconds
 
-            Pixmap.make(
-                info = surface.imageInfo, addr = frame.buffer, rowBytes = surface.imageInfo.minRowBytes
-            ).use { pixmap ->
-                surface.notifyContentWillChange(ContentChangeMode.DISCARD)
+                Pixmap.make(
+                    info = surface.imageInfo, addr = frame.buffer, rowBytes = surface.imageInfo.minRowBytes
+                ).use { pixmap ->
+                    if (frame.isClosed()) {
+                        return
+                    }
 
-                surface.writePixels(pixmap, 0, 0)
+                    surface.notifyContentWillChange(ContentChangeMode.DISCARD)
 
-                surface.flushAndSubmit()
+                    if (frame.isClosed()) {
+                        return
+                    }
 
-                _generationId.value = surface.generationId
+                    surface.writePixels(pixmap, 0, 0)
+
+                    surface.flushAndSubmit()
+
+                    _generationId.value = surface.generationId
+                }
+
+                val renderTime = System.nanoTime().nanoseconds - startTime
+
+                frame.onRenderComplete?.invoke(renderTime)
             }
-
-            val renderTime = System.nanoTime().nanoseconds - startTime
-
-            frame.onRenderComplete?.invoke(renderTime)
         }
     }
 
