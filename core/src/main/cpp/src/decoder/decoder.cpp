@@ -16,6 +16,10 @@ AVPixelFormat Decoder::_getHardwareAccelerationFormat(AVCodecContext *codecConte
 
 bool Decoder::_isStreamSeekable(const AVStream *stream) {
     if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        if (stream->disposition && (stream->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
+            return false;
+        }
+
         if (stream->duration == AV_NOPTS_VALUE) {
             return false;
         }
@@ -286,10 +290,6 @@ Decoder::Decoder(
                 format.channels = targetChannelLayout.nb_channels;
 
                 if (decodeAudioStream) {
-                    audioCodecContext->thread_count = 0;
-
-                    audioCodecContext->thread_type = FF_THREAD_FRAME;
-
                     if (sampleRate > 0) {
                         targetSampleRate = sampleRate;
 
@@ -380,10 +380,6 @@ Decoder::Decoder(
                 format.frameRate = av_q2d(videoStream->avg_frame_rate);
 
                 if (decodeVideoStream) {
-                    videoCodecContext->thread_count = 0;
-
-                    videoCodecContext->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
-
                     if (width > 0) {
                         targetWidth = width;
 
@@ -705,16 +701,13 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     int streamIndex;
 
-//    if (_hasAudio()) {
-//        std::cout << "selected audio stream" << std::endl;
-//        streamIndex = audioStream->index;
-//    } else if(_hasVideo()){
-//        std::cout << "selected video stream" << std::endl;
-//        streamIndex = videoStream->index;
-//    } else {
-//        std::cout << "selected default stream" << std::endl;
-    streamIndex = 0;
-//    }
+    if (_hasVideo() && _isStreamSeekable(videoStream)) {
+        streamIndex = videoStream->index;
+    } else if (_hasAudio() && _isStreamSeekable(videoStream)) {
+        streamIndex = audioStream->index;
+    } else {
+        streamIndex = 0;
+    }
 
     const auto targetTimestamp = av_rescale_q(
             timestampMicros,
