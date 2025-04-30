@@ -95,9 +95,9 @@ public:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _processAudio(AudioBufferPoolItem *poolItem);
+    void _processAudio(std::vector<uint8_t> &dst);
 
-    void _processVideo(VideoBufferPoolItem *poolItem);
+    void _processVideo(uint8_t *const *planes, const int *strides);
 
 public:
     Decoder(

@@ -73,7 +73,7 @@ interface Decoder<Media> {
                     )
 
                     else -> error("Unsupported format")
-                }
+                }.also { println(it) }
             }
         }
 

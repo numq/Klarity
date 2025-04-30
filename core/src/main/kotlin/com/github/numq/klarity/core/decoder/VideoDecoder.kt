@@ -16,11 +16,11 @@ internal class VideoDecoder(
 
     override suspend fun decode() = mutex.withLock {
         nativeDecoder.format.mapCatching { format ->
-            nativeDecoder.decodeVideo().mapCatching { nativeFrameInfo ->
-                when (nativeFrameInfo) {
+            nativeDecoder.decodeVideo().mapCatching { nativeFrame ->
+                when (nativeFrame) {
                     null -> Frame.EndOfStream
 
-                    else -> with(nativeFrameInfo) {
+                    else -> with(nativeFrame) {
                         when (getType()) {
                             null -> error("Unknown frame type")
 

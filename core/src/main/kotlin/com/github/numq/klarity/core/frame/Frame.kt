@@ -26,8 +26,8 @@ sealed interface Frame {
             override val isClosed: () -> Boolean,
             val width: Int,
             val height: Int,
-            val onRenderStart: (() -> Unit)? = null,
-            val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
+            val onRenderStart: (suspend () -> Unit)? = null,
+            val onRenderComplete: (suspend (renderTime: Duration) -> Unit)? = null
         ) : Content
     }
 

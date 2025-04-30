@@ -15,6 +15,10 @@ AVPixelFormat Decoder::_getHardwareAccelerationFormat(AVCodecContext *codecConte
 }
 
 bool Decoder::_isStreamSeekable(const AVStream *stream) {
+    if (!stream || !stream->codecpar) {
+        return false;
+    }
+
     if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
         if (stream->disposition && (stream->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
             return false;
@@ -124,8 +128,8 @@ bool Decoder::_prepareHardwareAcceleration(const uint32_t deviceType) {
     return false;
 }
 
-void Decoder::_processAudio(AudioBufferPoolItem *poolItem) {
-    if (!poolItem || !audioFrame || !swrContext) {
+void Decoder::_processAudio(std::vector<uint8_t> &dst) {
+    if (!audioFrame || !swrContext) {
         throw DecoderException("Invalid audio processing state");
     }
 
@@ -158,8 +162,6 @@ void Decoder::_processAudio(AudioBufferPoolItem *poolItem) {
         throw DecoderException("Invalid buffer size calculation");
     }
 
-    auto &dst = poolItem->buffer;
-
     dst.resize(bufferSize);
 
     auto out = dst.data();
@@ -191,8 +193,8 @@ void Decoder::_processAudio(AudioBufferPoolItem *poolItem) {
     dst.resize(actualSize);
 }
 
-void Decoder::_processVideo(VideoBufferPoolItem *poolItem) {
-    if (!poolItem || !swVideoFrame || !swsContext) {
+void Decoder::_processVideo(uint8_t *const *planes, const int *strides) {
+    if (!swVideoFrame || !swsContext) {
         throw DecoderException("Invalid video processing state");
     }
 
@@ -201,10 +203,6 @@ void Decoder::_processVideo(VideoBufferPoolItem *poolItem) {
     if (src->format == AV_PIX_FMT_NONE || src->width <= 0 || src->height <= 0) {
         throw DecoderException("Invalid source video frame");
     }
-
-    auto planes = poolItem->planes.data();
-
-    auto strides = poolItem->strides.data();
 
     if (sws_scale(
             swsContext.get(),
@@ -377,7 +375,9 @@ Decoder::Decoder(
 
                 format.height = targetHeight;
 
-                format.frameRate = av_q2d(videoStream->avg_frame_rate);
+                if (videoStream->avg_frame_rate.num != 0 && videoStream->avg_frame_rate.den != 0) {
+                    format.frameRate = av_q2d(videoStream->avg_frame_rate);
+                }
 
                 if (decodeVideoStream) {
                     if (width > 0) {
@@ -519,7 +519,7 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
                             AVRational{1, 1'000'000}
                     );
 
-                    _processAudio(poolItem);
+                    _processAudio(poolItem->buffer);
 
                     av_frame_unref(audioFrame.get());
 
@@ -636,7 +636,11 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                         av_opt_set(swsContext.get(), "threads", "auto", 0);
                     }
 
-                    _processVideo(poolItem);
+                    auto planes = poolItem->planes.data();
+
+                    auto strides = poolItem->strides.data();
+
+                    _processVideo(planes, strides);
 
                     av_frame_unref(swVideoFrame.get());
 
@@ -703,10 +707,10 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     if (_hasVideo() && _isStreamSeekable(videoStream)) {
         streamIndex = videoStream->index;
-    } else if (_hasAudio() && _isStreamSeekable(videoStream)) {
+    } else if (_hasAudio() && _isStreamSeekable(audioStream)) {
         streamIndex = audioStream->index;
     } else {
-        streamIndex = 0;
+        throw DecoderException("Could not find seekable stream");
     }
 
     const auto targetTimestamp = av_rescale_q(
@@ -782,6 +786,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
                                 formatContext->streams[streamIndex]->time_base,
                                 {1, AV_TIME_BASE}
                         );
+
                         break;
                     }
                 }

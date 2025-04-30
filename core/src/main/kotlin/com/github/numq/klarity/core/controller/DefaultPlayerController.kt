@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
+import kotlin.time.measureTime
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
@@ -417,19 +418,19 @@ internal class DefaultPlayerController(
         when (val pipeline = pipeline) {
             is Pipeline.Audio -> with(pipeline) {
                 sampler.stop().getOrThrow()
-                buffer.flush().getOrThrow()
+                buffer.clear().getOrThrow()
                 decoder.reset().getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
-                buffer.flush().getOrThrow()
+                buffer.clear().getOrThrow()
                 decoder.reset().getOrThrow()
             }
 
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
-                audioBuffer.flush().getOrThrow()
-                videoBuffer.flush().getOrThrow()
+                audioBuffer.clear().getOrThrow()
+                videoBuffer.clear().getOrThrow()
                 audioDecoder.reset().getOrThrow()
                 videoDecoder.reset().getOrThrow()
             }
@@ -455,18 +456,18 @@ internal class DefaultPlayerController(
             is Pipeline.Audio -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                buffer.flush().getOrThrow()
+                buffer.clear().getOrThrow()
             }
 
-            is Pipeline.Video -> pipeline.buffer.flush().getOrThrow()
+            is Pipeline.Video -> pipeline.buffer.clear().getOrThrow()
 
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
                 joinAll(controllerScope.launch {
-                    audioBuffer.flush().getOrThrow()
+                    audioBuffer.clear().getOrThrow()
                 }, controllerScope.launch {
-                    videoBuffer.flush().getOrThrow()
+                    videoBuffer.clear().getOrThrow()
                 })
             }
         }
@@ -490,13 +491,21 @@ internal class DefaultPlayerController(
 
             is Pipeline.AudioVideo -> with(pipeline) {
                 joinAll(controllerScope.launch {
-                    audioDecoder.seekTo(
-                        timestamp = timestamp, keyframesOnly = keyFramesOnly
-                    ).getOrThrow()
+                    println("audio seeked: ${
+                        measureTime {
+                            audioDecoder.seekTo(
+                                timestamp = timestamp, keyframesOnly = keyFramesOnly
+                            ).getOrThrow()
+                        }
+                    }")
                 }, controllerScope.launch {
-                    timestampAfterSeek = videoDecoder.seekTo(
-                        timestamp = timestamp, keyframesOnly = keyFramesOnly
-                    ).getOrThrow()
+                    println("video seeked: ${
+                        measureTime {
+                            timestampAfterSeek = videoDecoder.seekTo(
+                                timestamp = timestamp, keyframesOnly = keyFramesOnly
+                            ).getOrThrow()
+                        }
+                    }")
                 })
             }
         }
