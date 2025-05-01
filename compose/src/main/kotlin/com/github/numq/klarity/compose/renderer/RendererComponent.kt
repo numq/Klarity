@@ -23,19 +23,12 @@ import org.jetbrains.skia.Paint as SkPaint
 fun RendererComponent(
     modifier: Modifier = Modifier,
     foreground: Foreground,
-    background: Background = Background.Transparent
+    background: Background = Background.Transparent,
+    placeholder: @Composable () -> Unit = {},
 ) {
-    val rendererContext = remember(foreground.renderer) {
-        RendererContext.create(renderer = foreground.renderer)
-    }
+    val generationId by foreground.renderer.generationId.collectAsState()
 
-    val generationId by rendererContext.generationId.collectAsState()
-
-    DisposableEffect(rendererContext) {
-        onDispose {
-            rendererContext.close()
-        }
-    }
+    val drawsNothing = remember(foreground.renderer, generationId) { foreground.renderer.drawsNothing() }
 
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -76,21 +69,25 @@ fun RendererComponent(
                 }
             }
 
-            key(generationId) {
-                Canvas(modifier = modifier.fillMaxSize()) {
-                    rendererContext.withSurface { surface ->
-                        drawBackground(
-                            background = background,
-                            backgroundSize = backgroundSize,
-                            backgroundOffset = backgroundOffset,
-                            surface = surface,
-                        )
+            if (drawsNothing) {
+                placeholder()
+            } else {
+                key(generationId) {
+                    Canvas(modifier = modifier.fillMaxSize()) {
+                        foreground.renderer.draw { surface ->
+                            drawBackground(
+                                background = background,
+                                backgroundSize = backgroundSize,
+                                backgroundOffset = backgroundOffset,
+                                surface = surface,
+                            )
 
-                        drawForeground(
-                            foregroundSize = foregroundSize,
-                            foregroundOffset = foregroundOffset,
-                            surface = surface,
-                        )
+                            drawForeground(
+                                foregroundSize = foregroundSize,
+                                foregroundOffset = foregroundOffset,
+                                surface = surface,
+                            )
+                        }
                     }
                 }
             }
