@@ -243,113 +243,180 @@ internal class DefaultPlayerController(
             location = location, findAudioStream = audioBufferSize > 0, findVideoStream = videoBufferSize > 0
         ).getOrThrow()
 
-        val pipeline = when (media) {
-            is Media.Audio -> with(media) {
-                val decoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(
-                        location = location,
-                        framePoolCapacity = audioBufferSize,
-                        sampleRate = sampleRate,
-                        channels = channels
+        check(!media.duration.isNegative()) { "Media does not support playback" }
+
+        try {
+            val pipeline = when (media) {
+                is Media.Audio -> with(media) {
+                    val decoder = audioDecoderFactory.create(
+                        parameters = AudioDecoderFactory.Parameters(
+                            location = location,
+                            framePoolCapacity = audioBufferSize,
+                            sampleRate = sampleRate,
+                            channels = channels
+                        )
+                    ).getOrThrow()
+
+                    val buffer = bufferFactory.create(
+                        parameters = BufferFactory.Parameters(capacity = audioBufferSize)
+                    ).onFailure {
+                        decoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    val sampler = samplerFactory.create(
+                        parameters = SamplerFactory.Parameters(
+                            sampleRate = format.sampleRate,
+                            channels = format.channels
+                        )
+                    ).onFailure {
+                        decoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    Pipeline.Audio(
+                        media = media.copy(format = decoder.media.format),
+                        decoder = decoder,
+                        buffer = buffer,
+                        sampler = sampler
                     )
-                ).getOrThrow()
+                }
 
-                val buffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = audioBufferSize)
-                ).getOrThrow()
+                is Media.Video -> with(media) {
+                    val decoder = videoDecoderFactory.create(
+                        parameters = VideoDecoderFactory.Parameters(
+                            location = location,
+                            framePoolCapacity = videoBufferSize,
+                            width = width,
+                            height = height,
+                            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+                        )
+                    ).getOrThrow()
 
-                val sampler = samplerFactory.create(
-                    parameters = SamplerFactory.Parameters(sampleRate = format.sampleRate, channels = format.channels)
-                ).getOrThrow()
+                    val buffer = bufferFactory.create(
+                        parameters = BufferFactory.Parameters(capacity = videoBufferSize)
+                    ).onFailure {
+                        decoder.close().getOrDefault(Unit)
 
-                Pipeline.Audio(media = media, decoder = decoder, buffer = buffer, sampler = sampler)
+                        throw it
+                    }.getOrThrow()
+
+                    Pipeline.Video(
+                        media = media.copy(format = decoder.media.format),
+                        decoder = decoder,
+                        buffer = buffer
+                    )
+                }
+
+                is Media.AudioVideo -> with(media) {
+                    val audioDecoder = audioDecoderFactory.create(
+                        parameters = AudioDecoderFactory.Parameters(
+                            location = location,
+                            framePoolCapacity = audioBufferSize,
+                            sampleRate = sampleRate,
+                            channels = channels
+                        )
+                    ).getOrThrow()
+
+                    val videoDecoder = videoDecoderFactory.create(
+                        parameters = VideoDecoderFactory.Parameters(
+                            location = location,
+                            framePoolCapacity = videoBufferSize,
+                            width = width,
+                            height = height,
+                            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+                        )
+                    ).onFailure {
+                        audioDecoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    val audioBuffer = bufferFactory.create(
+                        parameters = BufferFactory.Parameters(capacity = audioBufferSize)
+                    ).onFailure {
+                        audioDecoder.close().getOrDefault(Unit)
+
+                        videoDecoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    val videoBuffer = bufferFactory.create(
+                        parameters = BufferFactory.Parameters(capacity = videoBufferSize)
+                    ).onFailure {
+                        audioDecoder.close().getOrDefault(Unit)
+
+                        videoDecoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    val sampler = samplerFactory.create(
+                        parameters = SamplerFactory.Parameters(
+                            sampleRate = audioFormat.sampleRate, channels = audioFormat.channels
+                        )
+                    ).onFailure {
+                        audioDecoder.close().getOrDefault(Unit)
+
+                        videoDecoder.close().getOrDefault(Unit)
+
+                        throw it
+                    }.getOrThrow()
+
+                    Pipeline.AudioVideo(
+                        media = media.copy(
+                            audioFormat = audioDecoder.media.format,
+                            videoFormat = videoDecoder.media.format
+                        ),
+                        audioDecoder = audioDecoder,
+                        videoDecoder = videoDecoder,
+                        audioBuffer = audioBuffer,
+                        videoBuffer = videoBuffer,
+                        sampler = sampler
+                    )
+                }
             }
 
-            is Media.Video -> with(media) {
-                val decoder = videoDecoderFactory.create(
-                    parameters = VideoDecoderFactory.Parameters(
-                        location = location,
-                        framePoolCapacity = videoBufferSize,
-                        width = width,
-                        height = height,
-                        hardwareAccelerationCandidates = hardwareAccelerationCandidates
-                    )
-                ).getOrThrow()
+            applySettings(pipeline, settings.value).getOrThrow()
 
-                val buffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = videoBufferSize)
-                ).getOrThrow()
+            val bufferLoop = bufferLoopFactory.create(
+                parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
+            ).onFailure {
+                pipeline.close().getOrDefault(Unit)
 
-                Pipeline.Video(media = media, decoder = decoder, buffer = buffer)
-            }
+                throw it
+            }.getOrThrow()
 
-            is Media.AudioVideo -> with(media) {
-                val audioDecoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(
-                        location = location,
-                        framePoolCapacity = audioBufferSize,
-                        sampleRate = sampleRate,
-                        channels = channels
-                    )
-                ).getOrThrow()
+            val playbackLoop = playbackLoopFactory.create(
+                parameters = PlaybackLoopFactory.Parameters(
+                    pipeline = pipeline,
+                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
+                    getRenderer = { renderer })
+            ).onFailure {
+                bufferLoop.close().getOrDefault(Unit)
 
-                val videoDecoder = videoDecoderFactory.create(
-                    parameters = VideoDecoderFactory.Parameters(
-                        location = location,
-                        framePoolCapacity = videoBufferSize,
-                        width = width,
-                        height = height,
-                        hardwareAccelerationCandidates = hardwareAccelerationCandidates
-                    )
-                ).getOrThrow()
+                pipeline.close().getOrDefault(Unit)
 
-                val audioBuffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = audioBufferSize)
-                ).getOrThrow()
+                throw it
+            }.getOrThrow()
 
-                val videoBuffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = videoBufferSize)
-                ).getOrThrow()
-
-                val sampler = samplerFactory.create(
-                    parameters = SamplerFactory.Parameters(
-                        sampleRate = audioFormat.sampleRate, channels = audioFormat.channels
-                    )
-                ).getOrThrow()
-
-                Pipeline.AudioVideo(
-                    media = media,
-                    audioDecoder = audioDecoder,
-                    videoDecoder = videoDecoder,
-                    audioBuffer = audioBuffer,
-                    videoBuffer = videoBuffer,
-                    sampler = sampler
+            updateState(
+                InternalPlayerState.Ready(
+                    media = pipeline.media,
+                    pipeline = pipeline,
+                    bufferLoop = bufferLoop,
+                    playbackLoop = playbackLoop,
+                    status = InternalPlayerState.Ready.Status.STOPPED
                 )
-            }
-        }
-
-        applySettings(pipeline, settings.value).getOrThrow()
-
-        val bufferLoop = bufferLoopFactory.create(
-            parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
-        ).getOrThrow()
-
-        val playbackLoop = playbackLoopFactory.create(
-            parameters = PlaybackLoopFactory.Parameters(
-                pipeline = pipeline,
-                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
-                getRenderer = { renderer })
-        ).getOrThrow()
-
-        updateState(
-            InternalPlayerState.Ready(
-                media = media,
-                pipeline = pipeline,
-                bufferLoop = bufferLoop,
-                playbackLoop = playbackLoop,
-                status = InternalPlayerState.Ready.Status.STOPPED
             )
-        )
+        } catch (t: Throwable) {
+            updateState(InternalPlayerState.Empty)
+
+            throw t
+        }
     }
 
     private suspend fun InternalPlayerState.Ready.handlePlay() = executePlaybackCommand {

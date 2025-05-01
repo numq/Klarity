@@ -307,11 +307,12 @@ fun PlaylistScreenSuccess(
                             }
 
                             val previewManager = remember(currentState.media.location) {
-                                PreviewManager.create(location = currentState.media.location).getOrThrow()
+                                PreviewManager.create(location = currentState.media.location).getOrNull()
                             }
 
                             val previewRenderer = remember(format) {
-                                format?.let(SkiaRenderer::create)?.getOrThrow()?.also(previewManager::attachRenderer)
+                                previewManager?.format?.let(SkiaRenderer::create)?.getOrNull()
+                                    ?.also(previewManager::attachRenderer)
                             }
 
                             var hoveredTimestamp by remember {
@@ -320,9 +321,9 @@ fun PlaylistScreenSuccess(
 
                             LaunchedEffect(hoveredTimestamp) {
                                 hoveredTimestamp?.run {
-                                    previewManager.preview(
+                                    previewManager?.preview(
                                         timestamp = timestamp, debounceTime = 100.milliseconds
-                                    ).getOrDefault(Unit)
+                                    )?.getOrDefault(Unit)
                                 }
                             }
 
@@ -331,7 +332,7 @@ fun PlaylistScreenSuccess(
                                     runBlocking {
                                         playerRenderer?.close()?.getOrThrow()
 
-                                        previewManager.close().getOrThrow()
+                                        previewManager?.close()?.getOrThrow()
 
                                         previewRenderer?.close()?.getOrThrow()
                                     }

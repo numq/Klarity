@@ -93,7 +93,7 @@ public:
 
     void _processAudio(std::vector<uint8_t> &dst);
 
-    void _processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, const int *strides);
+    void _processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &planes, std::vector<int> &strides);
 
 public:
     Decoder(

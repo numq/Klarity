@@ -14,9 +14,7 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultSkiaRenderer(
-    override val format: VideoFormat,
-    private val imageInfo: ImageInfo,
-    private val surface: Surface,
+    override val format: VideoFormat
 ) : SkiaRenderer {
     companion object {
         const val DRAWS_NOTHING_ID = -1
@@ -30,11 +28,22 @@ internal class DefaultSkiaRenderer(
 
     private val minByteSize by lazy { imageInfo.computeMinByteSize() }
 
-    private val renderPixmap = Pixmap.make(
-        info = imageInfo,
-        buffer = Data.makeEmpty(),
-        rowBytes = imageInfo.minRowBytes
+    private val imageInfo = ImageInfo(
+        width = format.width,
+        height = format.height,
+        colorType = ColorType.BGRA_8888,
+        alphaType = ColorAlphaType.UNPREMUL
     )
+
+    private val surface = Surface.makeRaster(imageInfo)
+
+    private val targetPixmap = Data.makeEmpty().use { buffer ->
+        Pixmap.make(
+            info = imageInfo,
+            buffer = buffer,
+            rowBytes = imageInfo.minRowBytes
+        )
+    }
 
     private val cache = mutableListOf<CachedFrame>()
 
@@ -62,11 +71,7 @@ internal class DefaultSkiaRenderer(
                 runCatching {
                     require(!isClosed.get() && !cachedFrame.pixmap.isClosed)
 
-                    surface.notifyContentWillChange(ContentChangeMode.DISCARD)
-
                     surface.writePixels(cachedFrame.pixmap, 0, 0)
-
-                    surface.flushAndSubmit()
 
                     _generationId.value = surface.generationId
                 }.onFailure {
@@ -86,21 +91,15 @@ internal class DefaultSkiaRenderer(
 
                     val startTime = System.nanoTime().nanoseconds
 
-                    renderPixmap.reset(info = imageInfo, addr = frame.buffer, rowBytes = imageInfo.minRowBytes)
+                    targetPixmap.reset(info = imageInfo, addr = frame.buffer, rowBytes = imageInfo.minRowBytes)
 
-                    surface.notifyContentWillChange(ContentChangeMode.DISCARD)
-
-                    surface.writePixels(renderPixmap, 0, 0)
-
-                    surface.flushAndSubmit()
-
-                    _generationId.value = surface.generationId
+                    surface.writePixels(targetPixmap, 0, 0)
 
                     val renderTime = System.nanoTime().nanoseconds - startTime
 
                     frame.onRenderComplete?.invoke(renderTime)
 
-                    Unit
+                    _generationId.value = surface.generationId
                 }.onFailure {
                     _generationId.value = DRAWS_NOTHING_ID
                 }.onFailure(continuation::resumeWithException).onSuccess(continuation::resume).getOrThrow()
@@ -130,17 +129,15 @@ internal class DefaultSkiaRenderer(
         }
     }
 
-    override suspend fun flush() = renderMutex.withLock {
+    override suspend fun flush(color: Int) = renderMutex.withLock {
         runCatching {
             suspendCoroutine { continuation ->
                 runCatching {
                     require(!isClosed.get())
 
-                    surface.notifyContentWillChange(ContentChangeMode.DISCARD)
+                    targetPixmap.reset()
 
-                    surface.canvas.clear(Color.BLACK)
-
-                    surface.flushAndSubmit()
+                    surface.canvas.clear(color)
 
                     _generationId.value = surface.generationId
                 }.onFailure(continuation::resumeWithException).onSuccess {
@@ -153,12 +150,12 @@ internal class DefaultSkiaRenderer(
     override suspend fun close() = cacheMutex.withLock {
         runCatching {
             if (!isClosed.get()) {
-                if (!renderPixmap.isClosed) {
-                    renderPixmap.close()
-                }
-
                 if (!surface.isClosed) {
                     surface.close()
+                }
+
+                if (!targetPixmap.isClosed) {
+                    targetPixmap.close()
                 }
 
                 val iterator = cache.iterator()

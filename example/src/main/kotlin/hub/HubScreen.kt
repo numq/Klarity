@@ -72,8 +72,6 @@ fun HubScreen(
             hubItems += pendingItem
             coroutineScope.launch(Dispatchers.Default) {
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
-                    println(media)
-
                     val player = KlarityPlayer.create().getOrThrow()
 
                     player.prepare(location = media.location).getOrThrow()

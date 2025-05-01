@@ -32,8 +32,6 @@ internal interface Decoder<Media> {
             ).use { decoder ->
                 val format = decoder.format.getOrThrow()
 
-                check(format.durationMicros > 0L) { "Media does not support playback" }
-
                 val audioFormat = format.takeIf { fmt ->
                     fmt.sampleRate > 0 && fmt.channels > 0
                 }?.let { fmt ->

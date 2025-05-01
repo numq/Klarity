@@ -1,6 +1,7 @@
 package com.github.numq.klarity.core.preview
 
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
+import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.renderer.Renderer
 import kotlin.time.Duration
@@ -9,6 +10,11 @@ import kotlin.time.Duration
  * Provides real-time frame capture functionality for video media at specified timestamps, displays the captured frames through an attached renderer.
  */
 interface PreviewManager {
+    /**
+     * Video format of the media used
+     */
+    val format: VideoFormat
+
     /**
      * Attaches a renderer to display preview frames. Only one renderer may be attached at a time.
      * Any previously attached renderer will be automatically detached.
@@ -47,7 +53,7 @@ interface PreviewManager {
     suspend fun close(): Result<Unit>
 
     companion object {
-        private const val MIN_FRAME_POOL_CAPACITY = 2
+        private const val MIN_FRAME_POOL_CAPACITY = 1
 
         /**
          * Creates a new PreviewManager instance for the specified media file.

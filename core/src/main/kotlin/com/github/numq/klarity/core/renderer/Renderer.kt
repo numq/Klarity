@@ -10,7 +10,5 @@ interface Renderer {
 
     suspend fun save(frame: Frame.Content.Video): Result<Unit>
 
-    suspend fun flush(): Result<Unit>
-
     suspend fun close(): Result<Unit>
 }

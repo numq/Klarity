@@ -43,18 +43,6 @@ bool Decoder::_hasVideo() {
         return false;
     }
 
-    if (!videoStream->codecpar || videoStream->codecpar->codec_type != AVMEDIA_TYPE_VIDEO) {
-        return false;
-    }
-
-    if (videoCodecContext->pix_fmt == AV_PIX_FMT_NONE) {
-        return false;
-    }
-
-    if (videoCodecContext->width <= 0 || videoCodecContext->height <= 0) {
-        return false;
-    }
-
     if (!swVideoFrame || !videoBufferPool) {
         return false;
     }
@@ -169,7 +157,7 @@ void Decoder::_processAudio(std::vector<uint8_t> &dst) {
     dst.resize(actualSize);
 }
 
-void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, const int *strides) {
+void Decoder::_processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &planes, std::vector<int> &strides) {
     if (!swVideoFrame || !swsContext) {
         throw DecoderException("Invalid video processing state");
     }
@@ -201,11 +189,11 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, c
 
         av_opt_set(swsContext.get(), "threads", "auto", 0);
 
-        swsPixelFormat = static_cast<AVPixelFormat>(src->format);
-
         swsWidth = src->width;
 
         swsHeight = src->height;
+
+        swsPixelFormat = static_cast<AVPixelFormat>(src->format);
     }
 
     if (sws_scale(
@@ -214,8 +202,8 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, c
             src->linesize,
             0,
             src->height,
-            planes,
-            strides
+            planes.data(),
+            strides.data()
     ) <= 0) {
         throw DecoderException("Video conversion failed");
     }
@@ -268,7 +256,7 @@ Decoder::Decoder(
 
     format = {
             location,
-            formatContext->duration
+            formatContext->duration < 0 || formatContext->duration & AV_NOPTS_VALUE ? 0 : formatContext->duration
     };
 
     for (int streamIndex = 0; streamIndex < formatContext->nb_streams; ++streamIndex) {
@@ -298,11 +286,7 @@ Decoder::Decoder(
 
                 targetSampleRate = audioCodecContext->sample_rate;
 
-                format.sampleRate = targetSampleRate;
-
                 av_channel_layout_copy(&targetChannelLayout, &audioCodecContext->ch_layout);
-
-                format.channels = targetChannelLayout.nb_channels;
 
                 if (decodeAudioStream) {
                     audioCodecContext->thread_count = static_cast<int>(
@@ -319,16 +303,10 @@ Decoder::Decoder(
 
                     if (sampleRate > 0) {
                         targetSampleRate = sampleRate;
-
-                        format.sampleRate = targetSampleRate;
                     }
 
                     if (channels > 0) {
-                        av_channel_layout_uninit(&targetChannelLayout);
-
                         av_channel_layout_default(&targetChannelLayout, channels);
-
-                        format.channels = targetChannelLayout.nb_channels;
                     }
 
                     SwrContext *rawSwrContext = nullptr;
@@ -361,6 +339,10 @@ Decoder::Decoder(
 
                     audioBufferPool = std::make_unique<AudioBufferPool>(audioFramePoolCapacity);
                 }
+
+                format.sampleRate = targetSampleRate;
+
+                format.channels = targetChannelLayout.nb_channels;
             }
         } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && findVideoStream) {
             if ((videoDecoder = avcodec_find_decoder(stream->codecpar->codec_id))) {
@@ -380,8 +362,6 @@ Decoder::Decoder(
                     throw DecoderException("Could not copy parameters to video codec context");
                 }
 
-                videoCodecContext->get_format = _getHardwareAccelerationFormat;
-
                 if (decodeVideoStream && !hardwareAccelerationCandidates.empty()) {
                     for (auto deviceType: hardwareAccelerationCandidates) {
                         if (_prepareHardwareAcceleration(deviceType)) {
@@ -392,17 +372,17 @@ Decoder::Decoder(
                     }
                 }
 
+                if (_isHardwareAccelerated()) {
+                    videoCodecContext->get_format = _getHardwareAccelerationFormat;
+                }
+
                 if (avcodec_open2(videoCodecContext.get(), videoDecoder, nullptr) < 0) {
                     throw DecoderException("Could not open video decoder");
                 }
 
                 targetWidth = videoCodecContext->width;
 
-                format.width = targetWidth;
-
                 targetHeight = videoCodecContext->height;
-
-                format.height = targetHeight;
 
                 if (videoStream->avg_frame_rate.num != 0 && videoStream->avg_frame_rate.den != 0) {
                     format.frameRate = av_q2d(videoStream->avg_frame_rate);
@@ -423,14 +403,10 @@ Decoder::Decoder(
 
                     if (width > 0) {
                         targetWidth = width;
-
-                        format.width = targetWidth;
                     }
 
                     if (height > 0) {
                         targetHeight = height;
-
-                        format.height = targetHeight;
                     }
 
                     swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
@@ -454,11 +430,11 @@ Decoder::Decoder(
 
                     av_opt_set(swsContext.get(), "threads", "auto", 0);
 
-                    swsPixelFormat = static_cast<AVPixelFormat>(videoCodecContext->pix_fmt);
-
                     swsWidth = videoCodecContext->width;
 
                     swsHeight = videoCodecContext->height;
+
+                    swsPixelFormat = static_cast<AVPixelFormat>(videoCodecContext->pix_fmt);
 
                     swVideoFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
 
@@ -472,6 +448,14 @@ Decoder::Decoder(
                             targetHeight,
                             targetPixelFormat
                     );
+                }
+
+                format.width = targetWidth;
+
+                format.height = targetHeight;
+
+                if (!audioStream && videoStream->nb_frames <= 1) {
+                    format.durationMicros = 0;
                 }
             }
         }
@@ -651,7 +635,7 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                     const auto frameTimestampMicros = (swVideoFrame->best_effort_timestamp != AV_NOPTS_VALUE)
                                                       ? swVideoFrame->best_effort_timestamp : swVideoFrame->pts;
 
-                    _processVideo(poolItem->buffer, poolItem->planes.data(), poolItem->strides.data());
+                    _processVideo(poolItem->buffer, poolItem->planes, poolItem->strides);
 
                     av_frame_unref(swVideoFrame.get());
 

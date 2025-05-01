@@ -17,6 +17,8 @@ internal class DefaultPreviewManager(
     @Volatile
     private var renderer: Renderer? = null
 
+    override val format = videoDecoder.media.videoFormat
+
     override fun attachRenderer(renderer: Renderer) {
         this.renderer = renderer
     }
@@ -40,7 +42,7 @@ internal class DefaultPreviewManager(
             ).getOrDefault(Unit)
 
             (videoDecoder.decode().getOrThrow() as? Frame.Content.Video)?.let { frame ->
-                renderer?.render(frame)
+                renderer?.render(frame)?.getOrThrow()
             }
         }
     }.recoverCatching { t ->

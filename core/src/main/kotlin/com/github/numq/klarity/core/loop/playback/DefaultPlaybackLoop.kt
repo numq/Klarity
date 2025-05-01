@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.microseconds
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
@@ -72,13 +71,7 @@ internal class DefaultPlaybackLoop(
         onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
-            when (val frame = buffer.peek().getOrThrow()) {
-                null -> {
-                    delay(500.microseconds)
-
-                    continue
-                }
-
+            when (val frame = buffer.take().getOrThrow()) {
                 is Frame.Content.Video -> {
                     currentCoroutineContext().ensureActive()
 
@@ -106,9 +99,7 @@ internal class DefaultPlaybackLoop(
 
                     currentCoroutineContext().ensureActive()
 
-                    getRenderer()?.render(frame)
-
-                    buffer.take().getOrThrow()
+                    getRenderer()?.render(frame)?.getOrThrow()
 
                     onTimestamp(frameTime)
 
@@ -125,6 +116,8 @@ internal class DefaultPlaybackLoop(
                     }
 
                     videoClock.set(Duration.INFINITE)
+
+                    buffer.take().getOrThrow()
 
                     break
                 }
