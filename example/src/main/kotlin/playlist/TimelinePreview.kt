@@ -10,8 +10,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.RendererComponent
+import com.github.numq.klarity.compose.renderer.SkiaRenderer
 import com.github.numq.klarity.compose.scale.ImageScale
-import com.github.numq.klarity.core.renderer.Renderer
 import controls.HoveredTimestamp
 import extension.formatTimestamp
 
@@ -20,7 +20,7 @@ fun TimelinePreview(
     width: Float,
     height: Float,
     hoveredTimestamp: HoveredTimestamp,
-    previewRenderer: Renderer
+    renderer: SkiaRenderer
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
         Card(modifier = Modifier.padding(4.dp).graphicsLayer {
@@ -32,7 +32,7 @@ fun TimelinePreview(
             ) {
                 RendererComponent(
                     modifier = Modifier.size(width = width.dp, height = height.dp),
-                    foreground = Foreground(renderer = previewRenderer, imageScale = ImageScale.Crop)
+                    foreground = Foreground(renderer = renderer, imageScale = ImageScale.Crop)
                 )
                 Box(modifier = Modifier.weight(1f, fill = false), contentAlignment = Alignment.Center) {
                     Text(

@@ -4,7 +4,7 @@ import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.renderer.Renderer
 
-class PlaybackLoopFactory : Factory<PlaybackLoopFactory.Parameters, PlaybackLoop> {
+internal class PlaybackLoopFactory : Factory<PlaybackLoopFactory.Parameters, PlaybackLoop> {
     data class Parameters(
         val pipeline: Pipeline,
         val getPlaybackSpeedFactor: () -> Double,

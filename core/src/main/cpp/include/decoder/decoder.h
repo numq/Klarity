@@ -37,7 +37,7 @@ private:
 
     int targetHeight;
 
-    const int swsFlags = SWS_FAST_BILINEAR;
+    const int swsFlags = SWS_BILINEAR;
 
     AVPixelFormat swsPixelFormat = AV_PIX_FMT_NONE;
 
@@ -69,9 +69,9 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> swVideoFrame;
 
-    std::unique_ptr<AVFrame, AVFrameDeleter> dstVideoFrame;
-
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
+
+    std::unique_ptr<AVFrame, AVFrameDeleter> dstVideoFrame;
 
     std::unique_ptr<AudioBufferPool> audioBufferPool;
 
@@ -82,8 +82,6 @@ public:
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
     );
-
-    static bool _isStreamSeekable(const AVStream *stream);
 
     bool _hasAudio();
 
@@ -126,6 +124,10 @@ public:
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
+
+    void releaseAudioBuffer(void *buffer);
+
+    void releaseVideoBuffer(void *buffer);
 };
 
 #endif // KLARITY_DECODER_DECODER_H

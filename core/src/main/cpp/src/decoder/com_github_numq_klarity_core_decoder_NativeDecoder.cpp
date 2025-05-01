@@ -195,3 +195,29 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_0
         delete getDecoderPointer(decoderHandle);
     });
 }
+
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_releaseAudioBuffer(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong decoderHandle,
+        jlong bufferHandle
+) {
+    return handleException(env, [&] {
+        auto decoder = getDecoderPointer(decoderHandle);
+
+        decoder->releaseAudioBuffer(reinterpret_cast<void *>(bufferHandle));
+    });
+}
+
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_releaseVideoBuffer(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong decoderHandle,
+        jlong bufferHandle
+) {
+    return handleException(env, [&] {
+        auto decoder = getDecoderPointer(decoderHandle);
+
+        decoder->releaseVideoBuffer(reinterpret_cast<void *>(bufferHandle));
+    });
+}

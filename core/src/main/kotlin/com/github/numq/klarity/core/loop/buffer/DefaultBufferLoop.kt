@@ -135,6 +135,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     ensureActive()
 
                     onEndOfMedia()
+                } catch (t: Throwable) {
+                    throw t
                 } finally {
                     isBuffering = false
                 }
@@ -147,6 +149,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             try {
                 job?.cancelAndJoin()
                 job = null
+            } catch (t: Throwable) {
+                throw t
             } finally {
                 isBuffering = false
             }
@@ -158,6 +162,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             try {
                 job?.cancel()
                 job = null
+            } catch (t: Throwable) {
+                throw t
             } finally {
                 isBuffering = false
             }

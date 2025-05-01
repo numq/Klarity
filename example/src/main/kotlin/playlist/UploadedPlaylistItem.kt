@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -33,12 +32,6 @@ fun UploadedPlaylistItem(
     select: () -> Unit,
     delete: () -> Unit,
 ) {
-    DisposableEffect(Unit) {
-        onDispose {
-            playlistItem.renderer?.close()
-        }
-    }
-
     Row(
         modifier = Modifier.fillMaxWidth().height(64.dp),
         horizontalArrangement = Arrangement.spacedBy(space = 4.dp, alignment = Alignment.Start),

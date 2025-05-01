@@ -8,7 +8,7 @@ import com.github.numq.klarity.core.media.Media
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
-interface Decoder<Media> {
+internal interface Decoder<Media> {
     val media: Media
 
     suspend fun decode(): Result<Frame>
@@ -31,6 +31,8 @@ interface Decoder<Media> {
                 videoFramePoolCapacity = if (findVideoStream) 0 else -1
             ).use { decoder ->
                 val format = decoder.format.getOrThrow()
+
+                check(format.durationMicros > 0L) { "Media does not support playback" }
 
                 val audioFormat = format.takeIf { fmt ->
                     fmt.sampleRate > 0 && fmt.channels > 0
@@ -73,7 +75,7 @@ interface Decoder<Media> {
                     )
 
                     else -> error("Unsupported format")
-                }.also { println(it) }
+                }
             }
         }
 

@@ -8,6 +8,7 @@
 #include "frame.h"
 
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include "libavutil/imgutils.h"
 }
 
@@ -45,6 +46,12 @@ public:
 
         return items[index++ % capacity].get();
     }
+
+    void release(uint8_t *buffer) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        // todo
+    }
 };
 
 class AudioBufferPoolItem {
@@ -66,8 +73,8 @@ public:
 
     AVPixelFormat format;
 
-    VideoBufferPoolItem(int w, int h, AVPixelFormat fmt) : width(w), height(h), format(fmt) {
-        auto size = av_image_get_buffer_size(fmt, w, h, 1);
+    VideoBufferPoolItem(int width, int height, AVPixelFormat format) : width(width), height(height), format(format) {
+        auto size = av_image_get_buffer_size(format, width, height, 1);
 
         if (size < 0) {
             throw DecoderException("Could not get video buffer size");
@@ -77,11 +84,13 @@ public:
 
         buffer.resize(size);
 
-        planes.resize(AV_NUM_DATA_POINTERS);
+        planes.resize(4);
 
-        strides.resize(AV_NUM_DATA_POINTERS);
+        strides.resize(4);
 
-        if (av_image_fill_arrays(
+        int actualSize;
+
+        if ((actualSize = av_image_fill_arrays(
                 planes.data(),
                 strides.data(),
                 buffer.data(),
@@ -89,9 +98,11 @@ public:
                 width,
                 height,
                 1
-        ) <= 0) {
+        )) <= 0) {
             throw DecoderException("Could not fill video buffers");
         }
+
+        buffer.resize(actualSize);
     }
 };
 

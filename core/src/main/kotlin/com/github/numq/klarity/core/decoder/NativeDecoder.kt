@@ -49,6 +49,12 @@ internal class NativeDecoder(
 
         @JvmStatic
         external fun delete(handle: Long)
+
+        @JvmStatic
+        external fun releaseAudioBuffer(handle: Long, buffer: Long)
+
+        @JvmStatic
+        external fun releaseVideoBuffer(handle: Long, buffer: Long)
     }
 
     companion object {
@@ -59,6 +65,10 @@ internal class NativeDecoder(
 
     internal var nativeHandle = AtomicLong(-1L)
         private set
+
+    private fun ensureOpen() {
+        check(nativeHandle.get() != -1L) { "Native sampler is closed" }
+    }
 
     internal fun isClosed() = nativeHandle.get() == -1L
 
@@ -85,19 +95,17 @@ internal class NativeDecoder(
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
         synchronized(lock) {
-            runCatching {
-                if (nativeHandle.get() != -1L) {
-                    Native.delete(handle = nativeHandle.get())
+            ensureOpen()
 
-                    nativeHandle.set(-1L)
-                }
-            }.getOrDefault(Unit)
+            Native.delete(handle = nativeHandle.get())
+
+            nativeHandle.set(-1L)
         }
     }
 
     val format = synchronized(lock) {
         runCatching {
-            check(nativeHandle.get() != -1L) { "Decoder has been closed" }
+            ensureOpen()
 
             Native.getFormat(handle = nativeHandle.get())
         }
@@ -105,18 +113,24 @@ internal class NativeDecoder(
 
     fun decodeAudio() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.decodeAudio(handle = nativeHandle.get())
         }
     }
 
     fun decodeVideo() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.decodeVideo(handle = nativeHandle.get())
         }
     }
 
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.seekTo(
                 handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
             ).takeIf { it >= 0 } ?: timestampMicros
@@ -125,7 +139,25 @@ internal class NativeDecoder(
 
     fun reset() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.reset(handle = nativeHandle.get())
+        }
+    }
+
+    fun releaseAudioBuffer(handle: Long) = synchronized(lock) {
+        runCatching {
+            ensureOpen()
+
+            Native.releaseAudioBuffer(handle = nativeHandle.get(), buffer = handle)
+        }
+    }
+
+    fun releaseVideoBuffer(handle: Long) = synchronized(lock) {
+        runCatching {
+            ensureOpen()
+
+            Native.releaseVideoBuffer(handle = nativeHandle.get(), buffer = handle)
         }
     }
 

@@ -91,22 +91,24 @@ internal class DefaultPlaybackLoop(
 
                         videoClockTime.isFinite() -> videoClockTime
 
-                        else -> Duration.ZERO
+                        else -> Duration.INFINITE
                     }
 
                     val frameTime = frame.timestamp
 
                     val playbackSpeedFactor = getPlaybackSpeedFactor()
 
-                    val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
+                    if (masterClockTime.isFinite()) {
+                        val deltaTime = (frameTime - masterClockTime) / playbackSpeedFactor
 
-                    delay(deltaTime)
+                        delay(deltaTime)
+                    }
 
                     currentCoroutineContext().ensureActive()
 
-                    getRenderer()?.render(frame.copy {
-                        buffer.take()
-                    })
+                    getRenderer()?.render(frame)
+
+                    buffer.take().getOrThrow()
 
                     onTimestamp(frameTime)
 
@@ -206,6 +208,8 @@ internal class DefaultPlaybackLoop(
                     ensureActive()
 
                     onEndOfMedia()
+                } catch (t: Throwable) {
+                    throw t
                 } finally {
                     isPlaying = false
 
@@ -220,9 +224,11 @@ internal class DefaultPlaybackLoop(
     override suspend fun stop() = mutex.withLock {
         runCatching {
             try {
-                job?.cancel()
+                job?.cancelAndJoin()
 
                 job = null
+            } catch (t: Throwable) {
+                throw t
             } finally {
                 isPlaying = false
 
@@ -239,6 +245,8 @@ internal class DefaultPlaybackLoop(
                 job?.cancel()
 
                 job = null
+            } catch (t: Throwable) {
+                throw t
             } finally {
                 isPlaying = false
 

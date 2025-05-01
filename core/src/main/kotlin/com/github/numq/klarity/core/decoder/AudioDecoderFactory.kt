@@ -3,7 +3,7 @@ package com.github.numq.klarity.core.decoder
 import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.media.Media
 
-class AudioDecoderFactory : Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>> {
+internal class AudioDecoderFactory : Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>> {
     data class Parameters(
         val location: String,
         val framePoolCapacity: Int,

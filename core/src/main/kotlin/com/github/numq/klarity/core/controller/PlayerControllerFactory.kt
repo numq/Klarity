@@ -16,7 +16,7 @@ import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 
-class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
+internal class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
         val initialSettings: PlayerSettings?,
         val audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,

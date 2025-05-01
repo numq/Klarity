@@ -32,7 +32,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
 import notification.Notification
-import kotlin.time.Duration.Companion.ZERO
 
 @Composable
 fun UploadedHubItem(
@@ -59,37 +58,45 @@ fun UploadedHubItem(
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
-                hubItem.previewManager?.preview(ZERO)?.getOrThrow()
+                hubItem.renderer?.let { renderer ->
+                    renderer.withCache { cache ->
+                        cache.firstOrNull()?.let { cachedFrame ->
+                            renderer.render(cachedFrame).getOrThrow()
+                        }
 
-                previewJob?.cancel()
-                previewJob = launch(Dispatchers.Default) {
-                    when (state) {
-                        is PlayerState.Ready.Stopped -> {
-                            hoverInteractionSource.interactions.collectLatest { interaction ->
-                                when (interaction) {
-                                    is HoverInteraction.Enter -> {
-                                        val n = 10
+                        if (cache.size > 1) {
+                            previewJob?.cancel()
 
-                                        var snapshotIndex = 0
+                            previewJob = launch(Dispatchers.Default) {
+                                when (state) {
+                                    is PlayerState.Ready.Stopped -> {
+                                        hoverInteractionSource.interactions.collectLatest { interaction ->
+                                            when (interaction) {
+                                                is HoverInteraction.Enter -> {
+                                                    var snapshotIndex = 0
 
-                                        while (isActive) {
-                                            snapshotIndex = (snapshotIndex + 1) % n
+                                                    while (isActive) {
+                                                        cache.getOrNull(snapshotIndex)?.let { cachedFrame ->
+                                                            renderer.render(cachedFrame).getOrThrow()
+                                                        }
 
-                                            hubItem.previewManager?.preview(
-                                                timestamp = (currentState.media.duration * snapshotIndex) / (n - 1)
-                                            )?.getOrThrow()
+                                                        snapshotIndex = (snapshotIndex + 1) % cache.size
 
-                                            delay(500L)
+                                                        delay(500L)
+                                                    }
+                                                }
+
+                                                is HoverInteraction.Exit -> cache.firstOrNull()?.let { cachedFrame ->
+                                                    renderer.render(cachedFrame).getOrThrow()
+                                                }
+                                            }
                                         }
                                     }
 
-                                    is HoverInteraction.Exit -> hubItem.previewManager?.preview(timestamp = ZERO)
-                                        ?.getOrThrow()
+                                    else -> return@launch
                                 }
                             }
                         }
-
-                        else -> return@launch
                     }
                 }
 
@@ -106,6 +113,7 @@ fun UploadedHubItem(
 
             else -> {
                 previewJob?.cancel()
+
                 previewJob = null
             }
         }
@@ -114,18 +122,6 @@ fun UploadedHubItem(
     LaunchedEffect(error) {
         error?.run {
             notify(Notification(exception.localizedMessage))
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            hubItem.renderer?.close()
-
-            runBlocking {
-                hubItem.previewManager?.close()
-
-                hubItem.player.close()
-            }
         }
     }
 

@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
-import kotlin.time.measureTime
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
@@ -102,10 +101,10 @@ internal class DefaultPlayerController(
 
     override val state = MutableStateFlow<PlayerState>(PlayerState.Empty)
 
-    private suspend fun withInternalState(
-        onEmpty: (suspend InternalPlayerState.Empty.() -> Unit)? = null,
-        onPreparing: (suspend InternalPlayerState.Preparing.() -> Unit)? = null,
-        onReady: (suspend InternalPlayerState.Ready.() -> Unit)? = null
+    private suspend fun <T> withInternalState(
+        onEmpty: (suspend InternalPlayerState.Empty.() -> T)? = null,
+        onPreparing: (suspend InternalPlayerState.Preparing.() -> T)? = null,
+        onReady: (suspend InternalPlayerState.Ready.() -> T)? = null
     ) = when (val state = internalState) {
         is InternalPlayerState.Empty -> onEmpty?.invoke(state)
 
@@ -436,11 +435,9 @@ internal class DefaultPlayerController(
             }
         }
 
-        joinAll(controllerScope.launch {
-            bufferTimestamp.emit(Duration.ZERO)
-        }, controllerScope.launch {
-            playbackTimestamp.emit(Duration.ZERO)
-        })
+        bufferTimestamp.emit(Duration.ZERO)
+
+        playbackTimestamp.emit(Duration.ZERO)
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.STOPPED))
     }
@@ -464,11 +461,9 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> with(pipeline) {
                 sampler.stop().getOrThrow()
 
-                joinAll(controllerScope.launch {
-                    audioBuffer.clear().getOrThrow()
-                }, controllerScope.launch {
-                    videoBuffer.clear().getOrThrow()
-                })
+                audioBuffer.clear().getOrThrow()
+
+                videoBuffer.clear().getOrThrow()
             }
         }
 
@@ -490,31 +485,17 @@ internal class DefaultPlayerController(
             }
 
             is Pipeline.AudioVideo -> with(pipeline) {
-                joinAll(controllerScope.launch {
-                    println("audio seeked: ${
-                        measureTime {
-                            audioDecoder.seekTo(
-                                timestamp = timestamp, keyframesOnly = keyFramesOnly
-                            ).getOrThrow()
-                        }
-                    }")
-                }, controllerScope.launch {
-                    println("video seeked: ${
-                        measureTime {
-                            timestampAfterSeek = videoDecoder.seekTo(
-                                timestamp = timestamp, keyframesOnly = keyFramesOnly
-                            ).getOrThrow()
-                        }
-                    }")
-                })
+                val seekAudioJob = controllerScope.launch {
+                    audioDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
+                }
+
+                val seekVideoJob = controllerScope.launch {
+                    videoDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
+                }
+
+                joinAll(seekAudioJob, seekVideoJob)
             }
         }
-
-        joinAll(controllerScope.launch {
-            bufferTimestamp.emit(Duration.ZERO)
-        }, controllerScope.launch {
-            playbackTimestamp.emit(Duration.ZERO)
-        })
 
         bufferLoop.start(
             coroutineScope = bufferScope,
@@ -522,11 +503,9 @@ internal class DefaultPlayerController(
             onTimestamp = ::handleBufferTimestamp,
             onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
 
-        joinAll(controllerScope.launch {
-            bufferTimestamp.emit(timestampAfterSeek)
-        }, controllerScope.launch {
-            playbackTimestamp.emit(timestampAfterSeek)
-        })
+        bufferTimestamp.emit(timestampAfterSeek)
+
+        playbackTimestamp.emit(timestampAfterSeek)
 
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.PAUSED))
     }
@@ -540,11 +519,9 @@ internal class DefaultPlayerController(
 
         pipeline.close().getOrThrow()
 
-        joinAll(controllerScope.launch {
-            bufferTimestamp.emit(Duration.ZERO)
-        }, controllerScope.launch {
-            playbackTimestamp.emit(Duration.ZERO)
-        })
+        bufferTimestamp.emit(Duration.ZERO)
+
+        playbackTimestamp.emit(Duration.ZERO)
 
         updateState(InternalPlayerState.Empty)
     }
@@ -572,9 +549,9 @@ internal class DefaultPlayerController(
     override suspend fun execute(command: Command) = runCatching {
         val status = (internalState as? InternalPlayerState.Ready)?.status
 
-        commandJob = controllerScope.launch {
-            when (command) {
-                is Command.Prepare -> withInternalState(onEmpty = {
+        commandJob = when (command) {
+            is Command.Prepare -> controllerScope.launch {
+                withInternalState(onEmpty = {
                     with(command) {
                         handlePrepare(
                             location = location,
@@ -588,34 +565,44 @@ internal class DefaultPlayerController(
                         )
                     }
                 })
+            }
 
-                is Command.Play -> withInternalState {
+            is Command.Play -> controllerScope.launch {
+                withInternalState {
                     if (status == InternalPlayerState.Ready.Status.STOPPED) {
                         handlePlay()
                     }
                 }
+            }
 
-                is Command.Pause -> withInternalState {
+            is Command.Pause -> controllerScope.launch {
+                withInternalState {
                     if (status == InternalPlayerState.Ready.Status.PLAYING) {
                         handlePause()
                     }
                 }
+            }
 
-                is Command.Resume -> withInternalState {
+            is Command.Resume -> controllerScope.launch {
+                withInternalState {
                     if (status == InternalPlayerState.Ready.Status.PAUSED) {
                         handleResume()
                     }
                 }
+            }
 
-                is Command.Stop -> withInternalState {
+            is Command.Stop -> controllerScope.launch {
+                withInternalState {
                     when (status) {
                         InternalPlayerState.Ready.Status.PLAYING, InternalPlayerState.Ready.Status.PAUSED, InternalPlayerState.Ready.Status.COMPLETED, InternalPlayerState.Ready.Status.SEEKING -> handleStop()
 
                         else -> return@withInternalState
                     }
                 }
+            }
 
-                is Command.SeekTo -> withInternalState {
+            is Command.SeekTo -> controllerScope.launch {
+                withInternalState {
                     when (status) {
                         InternalPlayerState.Ready.Status.PLAYING, InternalPlayerState.Ready.Status.PAUSED, InternalPlayerState.Ready.Status.STOPPED, InternalPlayerState.Ready.Status.COMPLETED, InternalPlayerState.Ready.Status.SEEKING -> handleSeekTo(
                             timestamp = command.timestamp, keyFramesOnly = command.keyFramesOnly
@@ -624,18 +611,22 @@ internal class DefaultPlayerController(
                         else -> return@withInternalState
                     }
                 }
+            }
 
-                is Command.Release -> withInternalState {
-                    commandJob?.cancelAndJoin()
+            is Command.Release -> withInternalState {
+                commandJob?.cancelAndJoin()
 
-                    commandJob = null
+                commandJob = null
 
+                controllerScope.launch {
                     handleRelease()
                 }
             }
-        }.also {
-            it.join()
         }
+
+        commandJob?.join()
+
+        Unit
     }
 
     override suspend fun close() = commandMutex.withLock {

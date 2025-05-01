@@ -14,15 +14,12 @@ interface PreviewManager {
      * Any previously attached renderer will be automatically detached.
      *
      * @param renderer The renderer implementation that will receive video frames
-     * @throws PreviewManagerException if the renderer cannot be attached
      */
     fun attachRenderer(renderer: Renderer)
 
     /**
      * Detaches the current renderer if one is attached. After detachment, preview frames
      * will not be displayed until a new renderer is attached.
-     *
-     * @throws PreviewManagerException if detachment fails
      */
     fun detachRenderer()
 
@@ -33,9 +30,7 @@ interface PreviewManager {
      * @param timestamp Desired timestamp
      * @param debounceTime Minimum delay between consecutive requests
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @return [Result] indicating success or containing failure information
-     * @throws PreviewManagerException if seek or decode operation fails
-     * @throws IllegalArgumentException if timestamp is out of bounds
+     * @return [Result] Indicating success or containing failure information
      */
     suspend fun preview(
         timestamp: Duration,
@@ -47,13 +42,12 @@ interface PreviewManager {
      * Releases all resources and stops any ongoing preview operations.
      * The instance should not be used after closing.
      *
-     * @return [Result] indicating success or containing failure information
-     * @throws PreviewManagerException if resources cannot be properly released
+     * @return [Result] Indicating success or containing failure information
      */
     suspend fun close(): Result<Unit>
 
     companion object {
-        private const val MIN_FRAME_POOL_CAPACITY = 1
+        private const val MIN_FRAME_POOL_CAPACITY = 2
 
         /**
          * Creates a new PreviewManager instance for the specified media file.
@@ -63,9 +57,7 @@ interface PreviewManager {
          * @param width Optional output width in pixels (keeps original if null)
          * @param height Optional output height in pixels (keeps original if null)
          * @param hardwareAccelerationCandidates Preferred acceleration methods in order
-         * @return [Result] containing new PreviewManager or failure information
-         * @throws PreviewManagerException if preview capture fails
-         * @throws UnsupportedOperationException for unsupported media formats
+         * @return [Result] Containing new PreviewManager or failure information
          */
         fun create(
             location: String,
@@ -73,18 +65,16 @@ interface PreviewManager {
             width: Int? = null,
             height: Int? = null,
             hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
-        ): Result<PreviewManager> = runCatching {
-            VideoDecoderFactory().create(
-                parameters = VideoDecoderFactory.Parameters(
-                    location = location,
-                    framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
-                    width = width,
-                    height = height,
-                    hardwareAccelerationCandidates = hardwareAccelerationCandidates
-                )
-            ).mapCatching { decoder ->
-                DefaultPreviewManager(videoDecoder = decoder)
-            }.getOrThrow()
+        ): Result<PreviewManager> = VideoDecoderFactory().create(
+            parameters = VideoDecoderFactory.Parameters(
+                location = location,
+                framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
+                width = width,
+                height = height,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates
+            )
+        ).mapCatching { decoder ->
+            DefaultPreviewManager(videoDecoder = decoder)
         }
     }
 }

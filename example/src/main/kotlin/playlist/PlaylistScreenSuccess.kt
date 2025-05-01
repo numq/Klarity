@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.github.numq.klarity.compose.renderer.Background
 import com.github.numq.klarity.compose.renderer.Foreground
 import com.github.numq.klarity.compose.renderer.RendererComponent
+import com.github.numq.klarity.compose.renderer.SkiaRenderer
 import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.player.KlarityPlayer
@@ -30,7 +31,6 @@ import com.github.numq.klarity.core.preview.PreviewManager
 import com.github.numq.klarity.core.probe.ProbeManager
 import com.github.numq.klarity.core.queue.MediaQueue
 import com.github.numq.klarity.core.queue.SelectedItem
-import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.snapshot.SnapshotManager
 import com.github.numq.klarity.core.state.PlayerState
 import controls.HoveredTimestamp
@@ -103,15 +103,24 @@ fun PlaylistScreenSuccess(
         uploadingJob = pendingChannel.consumeAsFlow().onEach { pendingItem ->
             coroutineScope.launch(Dispatchers.Default) {
                 queue.add(pendingItem)
+
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
-                    val uploadedItem = PlaylistItem.Uploaded(
-                        media = media,
-                        renderer = SnapshotManager.snapshot(location = media.location).getOrNull()?.let { snapshot ->
-                            media.videoFormat?.let(Renderer::create)?.getOrNull()?.apply {
-                                render(snapshot)
+                    val renderer = media.videoFormat?.let(SkiaRenderer::create)?.mapCatching { renderer ->
+                        SnapshotManager.snapshot(location = media.location, renderer = renderer).getOrThrow()
+
+                        renderer
+                    }?.mapCatching { renderer ->
+                        renderer.withCache { cache ->
+                            cache.firstOrNull()?.let { cachedFrame ->
+                                renderer.render(cachedFrame).getOrThrow()
                             }
                         }
-                    )
+
+                        renderer
+                    }?.getOrThrow()
+
+                    val uploadedItem = PlaylistItem.Uploaded(media = media, renderer = renderer)
+
                     queue.replace(pendingItem, uploadedItem)
                 }.onFailure(::handleException).onFailure {
                     queue.delete(pendingItem)
@@ -124,6 +133,14 @@ fun PlaylistScreenSuccess(
             uploadingJob = null
 
             pendingChannel.close()
+
+            runBlocking {
+                player.close().getOrThrow()
+
+                items.filterIsInstance<PlaylistItem.Uploaded>().forEach { item ->
+                    item.renderer?.close()?.getOrThrow()
+                }
+            }
         }
     }
 
@@ -207,7 +224,11 @@ fun PlaylistScreenSuccess(
             when (playlistItem) {
                 is PlaylistItem.Pending -> queue.delete(playlistItem)
 
-                is PlaylistItem.Uploaded -> queue.delete(playlistItem)
+                is PlaylistItem.Uploaded -> {
+                    queue.delete(playlistItem)
+
+                    playlistItem.renderer?.close()?.getOrThrow()
+                }
             }
         }
     }
@@ -277,20 +298,20 @@ fun PlaylistScreenSuccess(
                         is PlayerState.Empty -> Box(modifier = Modifier.fillMaxSize())
 
                         is PlayerState.Ready -> {
-                            val previewManager = remember(currentState.media.location) {
-                                PreviewManager.create(location = currentState.media.location).getOrThrow()
-                            }
-
                             val format = remember(currentState.media.videoFormat) {
                                 currentState.media.videoFormat
                             }
 
                             val playerRenderer = remember(format) {
-                                format?.let(Renderer::create)?.getOrThrow()?.also(player::attachRenderer)
+                                format?.let(SkiaRenderer::create)?.getOrThrow()?.also(player::attachRenderer)
+                            }
+
+                            val previewManager = remember(currentState.media.location) {
+                                PreviewManager.create(location = currentState.media.location).getOrThrow()
                             }
 
                             val previewRenderer = remember(format) {
-                                format?.let(Renderer::create)?.getOrThrow()?.also(previewManager::attachRenderer)
+                                format?.let(SkiaRenderer::create)?.getOrThrow()?.also(previewManager::attachRenderer)
                             }
 
                             var hoveredTimestamp by remember {
@@ -300,24 +321,19 @@ fun PlaylistScreenSuccess(
                             LaunchedEffect(hoveredTimestamp) {
                                 hoveredTimestamp?.run {
                                     previewManager.preview(
-                                        timestamp = timestamp,
-                                        debounceTime = 100.milliseconds
+                                        timestamp = timestamp, debounceTime = 100.milliseconds
                                     ).getOrDefault(Unit)
                                 }
                             }
 
-                            DisposableEffect(format) {
-                                playerRenderer?.let(player::attachRenderer)
-
-                                previewRenderer?.let(previewManager::attachRenderer)
-
+                            DisposableEffect(Unit) {
                                 onDispose {
-                                    playerRenderer?.close()
-
-                                    previewRenderer?.close()
-
                                     runBlocking {
+                                        playerRenderer?.close()?.getOrThrow()
+
                                         previewManager.close().getOrThrow()
+
+                                        previewRenderer?.close()?.getOrThrow()
                                     }
                                 }
                             }
@@ -356,11 +372,11 @@ fun PlaylistScreenSuccess(
                                             if (currentState.media is Media.Audio) {
                                                 Icon(Icons.Default.AudioFile, null)
                                             } else {
-                                                playerRenderer?.let { renderer ->
+                                                playerRenderer?.let {
                                                     RendererComponent(
                                                         modifier = Modifier.fillMaxSize(),
                                                         background = Background.Blur(),
-                                                        foreground = Foreground(renderer = renderer)
+                                                        foreground = Foreground(renderer = playerRenderer)
                                                     )
                                                 } ?: Icon(Icons.Default.BrokenImage, null)
                                             }
@@ -390,8 +406,7 @@ fun PlaylistScreenSuccess(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             BoxWithConstraints(
-                                                modifier = Modifier.weight(1f),
-                                                contentAlignment = Alignment.CenterStart
+                                                modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
                                             ) {
                                                 Text(
                                                     text = "${playbackTimestamp.inWholeMilliseconds.formatTimestamp()}/${currentState.media.duration.inWholeMilliseconds.formatTimestamp()}",
@@ -431,11 +446,9 @@ fun PlaylistScreenSuccess(
                                                 },
                                                 stop = {
                                                     player.stop().getOrDefault(Unit)
-                                                }
-                                            )
+                                                })
                                             Box(
-                                                modifier = Modifier.weight(1f),
-                                                contentAlignment = Alignment.CenterStart
+                                                modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
                                             ) {
                                                 VolumeControls(
                                                     modifier = Modifier.fillMaxWidth(),
@@ -456,7 +469,7 @@ fun PlaylistScreenSuccess(
                                     }
 
                                     hoveredTimestamp?.let { timestamp ->
-                                        previewRenderer?.let { renderer ->
+                                        previewRenderer?.takeIf { !it.drawsNothing() }?.let {
                                             Box(
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentAlignment = Alignment.BottomStart
@@ -465,7 +478,7 @@ fun PlaylistScreenSuccess(
                                                     width = 128f,
                                                     height = 128f,
                                                     hoveredTimestamp = timestamp,
-                                                    previewRenderer = renderer,
+                                                    renderer = previewRenderer,
                                                 )
                                             }
                                         }
@@ -483,8 +496,7 @@ fun PlaylistScreenSuccess(
                                     },
                                     onHoveredTimestamp = { value ->
                                         hoveredTimestamp = value
-                                    }
-                                )
+                                    })
                             }
                         }
                     }

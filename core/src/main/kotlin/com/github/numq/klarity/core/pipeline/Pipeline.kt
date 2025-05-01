@@ -6,7 +6,7 @@ import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.sampler.Sampler
 
-sealed interface Pipeline {
+internal sealed interface Pipeline {
     val media: Media
 
     suspend fun close(): Result<Unit>

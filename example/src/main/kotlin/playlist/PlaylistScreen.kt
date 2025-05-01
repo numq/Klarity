@@ -2,13 +2,11 @@ package playlist
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.github.numq.klarity.core.event.PlayerEvent
 import com.github.numq.klarity.core.player.KlarityPlayer
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.runBlocking
 import notification.Notification
 import java.io.File
 
@@ -22,14 +20,6 @@ fun PlaylistScreen(
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         player.onSuccess { player ->
-            DisposableEffect(Unit) {
-                onDispose {
-                    runBlocking {
-                        player.close().getOrThrow()
-                    }
-                }
-            }
-
             PlaylistScreenSuccess(
                 player = player,
                 openFileChooser = openFileChooser,

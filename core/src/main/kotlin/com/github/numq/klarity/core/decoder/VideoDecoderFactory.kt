@@ -4,7 +4,7 @@ import com.github.numq.klarity.core.factory.Factory
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.media.Media
 
-class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>> {
+internal class VideoDecoderFactory : Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>> {
     data class Parameters(
         val location: String,
         val framePoolCapacity: Int,

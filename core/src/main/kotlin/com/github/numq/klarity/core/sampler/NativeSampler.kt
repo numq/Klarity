@@ -35,6 +35,10 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     private var nativeHandle = AtomicLong(-1L)
 
+    private fun ensureOpen() {
+        check(nativeHandle.get() != -1L) { "Native sampler is closed" }
+    }
+
     init {
         synchronized(lock) {
             nativeHandle.set(Native.create(sampleRate = sampleRate, channels = channels))
@@ -45,48 +49,58 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     private val cleanable = NativeCleaner.cleaner.register(this) {
         synchronized(lock) {
-            runCatching {
-                if (nativeHandle.get() != -1L) {
-                    Native.delete(handle = nativeHandle.get())
+            ensureOpen()
 
-                    nativeHandle.set(-1L)
-                }
-            }.getOrDefault(Unit)
+            Native.delete(handle = nativeHandle.get())
+
+            nativeHandle.set(-1L)
         }
     }
 
     fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.setPlaybackSpeed(handle = nativeHandle.get(), factor = factor)
         }
     }
 
     fun setVolume(value: Float) = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.setVolume(handle = nativeHandle.get(), value = value)
         }
     }
 
     fun start() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.start(handle = nativeHandle.get())
         }
     }
 
     fun play(buffer: Long, size: Int) = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.play(handle = nativeHandle.get(), buffer = buffer, size = size)
         }
     }
 
     fun pause() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.pause(handle = nativeHandle.get())
         }
     }
 
     fun stop() = synchronized(lock) {
         runCatching {
+            ensureOpen()
+
             Native.stop(handle = nativeHandle.get())
         }
     }

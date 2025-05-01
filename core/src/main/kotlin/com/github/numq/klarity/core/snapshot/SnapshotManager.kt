@@ -3,13 +3,14 @@ package com.github.numq.klarity.core.snapshot
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.renderer.Renderer
 import kotlin.time.Duration
 
 /**
  * Provides frame capture functionality for video media at specified timestamps.
  */
 object SnapshotManager {
-    private const val MIN_FRAME_POOL_CAPACITY = 1
+    private const val MIN_FRAME_POOL_CAPACITY = 2
 
     /**
      * Captures multiple video frames at specified timestamps.
@@ -21,41 +22,44 @@ object SnapshotManager {
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
      * @param timestamps A function that provides a media duration that can be used to construct desired timestamps
-     * @return [Result] containing list of captured frames, or failure if decoding failed
+     * @return [Result] Indicating success or containing failure information
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshots(
         location: String,
+        renderer: Renderer,
         framePoolCapacity: Int = MIN_FRAME_POOL_CAPACITY,
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestamps: (duration: Duration) -> (List<Duration>) = { listOf(Duration.ZERO) },
-    ) = runCatching {
-        VideoDecoderFactory().create(
-            parameters = VideoDecoderFactory.Parameters(
-                location = location,
-                framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
-                width = width,
-                height = height,
-                hardwareAccelerationCandidates = hardwareAccelerationCandidates
-            )
-        ).mapCatching { decoder ->
-            try {
-                timestamps(decoder.media.duration).filter {
-                    it in Duration.ZERO..decoder.media.duration
-                }.mapNotNull { timestamp ->
-                    decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrNull()
+    ) = VideoDecoderFactory().create(
+        parameters = VideoDecoderFactory.Parameters(
+            location = location,
+            framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
+            width = width,
+            height = height,
+            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+        )
+    ).mapCatching { decoder ->
+        try {
+            timestamps(decoder.media.duration).distinct().filter {
+                it in Duration.ZERO..decoder.media.duration
+            }.forEach { timestamp ->
+                decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrDefault(Unit)
 
-                    decoder.decode().getOrNull() as? Frame.Content.Video
+                (decoder.decode().getOrThrow() as? Frame.Content.Video)?.let { frame ->
+                    renderer.save(frame).getOrThrow()
                 }
-            } finally {
-                decoder.close().getOrThrow()
             }
-        }.recoverCatching { t ->
-            throw SnapshotManagerException(t)
-        }.getOrThrow()
+        } catch (t: Throwable) {
+            throw t
+        } finally {
+            decoder.close().getOrThrow()
+        }
+    }.recoverCatching { t ->
+        throw SnapshotManagerException(t)
     }
 
     /**
@@ -68,12 +72,13 @@ object SnapshotManager {
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
      * @param timestamp A function that provides a media duration that can be used to construct desired timestamp
-     * @return [Result] containing captured frame (nullable if no frame at timestamp), or failure
+     * @return [Result] Indicating success or containing failure information
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshot(
         location: String,
-        framePoolCapacity: Int = 2,
+        renderer: Renderer,
+        framePoolCapacity: Int = MIN_FRAME_POOL_CAPACITY,
         width: Int? = null,
         height: Int? = null,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
@@ -81,6 +86,7 @@ object SnapshotManager {
         timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
     ) = snapshots(
         location = location,
+        renderer = renderer,
         framePoolCapacity = framePoolCapacity,
         width = width,
         height = height,
@@ -88,5 +94,5 @@ object SnapshotManager {
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,
         timestamps = { duration ->
             listOf(timestamp(duration))
-        }).map(List<Frame.Content.Video?>::firstOrNull)
+        })
 }

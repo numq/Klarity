@@ -34,9 +34,12 @@ internal class DefaultPreviewManager(
         previewJob = coroutineScope.launch {
             delay(debounceTime)
 
-            videoDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
+            videoDecoder.seekTo(
+                timestamp = timestamp.coerceIn(Duration.ZERO..videoDecoder.media.duration),
+                keyframesOnly = keyframesOnly
+            ).getOrDefault(Unit)
 
-            (videoDecoder.decode().getOrNull() as? Frame.Content.Video)?.let { frame ->
+            (videoDecoder.decode().getOrThrow() as? Frame.Content.Video)?.let { frame ->
                 renderer?.render(frame)
             }
         }

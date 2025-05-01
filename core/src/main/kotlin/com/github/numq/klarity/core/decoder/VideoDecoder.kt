@@ -33,8 +33,11 @@ internal class VideoDecoder(
                                 isClosed = {
                                     nativeDecoder.isClosed() || buffer < 0L || size <= 0
                                 },
+                                onClose = {
+                                    nativeDecoder.releaseVideoBuffer(buffer)
+                                },
                                 width = format.width,
-                                height = format.height
+                                height = format.height,
                             )
                         }
                     }

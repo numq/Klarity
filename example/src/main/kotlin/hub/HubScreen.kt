@@ -17,17 +17,15 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
+import com.github.numq.klarity.compose.renderer.SkiaRenderer
 import com.github.numq.klarity.core.player.KlarityPlayer
-import com.github.numq.klarity.core.preview.PreviewManager
 import com.github.numq.klarity.core.probe.ProbeManager
-import com.github.numq.klarity.core.renderer.Renderer
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import com.github.numq.klarity.core.snapshot.SnapshotManager
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 import notification.Notification
 import remote.RemoteUploadingDialog
 import slider.StepSlider
@@ -53,36 +51,48 @@ fun HubScreen(
 
     var isRemoteUploadingDialogVisible by remember { mutableStateOf(false) }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            runBlocking {
+                awaitAll(
+                    *hubItems.filterIsInstance<HubItem.Uploaded>().map { hubItem ->
+                        async {
+                            hubItem.player.close().getOrThrow()
+
+                            hubItem.renderer?.close()?.getOrThrow()
+                        }
+                    }.toTypedArray()
+                )
+            }
+        }
+    }
+
     DisposableEffect(pendingChannel) {
         uploadingJob = pendingChannel.consumeAsFlow().onEach { pendingItem ->
             hubItems += pendingItem
             coroutineScope.launch(Dispatchers.Default) {
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
-                    when (val format = media.videoFormat) {
-                        null -> HubItem.Uploaded(
-                            player = KlarityPlayer.create().getOrThrow().apply {
-                                prepare(location = media.location).getOrDefault(Unit)
-                            },
-                            previewManager = null,
-                            renderer = null
-                        )
+                    println(media)
 
-                        else -> {
-                            val player = KlarityPlayer.create().getOrThrow()
+                    val player = KlarityPlayer.create().getOrThrow()
 
-                            player.prepare(location = media.location).getOrThrow()
+                    player.prepare(location = media.location).getOrThrow()
 
-                            val previewManager = PreviewManager.create(location = media.location).getOrThrow()
+                    val renderer = media.videoFormat?.let { format ->
+                        SkiaRenderer.create(format = format).mapCatching { renderer ->
+                            val maxSnapshots = 10
 
-                            val renderer = Renderer.create(format = format).getOrThrow()
+                            SnapshotManager.snapshots(location = media.location, renderer = renderer, timestamps = {
+                                (0..maxSnapshots).map {
+                                    (media.duration * it) / (maxSnapshots - 1)
+                                }
+                            }).getOrThrow()
 
-                            player.attachRenderer(renderer)
-
-                            previewManager.attachRenderer(renderer)
-
-                            HubItem.Uploaded(player = player, previewManager = previewManager, renderer = renderer)
-                        }
+                            renderer
+                        }.onSuccess(player::attachRenderer).getOrThrow()
                     }
+
+                    HubItem.Uploaded(player = player, renderer = renderer)
                 }.onSuccess { uploadedItem ->
                     hubItems = hubItems.map { if (it.id == pendingItem.id) uploadedItem else it }
                 }.onFailure {
@@ -100,6 +110,7 @@ fun HubScreen(
 
     fun addLocation(location: String) {
         val pendingItem = HubItem.Pending(location = location)
+
         coroutineScope.launch {
             pendingChannel.send(pendingItem)
         }
@@ -114,6 +125,12 @@ fun HubScreen(
             hubItems -= hubItem
         } else if (hubItem is HubItem.Uploaded) {
             hubItems = hubItems.filterNot { item -> item is HubItem.Uploaded && item.id == hubItem.id }
+
+            coroutineScope.launch {
+                hubItem.player.close().getOrThrow()
+
+                hubItem.renderer?.close()?.getOrThrow()
+            }
         }
     }
 
