@@ -180,9 +180,7 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, c
         throw DecoderException("Invalid source video frame");
     }
 
-    if (src->width != swsWidth ||
-        src->height != swsHeight ||
-        src->format != swsPixelFormat) {
+    if (src->width != swsWidth || src->height != swsHeight || src->format != swsPixelFormat) {
         swsContext.reset(sws_getCachedContext(
                 swsContext.release(),
                 src->width,
@@ -230,7 +228,7 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, c
     );
 
     if (actualSize <= 0) {
-        throw DecoderException("Invalid converted audio size");
+        throw DecoderException("Invalid converted video size");
     }
 
     dst.resize(actualSize);
@@ -272,8 +270,6 @@ Decoder::Decoder(
             location,
             formatContext->duration
     };
-
-    // !stream || stream->nb_frames <= 0 || stream->duration <= 0
 
     for (int streamIndex = 0; streamIndex < formatContext->nb_streams; ++streamIndex) {
         auto stream = formatContext->streams[streamIndex];
