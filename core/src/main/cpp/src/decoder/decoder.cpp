@@ -169,7 +169,7 @@ void Decoder::_processAudio(std::vector<uint8_t> &dst) {
     dst.resize(actualSize);
 }
 
-void Decoder::_processVideo(uint8_t *const *planes, const int *strides) {
+void Decoder::_processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, const int *strides) {
     if (!swVideoFrame || !swsContext) {
         throw DecoderException("Invalid video processing state");
     }
@@ -203,11 +203,11 @@ void Decoder::_processVideo(uint8_t *const *planes, const int *strides) {
 
         av_opt_set(swsContext.get(), "threads", "auto", 0);
 
-        swsPixelFormat = static_cast<AVPixelFormat>(swVideoFrame->format);
+        swsPixelFormat = static_cast<AVPixelFormat>(src->format);
 
-        swsWidth = swVideoFrame->width;
+        swsWidth = src->width;
 
-        swsHeight = swVideoFrame->height;
+        swsHeight = src->height;
     }
 
     if (sws_scale(
@@ -218,9 +218,22 @@ void Decoder::_processVideo(uint8_t *const *planes, const int *strides) {
             src->height,
             planes,
             strides
-    ) < 0) {
+    ) <= 0) {
         throw DecoderException("Video conversion failed");
     }
+
+    int actualSize = av_image_get_buffer_size(
+            targetPixelFormat,
+            targetWidth,
+            targetHeight,
+            1
+    );
+
+    if (actualSize <= 0) {
+        throw DecoderException("Invalid converted audio size");
+    }
+
+    dst.resize(actualSize);
 }
 
 Decoder::Decoder(
@@ -457,20 +470,6 @@ Decoder::Decoder(
                         throw DecoderException("Memory allocation failed for software video frame");
                     }
 
-                    dstVideoFrame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
-
-                    if (!dstVideoFrame) {
-                        throw DecoderException("Memory allocation failed for destination video frame");
-                    }
-
-                    dstVideoFrame->width = targetWidth;
-
-                    dstVideoFrame->height = targetHeight;
-
-                    dstVideoFrame->format = targetPixelFormat;
-
-                    av_frame_get_buffer(dstVideoFrame.get(), 1);
-
                     videoBufferPool = std::make_unique<VideoBufferPool>(
                             videoFramePoolCapacity,
                             targetWidth,
@@ -656,11 +655,7 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                     const auto frameTimestampMicros = (swVideoFrame->best_effort_timestamp != AV_NOPTS_VALUE)
                                                       ? swVideoFrame->best_effort_timestamp : swVideoFrame->pts;
 
-                    auto planes = poolItem->planes.data();
-
-                    auto strides = poolItem->strides.data();
-
-                    _processVideo(planes, strides);
+                    _processVideo(poolItem->buffer, poolItem->planes.data(), poolItem->strides.data());
 
                     av_frame_unref(swVideoFrame.get());
 

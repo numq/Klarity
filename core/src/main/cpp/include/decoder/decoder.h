@@ -71,8 +71,6 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    std::unique_ptr<AVFrame, AVFrameDeleter> dstVideoFrame;
-
     std::unique_ptr<AudioBufferPool> audioBufferPool;
 
     std::unique_ptr<VideoBufferPool> videoBufferPool;
@@ -95,7 +93,7 @@ public:
 
     void _processAudio(std::vector<uint8_t> &dst);
 
-    void _processVideo(uint8_t *const *planes, const int *strides);
+    void _processVideo(std::vector<uint8_t> &dst, uint8_t *const *planes, const int *strides);
 
 public:
     Decoder(

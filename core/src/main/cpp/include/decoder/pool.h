@@ -84,9 +84,9 @@ public:
 
         buffer.resize(size);
 
-        planes.resize(4);
+        planes.resize(AV_NUM_DATA_POINTERS);
 
-        strides.resize(4);
+        strides.resize(AV_NUM_DATA_POINTERS);
 
         int actualSize;
 
