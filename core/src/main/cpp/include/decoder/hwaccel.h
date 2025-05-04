@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <shared_mutex>
+#include "deleter.h"
 #include "exception.h"
 
 extern "C" {
@@ -15,7 +16,7 @@ class HardwareAcceleration {
 private:
     static std::shared_mutex mutex;
 
-    static std::map<AVHWDeviceType, AVBufferRef *> contexts;
+    static std::map<AVHWDeviceType, std::shared_ptr<AVBufferRef>> contexts;
 
 public:
     static std::vector<AVHWDeviceType> getAvailableHardwareAcceleration();

@@ -3,6 +3,7 @@ package com.github.numq.klarity.core.preview
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.format.VideoFormat
 import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
+import com.github.numq.klarity.core.pool.PoolFactory
 import com.github.numq.klarity.core.renderer.Renderer
 import kotlin.time.Duration
 
@@ -53,34 +54,31 @@ interface PreviewManager {
     suspend fun close(): Result<Unit>
 
     companion object {
-        private const val MIN_FRAME_POOL_CAPACITY = 1
+        private const val POOL_CAPACITY = 2
 
         /**
          * Creates a new PreviewManager instance for the specified media file.
          *
          * @param location Path or URI to media source
-         * @param framePoolCapacity Capacity of the pool of frames pre-allocated by the decoder
-         * @param width Optional output width in pixels (keeps original if null)
-         * @param height Optional output height in pixels (keeps original if null)
          * @param hardwareAccelerationCandidates Preferred acceleration methods in order
          * @return [Result] Containing new PreviewManager or failure information
          */
         fun create(
             location: String,
-            framePoolCapacity: Int = MIN_FRAME_POOL_CAPACITY,
-            width: Int? = null,
-            height: Int? = null,
             hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         ): Result<PreviewManager> = VideoDecoderFactory().create(
             parameters = VideoDecoderFactory.Parameters(
                 location = location,
-                framePoolCapacity = framePoolCapacity.coerceAtLeast(MIN_FRAME_POOL_CAPACITY),
-                width = width,
-                height = height,
                 hardwareAccelerationCandidates = hardwareAccelerationCandidates
             )
         ).mapCatching { decoder ->
-            DefaultPreviewManager(videoDecoder = decoder)
+            PoolFactory().create(
+                parameters = PoolFactory.Parameters(
+                    poolCapacity = POOL_CAPACITY, bufferCapacity = decoder.media.videoFormat.bufferCapacity
+                )
+            ).mapCatching { pool ->
+                DefaultPreviewManager(decoder = decoder, pool = pool)
+            }.getOrThrow()
         }
     }
 }

@@ -8,12 +8,10 @@ import java.util.concurrent.atomic.AtomicLong
 
 internal class NativeDecoder(
     location: String,
-    audioFramePoolCapacity: Int,
-    videoFramePoolCapacity: Int,
-    sampleRate: Int? = null,
-    channels: Int? = null,
-    width: Int? = null,
-    height: Int? = null,
+    findAudioStream: Boolean,
+    findVideoStream: Boolean,
+    decodeAudioStream: Boolean,
+    decodeVideoStream: Boolean,
     hardwareAccelerationCandidates: IntArray? = null,
 ) : Closeable {
     private object Native {
@@ -23,23 +21,21 @@ internal class NativeDecoder(
         @JvmStatic
         external fun create(
             location: String,
-            audioFramePoolCapacity: Int,
-            videoFramePoolCapacity: Int,
-            sampleRate: Int,
-            channels: Int,
-            width: Int,
-            height: Int,
-            hardwareAccelerationCandidates: IntArray,
+            findAudioStream: Boolean,
+            findVideoStream: Boolean,
+            decodeAudioStream: Boolean,
+            decodeVideoStream: Boolean,
+            hardwareAccelerationCandidates: IntArray
         ): Long
 
         @JvmStatic
         external fun getFormat(handle: Long): NativeFormat
 
         @JvmStatic
-        external fun decodeAudio(handle: Long): NativeFrame?
+        external fun decodeAudio(handle: Long, buffer: Long, capacity: Int): NativeFrame?
 
         @JvmStatic
-        external fun decodeVideo(handle: Long): NativeFrame?
+        external fun decodeVideo(handle: Long, buffer: Long, capacity: Int): NativeFrame?
 
         @JvmStatic
         external fun seekTo(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
@@ -49,12 +45,6 @@ internal class NativeDecoder(
 
         @JvmStatic
         external fun delete(handle: Long)
-
-        @JvmStatic
-        external fun releaseAudioBuffer(handle: Long, buffer: Long)
-
-        @JvmStatic
-        external fun releaseVideoBuffer(handle: Long, buffer: Long)
     }
 
     companion object {
@@ -63,28 +53,21 @@ internal class NativeDecoder(
 
     private val lock = Any()
 
-    internal var nativeHandle = AtomicLong(-1L)
-        private set
+    private val nativeHandle = AtomicLong(-1L)
 
     private fun ensureOpen() {
         check(nativeHandle.get() != -1L) { "Native sampler is closed" }
     }
 
-    internal fun isClosed() = nativeHandle.get() == -1L
-
     init {
-        require(audioFramePoolCapacity >= 0 || videoFramePoolCapacity >= 0) { "Empty decoder is useless" }
-
         synchronized(lock) {
             nativeHandle.set(
                 Native.create(
                     location = location,
-                    audioFramePoolCapacity = audioFramePoolCapacity,
-                    videoFramePoolCapacity = videoFramePoolCapacity,
-                    sampleRate = sampleRate ?: 0,
-                    channels = channels ?: 0,
-                    width = width ?: 0,
-                    height = height ?: 0,
+                    findAudioStream = findAudioStream,
+                    findVideoStream = findVideoStream,
+                    decodeAudioStream = decodeAudioStream,
+                    decodeVideoStream = decodeVideoStream,
                     hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
                 )
             )
@@ -111,19 +94,21 @@ internal class NativeDecoder(
         }
     }
 
-    fun decodeAudio() = synchronized(lock) {
+    fun getNativeHandle() = nativeHandle.get()
+
+    fun decodeAudio(buffer: Long, capacity: Int) = synchronized(lock) {
         runCatching {
             ensureOpen()
 
-            Native.decodeAudio(handle = nativeHandle.get())
+            Native.decodeAudio(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
         }
     }
 
-    fun decodeVideo() = synchronized(lock) {
+    fun decodeVideo(buffer: Long, capacity: Int) = synchronized(lock) {
         runCatching {
             ensureOpen()
 
-            Native.decodeVideo(handle = nativeHandle.get())
+            Native.decodeVideo(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
         }
     }
 
@@ -142,22 +127,6 @@ internal class NativeDecoder(
             ensureOpen()
 
             Native.reset(handle = nativeHandle.get())
-        }
-    }
-
-    fun releaseAudioBuffer(handle: Long) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
-
-            Native.releaseAudioBuffer(handle = nativeHandle.get(), buffer = handle)
-        }
-    }
-
-    fun releaseVideoBuffer(handle: Long) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
-
-            Native.releaseVideoBuffer(handle = nativeHandle.get(), buffer = handle)
         }
     }
 

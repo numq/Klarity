@@ -33,7 +33,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     private val lock = Any()
 
-    private var nativeHandle = AtomicLong(-1L)
+    private val nativeHandle = AtomicLong(-1L)
 
     private fun ensureOpen() {
         check(nativeHandle.get() != -1L) { "Native sampler is closed" }
@@ -41,6 +41,10 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
 
     init {
         synchronized(lock) {
+            require(sampleRate > 0) { "Invalid sample rate" }
+
+            require(channels > 0) { "Invalid channels" }
+
             nativeHandle.set(Native.create(sampleRate = sampleRate, channels = channels))
 
             require(nativeHandle.get() != -1L) { "Could not instantiate native sampler" }

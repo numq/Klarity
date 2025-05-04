@@ -2,10 +2,9 @@ package com.github.numq.klarity.core.player
 
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.controller.PlayerController
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
-import com.github.numq.klarity.core.settings.VideoSettings
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 
@@ -44,18 +43,13 @@ internal class DefaultKlarityPlayer(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
-        audioSettings: AudioSettings,
-        videoSettings: VideoSettings,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?
     ) = playerController.execute(
         Command.Prepare(
             location = location,
             audioBufferSize = audioBufferSize,
             videoBufferSize = videoBufferSize,
-            sampleRate = audioSettings.sampleRate,
-            channels = audioSettings.channels,
-            width = videoSettings.width,
-            height = videoSettings.height,
-            hardwareAccelerationCandidates = videoSettings.hardwareAccelerationCandidates
+            hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     ).recoverCatching { t ->
         if (t !is CancellationException) {

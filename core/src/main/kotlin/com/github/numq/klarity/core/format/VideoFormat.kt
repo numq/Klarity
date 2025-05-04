@@ -7,4 +7,5 @@ data class VideoFormat(
     val height: Int,
     val frameRate: Double,
     val hardwareAcceleration: HardwareAcceleration,
+    val bufferCapacity: Int
 )

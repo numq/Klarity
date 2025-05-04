@@ -19,7 +19,7 @@ internal class DefaultSampler(
 
     override suspend fun setPlaybackSpeed(factor: Float) = mutex.withLock {
         runCatching {
-            sampler.setPlaybackSpeed(factor).map {
+            sampler.setPlaybackSpeed(factor = factor).map {
                 playbackSpeedFactor = factor
             }.getOrThrow()
         }
@@ -27,14 +27,14 @@ internal class DefaultSampler(
 
     override suspend fun setVolume(value: Float) = mutex.withLock {
         runCatching {
-            sampler.setVolume(value).map {
+            sampler.setVolume(value = value).map {
                 currentVolume = value
             }.getOrThrow()
         }
     }
 
     override suspend fun setMuted(state: Boolean) = mutex.withLock {
-        sampler.setVolume(if (state) 0f else currentVolume)
+        sampler.setVolume(value = if (state) 0f else currentVolume)
     }
 
     override suspend fun start() = mutex.withLock {
@@ -45,9 +45,7 @@ internal class DefaultSampler(
 
     override suspend fun play(frame: Frame.Content.Audio) = mutex.withLock {
         runCatching {
-            if (!frame.isClosed()) {
-                sampler.play(frame.buffer, frame.size).getOrThrow()
-            }
+            sampler.play(buffer = frame.data.pointer, size = frame.remaining).getOrThrow()
         }
     }
 

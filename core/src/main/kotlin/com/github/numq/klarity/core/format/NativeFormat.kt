@@ -8,5 +8,7 @@ internal data class NativeFormat(
     val width: Int,
     val height: Int,
     val frameRate: Double,
-    val hwDeviceType: Int
+    val hwDeviceType: Int,
+    val audioBufferCapacity: Int,
+    val videoBufferCapacity: Int
 )

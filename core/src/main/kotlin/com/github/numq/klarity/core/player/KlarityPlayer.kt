@@ -5,13 +5,13 @@ import com.github.numq.klarity.core.controller.PlayerControllerFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
+import com.github.numq.klarity.core.hwaccel.HardwareAcceleration
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
+import com.github.numq.klarity.core.pool.PoolFactory
 import com.github.numq.klarity.core.renderer.Renderer
 import com.github.numq.klarity.core.sampler.SamplerFactory
-import com.github.numq.klarity.core.settings.AudioSettings
 import com.github.numq.klarity.core.settings.PlayerSettings
-import com.github.numq.klarity.core.settings.VideoSettings
 import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -80,8 +80,7 @@ interface KlarityPlayer {
      * @param location The location of the media file to prepare.
      * @property audioBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the audio buffer size in frames.
      * @property videoBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the video buffer size in frames.
-     * @property audioSettings Desired audio settings for decoding.
-     * @property videoSettings Desired video settings for decoding.
+     * @property hardwareAccelerationCandidates Hardware acceleration candidates.
      *
      * @return A [Result] indicating success or failure of the operation.
      */
@@ -89,8 +88,7 @@ interface KlarityPlayer {
         location: String,
         audioBufferSize: Int = MIN_AUDIO_BUFFER_SIZE,
         videoBufferSize: Int = MIN_VIDEO_BUFFER_SIZE,
-        audioSettings: AudioSettings = AudioSettings(),
-        videoSettings: VideoSettings = VideoSettings(),
+        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null
     ): Result<Unit>
 
     /**
@@ -146,7 +144,7 @@ interface KlarityPlayer {
     suspend fun close(): Result<Unit>
 
     companion object {
-        const val MIN_AUDIO_BUFFER_SIZE = 4
+        const val MIN_AUDIO_BUFFER_SIZE = 2
 
         const val MIN_VIDEO_BUFFER_SIZE = 2
 
@@ -209,6 +207,7 @@ interface KlarityPlayer {
                     initialSettings = null,
                     audioDecoderFactory = AudioDecoderFactory(),
                     videoDecoderFactory = VideoDecoderFactory(),
+                    poolFactory = PoolFactory(),
                     bufferFactory = BufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),

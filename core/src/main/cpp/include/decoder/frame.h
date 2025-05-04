@@ -6,8 +6,7 @@ enum FrameType {
 };
 
 struct Frame {
-    uint8_t *buffer;
-    int size;
+    int remaining;
     int64_t timestampMicros;
     FrameType type;
 };

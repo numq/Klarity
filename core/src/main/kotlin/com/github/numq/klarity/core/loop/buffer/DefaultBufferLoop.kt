@@ -1,10 +1,14 @@
 package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.data.Data
+import com.github.numq.klarity.core.decoder.AudioDecoder
 import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.VideoDecoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
+import com.github.numq.klarity.core.pool.Pool
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,57 +22,81 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     override var isBuffering = false
 
     private suspend fun handleAudioBuffer(
-        decoder: Decoder<Media.Audio>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: Decoder<Media.Audio>, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
-            when (val frame = decoder.decode().getOrThrow()) {
-                is Frame.Content.Audio -> {
-                    currentCoroutineContext().ensureActive()
+            val data = pool.acquire().getOrThrow()
 
-                    buffer.put(frame).getOrThrow()
+            val frame = (decoder as AudioDecoder).decode(data = data).getOrThrow()
 
-                    currentCoroutineContext().ensureActive()
+            try {
+                when (frame) {
+                    is Frame.Content.Audio -> {
+                        currentCoroutineContext().ensureActive()
 
-                    onTimestamp(frame.timestamp)
+                        buffer.put(frame).getOrThrow()
+
+                        currentCoroutineContext().ensureActive()
+
+                        onTimestamp(frame.timestamp)
+                    }
+
+                    is Frame.EndOfStream -> {
+                        currentCoroutineContext().ensureActive()
+
+                        buffer.put(frame).getOrThrow()
+
+                        break
+                    }
+
+                    else -> error("Unsupported frame type: ${frame::class}")
+                }
+            } catch (t: Throwable) {
+                if (frame is Frame.Content.Audio) {
+                    pool.release(item = data).getOrThrow()
                 }
 
-                is Frame.EndOfStream -> {
-                    currentCoroutineContext().ensureActive()
-
-                    buffer.put(frame).getOrThrow()
-
-                    break
-                }
-
-                else -> error("Unsupported frame type: ${frame::class}")
+                throw t
             }
         }
     }
 
     private suspend fun handleVideoBuffer(
-        decoder: Decoder<Media.Video>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: Decoder<Media.Video>, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
-            when (val frame = decoder.decode().getOrThrow()) {
-                is Frame.Content.Video -> {
-                    currentCoroutineContext().ensureActive()
+            val data = pool.acquire().getOrThrow()
 
-                    buffer.put(frame).getOrThrow()
+            val frame = (decoder as VideoDecoder).decode(data = data).getOrThrow()
 
-                    currentCoroutineContext().ensureActive()
+            try {
+                when (frame) {
+                    is Frame.Content.Video -> {
+                        currentCoroutineContext().ensureActive()
 
-                    onTimestamp(frame.timestamp)
+                        buffer.put(frame).getOrThrow()
+
+                        currentCoroutineContext().ensureActive()
+
+                        onTimestamp(frame.timestamp)
+                    }
+
+                    is Frame.EndOfStream -> {
+                        currentCoroutineContext().ensureActive()
+
+                        buffer.put(frame).getOrThrow()
+
+                        break
+                    }
+
+                    else -> error("Unsupported frame type: ${frame::class}")
+                }
+            } catch (t: Throwable) {
+                if (frame is Frame.Content.Video) {
+                    pool.release(item = data).getOrThrow()
                 }
 
-                is Frame.EndOfStream -> {
-                    currentCoroutineContext().ensureActive()
-
-                    buffer.put(frame).getOrThrow()
-
-                    break
-                }
-
-                else -> error("Unsupported frame type: ${frame::class}")
+                throw t
             }
         }
     }
@@ -97,46 +125,54 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     when (pipeline) {
                         is Pipeline.Audio -> with(pipeline) {
                             handleAudioBuffer(
-                                decoder = decoder, buffer = buffer, onTimestamp = onTimestamp
+                                decoder = decoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
                             )
                         }
 
                         is Pipeline.Video -> with(pipeline) {
                             handleVideoBuffer(
-                                decoder = decoder, buffer = buffer, onTimestamp = onTimestamp
+                                decoder = decoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
                             )
                         }
 
                         is Pipeline.AudioVideo -> with(pipeline) {
                             var lastFrameTimestamp = Duration.ZERO
 
-                            joinAll(launch {
+                            val audioJob = launch {
                                 handleAudioBuffer(
-                                    decoder = audioDecoder, buffer = audioBuffer, onTimestamp = { frameTimestamp ->
+                                    decoder = audioDecoder,
+                                    pool = audioPool,
+                                    buffer = audioBuffer,
+                                    onTimestamp = { frameTimestamp ->
                                         if (frameTimestamp > lastFrameTimestamp) {
                                             onTimestamp(frameTimestamp)
 
                                             lastFrameTimestamp = frameTimestamp
                                         }
                                     })
-                            }, launch {
+                            }
+
+                            val videoJob = launch {
                                 handleVideoBuffer(
-                                    decoder = videoDecoder, buffer = videoBuffer, onTimestamp = { frameTimestamp ->
+                                    decoder = videoDecoder,
+                                    pool = videoPool,
+                                    buffer = videoBuffer,
+                                    onTimestamp = { frameTimestamp ->
                                         if (frameTimestamp > lastFrameTimestamp) {
                                             onTimestamp(frameTimestamp)
 
                                             lastFrameTimestamp = frameTimestamp
                                         }
                                     })
-                            })
+                            }
+
+                            joinAll(audioJob, videoJob)
                         }
                     }
 
                     ensureActive()
 
                     onEndOfMedia()
-                } catch (t: Throwable) {
-                    throw t
                 } finally {
                     isBuffering = false
                 }
@@ -149,8 +185,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             try {
                 job?.cancelAndJoin()
                 job = null
-            } catch (t: Throwable) {
-                throw t
             } finally {
                 isBuffering = false
             }
@@ -162,8 +196,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             try {
                 job?.cancel()
                 job = null
-            } catch (t: Throwable) {
-                throw t
             } finally {
                 isBuffering = false
             }

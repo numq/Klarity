@@ -26,12 +26,10 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         JNIEnv *env,
         jclass thisClass,
         jstring location,
-        jint audioFramePoolCapacity,
-        jint videoFramePoolCapacity,
-        jint sampleRate,
-        jint channels,
-        jint width,
-        jint height,
+        jboolean findAudioStream,
+        jboolean findVideoStream,
+        jboolean decodeAudioStream,
+        jboolean decodeVideoStream,
         jintArray hardwareAccelerationCandidates
 ) {
     return handleException<jlong>(env, [&] {
@@ -62,12 +60,10 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
 
         auto decoder = new Decoder(
                 locationStr,
-                audioFramePoolCapacity,
-                videoFramePoolCapacity,
-                sampleRate,
-                channels,
-                width,
-                height,
+                findAudioStream,
+                findVideoStream,
+                decodeAudioStream,
+                decodeVideoStream,
                 candidates
         );
 
@@ -101,7 +97,9 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 static_cast<jint>(format.width),
                 static_cast<jint>(format.height),
                 static_cast<jdouble>(format.frameRate),
-                static_cast<jint>(format.hwDeviceType)
+                static_cast<jint>(format.hwDeviceType),
+                static_cast<jint>(format.audioBufferCapacity),
+                static_cast<jint>(format.videoBufferCapacity)
         );
 
         env->DeleteLocalRef(location);
@@ -113,22 +111,23 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeAudio(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle
+        jlong decoderHandle,
+        jlong buffer,
+        jint capacity
 ) {
     return handleException<jobject>(env, [&] {
         auto decoder = getDecoderPointer(decoderHandle);
 
-        auto frame = decoder->decodeAudio().release();
+        auto frame = decoder->decodeAudio(reinterpret_cast<uint8_t *>(buffer), capacity);
 
-        if (!frame) {
+        if (!frame.has_value()) {
             return static_cast<jobject>(nullptr);
         }
 
         return env->NewObject(
                 frameClass,
                 frameConstructor,
-                reinterpret_cast<jlong>(frame->buffer),
-                static_cast<jint>(frame->size),
+                static_cast<jint>(frame->remaining),
                 static_cast<jlong>(frame->timestampMicros),
                 static_cast<jint>(frame->type)
         );
@@ -138,22 +137,23 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeVideo(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle
+        jlong decoderHandle,
+        jlong buffer,
+        jint capacity
 ) {
     return handleException<jobject>(env, [&] {
         auto decoder = getDecoderPointer(decoderHandle);
 
-        auto frame = decoder->decodeVideo().release();
+        auto frame = decoder->decodeVideo(reinterpret_cast<uint8_t *>(buffer), capacity);
 
-        if (!frame) {
+        if (!frame.has_value()) {
             return static_cast<jobject>(nullptr);
         }
 
         return env->NewObject(
                 frameClass,
                 frameConstructor,
-                reinterpret_cast<jlong>(frame->buffer),
-                static_cast<jint>(frame->size),
+                static_cast<jint>(frame->remaining),
                 static_cast<jlong>(frame->timestampMicros),
                 static_cast<jint>(frame->type)
         );
@@ -193,31 +193,5 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_0
 ) {
     return handleException(env, [&] {
         delete getDecoderPointer(decoderHandle);
-    });
-}
-
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_releaseAudioBuffer(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong decoderHandle,
-        jlong bufferHandle
-) {
-    return handleException(env, [&] {
-        auto decoder = getDecoderPointer(decoderHandle);
-
-        decoder->releaseAudioBuffer(reinterpret_cast<void *>(bufferHandle));
-    });
-}
-
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_releaseVideoBuffer(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong decoderHandle,
-        jlong bufferHandle
-) {
-    return handleException(env, [&] {
-        auto decoder = getDecoderPointer(decoderHandle);
-
-        decoder->releaseVideoBuffer(reinterpret_cast<void *>(bufferHandle));
     });
 }

@@ -1,5 +1,6 @@
 package com.github.numq.klarity.core.decoder
 
+import com.github.numq.klarity.core.data.Data
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
@@ -14,32 +15,25 @@ internal class VideoDecoder(
 ) : Decoder<Media.Video> {
     private val mutex = Mutex()
 
-    override suspend fun decode() = mutex.withLock {
+    override suspend fun decode(data: Data) = mutex.withLock {
         nativeDecoder.format.mapCatching { format ->
-            nativeDecoder.decodeVideo().mapCatching { nativeFrame ->
+            nativeDecoder.decodeVideo(buffer = data.pointer, capacity = data.capacity).mapCatching { nativeFrame ->
                 when (nativeFrame) {
                     null -> Frame.EndOfStream
 
-                    else -> with(nativeFrame) {
-                        when (getType()) {
-                            null -> error("Unknown frame type")
+                    else -> when (nativeFrame.getType()) {
+                        null -> error("Unknown frame type")
 
-                            NativeFrame.Type.AUDIO -> error("Audio frame is not supported by decoder")
+                        NativeFrame.Type.AUDIO -> error("Audio frame is not supported by decoder")
 
-                            NativeFrame.Type.VIDEO -> Frame.Content.Video(
-                                buffer = buffer,
-                                size = size,
-                                timestamp = timestampMicros.microseconds,
-                                isClosed = {
-                                    nativeDecoder.isClosed() || buffer < 0L || size <= 0
-                                },
-                                onClose = {
-                                    nativeDecoder.releaseVideoBuffer(buffer)
-                                },
-                                width = format.width,
-                                height = format.height,
-                            )
-                        }
+                        NativeFrame.Type.VIDEO -> Frame.Content.Video(
+                            data = data,
+                            remaining = nativeFrame.remaining,
+                            timestamp = nativeFrame.timestampMicros.microseconds,
+                            isClosed = data::isClosed,
+                            width = format.width,
+                            height = format.height
+                        )
                     }
                 }
             }.getOrThrow()

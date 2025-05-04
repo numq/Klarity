@@ -14,10 +14,6 @@ sealed interface Command {
         val location: String,
         val audioBufferSize: Int,
         val videoBufferSize: Int,
-        val sampleRate: Int?,
-        val channels: Int?,
-        val width: Int?,
-        val height: Int?,
         val hardwareAccelerationCandidates: List<HardwareAcceleration>?
     ) : Command {
         override val descriptor = Descriptor.PREPARE

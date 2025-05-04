@@ -6,6 +6,8 @@ jclass decoderExceptionClass = nullptr;
 
 jclass hardwareAccelerationExceptionClass = nullptr;
 
+jclass poolExceptionClass = nullptr;
+
 jclass samplerExceptionClass = nullptr;
 
 jclass formatClass = nullptr;
@@ -67,6 +69,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
+    poolExceptionClass = reinterpret_cast<jclass>(
+            env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/pool/PoolException"))
+    );
+
+    if (poolExceptionClass == nullptr) {
+        return JNI_ERR;
+    }
+
     samplerExceptionClass = reinterpret_cast<jclass>(
             env->NewGlobalRef(env->FindClass("com/github/numq/klarity/core/sampler/SamplerException"))
     );
@@ -83,7 +93,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIIDI)V");
+    formatConstructor = env->GetMethodID(formatClass, "<init>", "(Ljava/lang/String;JIIIIDIII)V");
 
     if (formatConstructor == nullptr) {
         return JNI_ERR;
@@ -97,7 +107,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_ERR;
     }
 
-    frameConstructor = env->GetMethodID(frameClass, "<init>", "(JIJI)V");
+    frameConstructor = env->GetMethodID(frameClass, "<init>", "(IJI)V");
 
     if (frameConstructor == nullptr) {
         return JNI_ERR;
@@ -137,6 +147,12 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
         env->DeleteGlobalRef(hardwareAccelerationExceptionClass);
 
         hardwareAccelerationExceptionClass = nullptr;
+    }
+
+    if (poolExceptionClass) {
+        env->DeleteGlobalRef(poolExceptionClass);
+
+        poolExceptionClass = nullptr;
     }
 
     if (samplerExceptionClass) {

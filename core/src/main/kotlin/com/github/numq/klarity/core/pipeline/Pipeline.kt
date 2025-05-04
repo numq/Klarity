@@ -1,9 +1,11 @@
 package com.github.numq.klarity.core.pipeline
 
 import com.github.numq.klarity.core.buffer.Buffer
+import com.github.numq.klarity.core.data.Data
 import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.pool.Pool
 import com.github.numq.klarity.core.sampler.Sampler
 
 internal sealed interface Pipeline {
@@ -14,22 +16,26 @@ internal sealed interface Pipeline {
     data class Audio(
         override val media: Media.Audio,
         val decoder: Decoder<Media.Audio>,
+        val pool: Pool<Data>,
         val buffer: Buffer<Frame>,
         val sampler: Sampler,
     ) : Pipeline {
         override suspend fun close() = runCatching {
             sampler.close().getOrThrow()
             decoder.close().getOrThrow()
+            pool.close().getOrThrow()
         }
     }
 
     data class Video(
         override val media: Media.Video,
         val decoder: Decoder<Media.Video>,
+        val pool: Pool<Data>,
         val buffer: Buffer<Frame>
     ) : Pipeline {
         override suspend fun close() = runCatching {
             decoder.close().getOrThrow()
+            pool.close().getOrThrow()
         }
     }
 
@@ -37,6 +43,8 @@ internal sealed interface Pipeline {
         override val media: Media.AudioVideo,
         val audioDecoder: Decoder<Media.Audio>,
         val videoDecoder: Decoder<Media.Video>,
+        val audioPool: Pool<Data>,
+        val videoPool: Pool<Data>,
         val audioBuffer: Buffer<Frame>,
         val videoBuffer: Buffer<Frame>,
         val sampler: Sampler
@@ -45,6 +53,8 @@ internal sealed interface Pipeline {
             sampler.close().getOrThrow()
             audioDecoder.close().getOrThrow()
             videoDecoder.close().getOrThrow()
+            audioPool.close().getOrThrow()
+            videoPool.close().getOrThrow()
         }
     }
 }

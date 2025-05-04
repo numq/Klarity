@@ -22,12 +22,10 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_
         JNIEnv *env,
         jclass thisClass,
         jstring location,
-        jint audioFramePoolCapacity,
-        jint videoFramePoolCapacity,
-        jint sampleRate,
-        jint channels,
-        jint width,
-        jint height,
+        jboolean findAudioStream,
+        jboolean findVideoStream,
+        jboolean decodeAudioStream,
+        jboolean decodeVideoStream,
         jintArray hardwareAccelerationCandidates
 );
 
@@ -40,19 +38,17 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeAudio(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle
+        jlong decoderHandle,
+        jlong buffer,
+        jint capacity
 );
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeVideo(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle
-);
-
-JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeMedia(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong decoderHandle
+        jlong decoderHandle,
+        jlong buffer,
+        jint capacity
 );
 
 JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_seekTo(

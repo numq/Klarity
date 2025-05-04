@@ -14,6 +14,10 @@ AVPixelFormat Decoder::_getHardwareAccelerationFormat(AVCodecContext *codecConte
     return AV_PIX_FMT_NONE;
 }
 
+bool Decoder::_isValid() {
+    return formatContext && (audioStream || videoStream);
+}
+
 bool Decoder::_hasAudio() {
     if (!audioStream || !audioCodecContext || !audioDecoder) {
         return false;
@@ -31,7 +35,7 @@ bool Decoder::_hasAudio() {
         return false;
     }
 
-    if (!audioFrame || !audioBufferPool) {
+    if (!audioFrame) {
         return false;
     }
 
@@ -43,15 +47,11 @@ bool Decoder::_hasVideo() {
         return false;
     }
 
-    if (!swVideoFrame || !videoBufferPool) {
+    if (!swVideoFrame) {
         return false;
     }
 
     return true;
-}
-
-bool Decoder::_isValid() {
-    return formatContext && (audioStream || videoStream);
 }
 
 bool Decoder::_isHardwareAccelerated() {
@@ -90,7 +90,7 @@ bool Decoder::_prepareHardwareAcceleration(const uint32_t deviceType) {
     return false;
 }
 
-void Decoder::_processAudio(std::vector<uint8_t> &dst) {
+int Decoder::_processAudio(uint8_t *buffer, int capacity) {
     if (!audioFrame || !swrContext) {
         throw DecoderException("Invalid audio processing state");
     }
@@ -101,39 +101,10 @@ void Decoder::_processAudio(std::vector<uint8_t> &dst) {
         throw DecoderException("Invalid source audio frame");
     }
 
-    auto outSamples = av_rescale_rnd(
-            swr_get_delay(swrContext.get(), src->sample_rate) + src->nb_samples,
-            targetSampleRate,
-            src->sample_rate,
-            AV_ROUND_UP
-    );
-
-    if (outSamples <= 0) {
-        throw DecoderException("Invalid output sample count");
-    }
-
-    outSamples += AV_INPUT_BUFFER_PADDING_SIZE;
-
-    const int bufferSize = av_samples_get_buffer_size(
-            nullptr,
-            targetChannelLayout.nb_channels,
-            static_cast<int>(outSamples),
-            targetSampleFormat,
-            1
-    );
-
-    if (bufferSize <= 0) {
-        throw DecoderException("Invalid buffer size calculation");
-    }
-
-    dst.resize(bufferSize);
-
-    auto out = dst.data();
-
     const int convertedSamples = swr_convert(
             swrContext.get(),
-            &out,
-            static_cast<int>(outSamples),
+            &buffer,
+            capacity,
             const_cast<const uint8_t **>(src->data),
             src->nb_samples
     );
@@ -144,7 +115,7 @@ void Decoder::_processAudio(std::vector<uint8_t> &dst) {
 
     int actualSize = av_samples_get_buffer_size(
             nullptr,
-            targetChannelLayout.nb_channels,
+            audioCodecContext->ch_layout.nb_channels,
             convertedSamples,
             targetSampleFormat,
             1
@@ -154,40 +125,44 @@ void Decoder::_processAudio(std::vector<uint8_t> &dst) {
         throw DecoderException("Invalid converted audio size");
     }
 
-    dst.resize(actualSize);
+    return actualSize;
 }
 
-void Decoder::_processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &planes, std::vector<int> &strides) {
+int Decoder::_processVideo(uint8_t *buffer) {
     if (!swVideoFrame || !swsContext) {
         throw DecoderException("Invalid video processing state");
     }
 
     auto src = swVideoFrame.get();
 
-    if (src->format == AV_PIX_FMT_NONE || src->width <= 0 || src->height <= 0) {
-        throw DecoderException("Invalid source video frame");
+    if (src->format == AV_PIX_FMT_NONE ||
+        src->width <= 0 ||
+        src->height <= 0 ||
+        !src->data[0] ||
+        src->linesize[0] <= 0) {
+        throw DecoderException("Invalid source video frame data");
     }
 
     if (src->width != swsWidth || src->height != swsHeight || src->format != swsPixelFormat) {
-        swsContext.reset(sws_getCachedContext(
+        auto newContext = sws_getCachedContext(
                 swsContext.release(),
                 src->width,
                 src->height,
                 static_cast<AVPixelFormat>(src->format),
-                targetWidth,
-                targetHeight,
+                videoCodecContext->width,
+                videoCodecContext->height,
                 targetPixelFormat,
                 swsFlags,
                 nullptr,
                 nullptr,
                 nullptr
-        ));
+        );
 
-        if (!swsContext) {
+        if (!newContext) {
             throw DecoderException("Could not allocate sws context");
         }
 
-        av_opt_set(swsContext.get(), "threads", "auto", 0);
+        swsContext.reset(newContext);
 
         swsWidth = src->width;
 
@@ -196,22 +171,32 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &p
         swsPixelFormat = static_cast<AVPixelFormat>(src->format);
     }
 
+    uint8_t *dst[4] = {buffer, nullptr, nullptr, nullptr};
+
+    int linesize[4] = {0, 0, 0, 0};
+
+    av_image_fill_linesizes(linesize, targetPixelFormat, videoCodecContext->width);
+
+    if (linesize[0] <= 0) {
+        throw DecoderException("Invalid destination linesize");
+    }
+
     if (sws_scale(
             swsContext.get(),
             src->data,
             src->linesize,
             0,
             src->height,
-            planes.data(),
-            strides.data()
+            dst,
+            linesize
     ) <= 0) {
         throw DecoderException("Video conversion failed");
     }
 
     int actualSize = av_image_get_buffer_size(
             targetPixelFormat,
-            targetWidth,
-            targetHeight,
+            videoCodecContext->width,
+            videoCodecContext->height,
             1
     );
 
@@ -219,28 +204,18 @@ void Decoder::_processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &p
         throw DecoderException("Invalid converted video size");
     }
 
-    dst.resize(actualSize);
+    return actualSize;
 }
 
 Decoder::Decoder(
         const std::string &location,
-        const int audioFramePoolCapacity,
-        const int videoFramePoolCapacity,
-        const int sampleRate,
-        const int channels,
-        const int width,
-        const int height,
+        const bool findAudioStream,
+        const bool findVideoStream,
+        const bool decodeAudioStream,
+        const bool decodeVideoStream,
         const std::vector<uint32_t> &hardwareAccelerationCandidates
 ) {
     std::unique_lock<std::shared_mutex> lock(mutex);
-
-    auto findAudioStream = audioFramePoolCapacity >= 0;
-
-    auto findVideoStream = videoFramePoolCapacity >= 0;
-
-    auto decodeAudioStream = audioFramePoolCapacity > 0;
-
-    auto decodeVideoStream = videoFramePoolCapacity > 0;
 
     AVFormatContext *rawFormatContext = nullptr;
 
@@ -284,38 +259,44 @@ Decoder::Decoder(
                     throw DecoderException("Could not open audio decoder");
                 }
 
-                targetSampleRate = audioCodecContext->sample_rate;
+                format.sampleRate = audioCodecContext->sample_rate;
 
-                av_channel_layout_copy(&targetChannelLayout, &audioCodecContext->ch_layout);
+                format.channels = audioCodecContext->ch_layout.nb_channels;
+
+                auto audioBufferCapacity = av_samples_get_buffer_size(
+                        nullptr,
+                        audioCodecContext->ch_layout.nb_channels,
+                        8192,
+                        targetSampleFormat,
+                        1
+                );
+
+                if (audioBufferCapacity <= 0) {
+                    throw DecoderException("Invalid audio buffer capacity");
+                }
+
+                audioBufferCapacity += AV_INPUT_BUFFER_PADDING_SIZE;
+
+                format.audioBufferCapacity = audioBufferCapacity;
 
                 if (decodeAudioStream) {
                     audioCodecContext->thread_count = static_cast<int>(
-                            std::min(16U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
+                            std::min(4U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
                     );
 
                     if (audioDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
                         audioCodecContext->thread_type = FF_THREAD_FRAME;
                     } else if (audioDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
                         audioCodecContext->thread_type = FF_THREAD_SLICE;
-                    } else {
-                        audioCodecContext->thread_count = 1;
-                    }
-
-                    if (sampleRate > 0) {
-                        targetSampleRate = sampleRate;
-                    }
-
-                    if (channels > 0) {
-                        av_channel_layout_default(&targetChannelLayout, channels);
                     }
 
                     SwrContext *rawSwrContext = nullptr;
 
                     if (swr_alloc_set_opts2(
                             &rawSwrContext,
-                            &targetChannelLayout,
+                            &audioCodecContext->ch_layout,
                             targetSampleFormat,
-                            targetSampleRate,
+                            audioCodecContext->sample_rate,
                             &audioCodecContext->ch_layout,
                             audioCodecContext->sample_fmt,
                             audioCodecContext->sample_rate,
@@ -336,13 +317,7 @@ Decoder::Decoder(
                     if (!audioFrame) {
                         throw DecoderException("Memory allocation failed for audio frame");
                     }
-
-                    audioBufferPool = std::make_unique<AudioBufferPool>(audioFramePoolCapacity);
                 }
-
-                format.sampleRate = targetSampleRate;
-
-                format.channels = targetChannelLayout.nb_channels;
             }
         } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && findVideoStream) {
             if ((videoDecoder = avcodec_find_decoder(stream->codecpar->codec_id))) {
@@ -365,6 +340,8 @@ Decoder::Decoder(
                 if (decodeVideoStream && !hardwareAccelerationCandidates.empty()) {
                     for (auto deviceType: hardwareAccelerationCandidates) {
                         if (_prepareHardwareAcceleration(deviceType)) {
+                            videoCodecContext->get_format = _getHardwareAccelerationFormat;
+
                             format.hwDeviceType = static_cast<AVHWDeviceType>(deviceType);
 
                             break;
@@ -372,41 +349,42 @@ Decoder::Decoder(
                     }
                 }
 
-                if (_isHardwareAccelerated()) {
-                    videoCodecContext->get_format = _getHardwareAccelerationFormat;
-                }
-
                 if (avcodec_open2(videoCodecContext.get(), videoDecoder, nullptr) < 0) {
                     throw DecoderException("Could not open video decoder");
                 }
 
-                targetWidth = videoCodecContext->width;
+                format.width = videoCodecContext->width;
 
-                targetHeight = videoCodecContext->height;
+                format.height = videoCodecContext->height;
 
                 if (videoStream->avg_frame_rate.num != 0 && videoStream->avg_frame_rate.den != 0) {
                     format.frameRate = av_q2d(videoStream->avg_frame_rate);
                 }
 
+                int videoBufferCapacity = av_image_get_buffer_size(
+                        targetPixelFormat,
+                        videoCodecContext->width,
+                        videoCodecContext->height,
+                        1
+                );
+
+                if (videoBufferCapacity <= 0) {
+                    throw DecoderException("Invalid video buffer capacity");
+                }
+
+                videoBufferCapacity += AV_INPUT_BUFFER_PADDING_SIZE;
+
+                format.videoBufferCapacity = videoBufferCapacity;
+
                 if (decodeVideoStream) {
                     videoCodecContext->thread_count = static_cast<int>(
-                            std::min(16U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
+                            std::min(4U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
                     );
 
                     if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
                         videoCodecContext->thread_type = FF_THREAD_FRAME;
                     } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
                         videoCodecContext->thread_type = FF_THREAD_SLICE;
-                    } else {
-                        videoCodecContext->thread_count = 1;
-                    }
-
-                    if (width > 0) {
-                        targetWidth = width;
-                    }
-
-                    if (height > 0) {
-                        targetHeight = height;
                     }
 
                     swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
@@ -414,8 +392,8 @@ Decoder::Decoder(
                                     videoCodecContext->width,
                                     videoCodecContext->height,
                                     videoCodecContext->pix_fmt,
-                                    targetWidth,
-                                    targetHeight,
+                                    videoCodecContext->width,
+                                    videoCodecContext->height,
                                     targetPixelFormat,
                                     swsFlags,
                                     nullptr,
@@ -428,8 +406,6 @@ Decoder::Decoder(
                         throw DecoderException("Could not allocate sws context");
                     }
 
-                    av_opt_set(swsContext.get(), "threads", "auto", 0);
-
                     swsWidth = videoCodecContext->width;
 
                     swsHeight = videoCodecContext->height;
@@ -441,21 +417,6 @@ Decoder::Decoder(
                     if (!swVideoFrame) {
                         throw DecoderException("Memory allocation failed for software video frame");
                     }
-
-                    videoBufferPool = std::make_unique<VideoBufferPool>(
-                            videoFramePoolCapacity,
-                            targetWidth,
-                            targetHeight,
-                            targetPixelFormat
-                    );
-                }
-
-                format.width = targetWidth;
-
-                format.height = targetHeight;
-
-                if (!audioStream && videoStream->nb_frames <= 1) {
-                    format.durationMicros = 0;
                 }
             }
         }
@@ -485,17 +446,11 @@ Decoder::~Decoder() {
 
     audioFrame.reset();
 
-    videoBufferPool.reset();
-
-    audioBufferPool.reset();
-
     packet.reset();
 
     swsContext.reset();
 
     swrContext.reset();
-
-    av_channel_layout_uninit(&targetChannelLayout);
 
     videoCodecContext.reset();
 
@@ -504,7 +459,7 @@ Decoder::~Decoder() {
     formatContext.reset();
 }
 
-std::unique_ptr<Frame> Decoder::decodeAudio() {
+std::optional<Frame> Decoder::decodeAudio(uint8_t *buffer, int capacity) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -515,10 +470,12 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
         throw DecoderException("Could not find audio stream");
     }
 
-    auto poolItem = audioBufferPool->acquire();
+    if (!buffer) {
+        throw DecoderException("Invalid buffer");
+    }
 
-    if (!poolItem) {
-        throw DecoderException("Could not get item from audio buffer pool");
+    if (capacity <= 0) {
+        throw DecoderException("Invalid buffer capacity");
     }
 
     av_packet_unref(packet.get());
@@ -527,6 +484,8 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
         while (av_read_frame(formatContext.get(), packet.get()) >= 0) {
             if (packet->stream_index == audioStream->index) {
                 if (avcodec_send_packet(audioCodecContext.get(), packet.get()) < 0) {
+                    av_packet_unref(packet.get());
+
                     continue;
                 }
 
@@ -544,19 +503,16 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
                             AVRational{1, 1'000'000}
                     );
 
-                    _processAudio(poolItem->buffer);
+                    auto remaining = _processAudio(buffer, capacity);
 
                     av_frame_unref(audioFrame.get());
 
-                    auto buffer = poolItem->buffer.data();
-
-                    auto size = static_cast<int>(poolItem->buffer.size());
-
-                    return std::make_unique<Frame>(
-                            buffer,
-                            size,
-                            timestampMicros,
-                            FrameType::AUDIO
+                    return std::optional(
+                            Frame{
+                                    remaining,
+                                    timestampMicros,
+                                    FrameType::AUDIO
+                            }
                     );
                 }
 
@@ -579,10 +535,10 @@ std::unique_ptr<Frame> Decoder::decodeAudio() {
         throw;
     }
 
-    return nullptr;
+    return std::nullopt;
 }
 
-std::unique_ptr<Frame> Decoder::decodeVideo() {
+std::optional<Frame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -593,10 +549,12 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
         throw DecoderException("Could not find video stream");
     }
 
-    auto poolItem = videoBufferPool->acquire();
+    if (!buffer) {
+        throw DecoderException("Invalid buffer");
+    }
 
-    if (!poolItem) {
-        throw DecoderException("Could not get item from video buffer pool");
+    if (capacity <= 0) {
+        throw DecoderException("Invalid buffer capacity");
     }
 
     av_packet_unref(packet.get());
@@ -605,6 +563,8 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
         while (av_read_frame(formatContext.get(), packet.get()) >= 0) {
             if (packet->stream_index == videoStream->index) {
                 if (avcodec_send_packet(videoCodecContext.get(), packet.get()) < 0) {
+                    av_packet_unref(packet.get());
+
                     continue;
                 }
 
@@ -635,7 +595,7 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                     const auto frameTimestampMicros = (swVideoFrame->best_effort_timestamp != AV_NOPTS_VALUE)
                                                       ? swVideoFrame->best_effort_timestamp : swVideoFrame->pts;
 
-                    _processVideo(poolItem->buffer, poolItem->planes, poolItem->strides);
+                    auto remaining = _processVideo(buffer);
 
                     av_frame_unref(swVideoFrame.get());
 
@@ -645,15 +605,12 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
                             AVRational{1, 1'000'000}
                     );
 
-                    auto data = poolItem->buffer.data();
-
-                    auto size = static_cast<int>(poolItem->buffer.size());
-
-                    return std::make_unique<Frame>(
-                            data,
-                            size,
-                            timestampMicros,
-                            FrameType::VIDEO
+                    return std::optional(
+                            Frame{
+                                    remaining,
+                                    timestampMicros,
+                                    FrameType::VIDEO
+                            }
                     );
                 }
 
@@ -680,7 +637,7 @@ std::unique_ptr<Frame> Decoder::decodeVideo() {
         throw;
     }
 
-    return nullptr;
+    return std::nullopt;
 }
 
 uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
@@ -836,16 +793,4 @@ void Decoder::reset() {
     if (_hasVideo()) {
         avcodec_flush_buffers(videoCodecContext.get());
     }
-}
-
-void Decoder::releaseAudioBuffer(void *buffer) {
-    std::unique_lock<std::shared_mutex> lock(mutex);
-
-    audioBufferPool->release(reinterpret_cast<uint8_t *>(buffer));
-}
-
-void Decoder::releaseVideoBuffer(void *buffer) {
-    std::unique_lock<std::shared_mutex> lock(mutex);
-
-    videoBufferPool->release(reinterpret_cast<uint8_t *>(buffer));
 }

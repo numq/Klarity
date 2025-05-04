@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include "deleter.h"
@@ -10,7 +11,6 @@
 #include "format.h"
 #include "frame.h"
 #include "hwaccel.h"
-#include "pool.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -29,21 +29,13 @@ private:
 
     const AVPixelFormat targetPixelFormat = AV_PIX_FMT_BGRA;
 
-    int targetSampleRate;
-
-    AVChannelLayout targetChannelLayout = AVChannelLayout{};
-
-    int targetWidth;
-
-    int targetHeight;
-
     const int swsFlags = SWS_BILINEAR;
-
-    AVPixelFormat swsPixelFormat = AV_PIX_FMT_NONE;
 
     int swsWidth = -1;
 
     int swsHeight = -1;
+
+    AVPixelFormat swsPixelFormat = AV_PIX_FMT_NONE;
 
     std::unique_ptr<AVFormatContext, AVFormatContextDeleter> formatContext;
 
@@ -71,39 +63,33 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
-    std::unique_ptr<AudioBufferPool> audioBufferPool;
-
-    std::unique_ptr<VideoBufferPool> videoBufferPool;
-
 public:
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,
             const AVPixelFormat *pixelFormats
     );
 
+    bool _isValid();
+
     bool _hasAudio();
 
     bool _hasVideo();
-
-    bool _isValid();
 
     bool _isHardwareAccelerated();
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    void _processAudio(std::vector<uint8_t> &dst);
+    int _processAudio(uint8_t *buffer, int capacity);
 
-    void _processVideo(std::vector<uint8_t> &dst, std::vector<uint8_t *> &planes, std::vector<int> &strides);
+    int _processVideo(uint8_t *buffer);
 
 public:
     Decoder(
             const std::string &location,
-            int audioFramePoolCapacity,
-            int videoFramePoolCapacity,
-            int sampleRate,
-            int channels,
-            int width,
-            int height,
+            bool findAudioStream,
+            bool findVideoStream,
+            bool decodeAudioStream,
+            bool decodeVideoStream,
             const std::vector<uint32_t> &hardwareAccelerationCandidates
     );
 
@@ -115,17 +101,13 @@ public:
 
     Format format;
 
-    std::unique_ptr<Frame> decodeAudio();
+    std::optional<Frame> decodeAudio(uint8_t *buffer, int capacity);
 
-    std::unique_ptr<Frame> decodeVideo();
+    std::optional<Frame> decodeVideo(uint8_t *buffer, int capacity);
 
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
-
-    void releaseAudioBuffer(void *buffer);
-
-    void releaseVideoBuffer(void *buffer);
 };
 
 #endif // KLARITY_DECODER_DECODER_H

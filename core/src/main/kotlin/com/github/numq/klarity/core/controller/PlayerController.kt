@@ -1,21 +1,14 @@
 package com.github.numq.klarity.core.controller
 
-import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.command.Command
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
-import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.event.PlayerEvent
-import com.github.numq.klarity.core.factory.Factory
-import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
-import com.github.numq.klarity.core.loop.playback.PlaybackLoop
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
-import com.github.numq.klarity.core.media.Media
+import com.github.numq.klarity.core.pool.PoolFactory
 import com.github.numq.klarity.core.renderer.Renderer
-import com.github.numq.klarity.core.sampler.Sampler
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.PlayerState
@@ -49,17 +42,19 @@ interface PlayerController {
     companion object {
         internal fun create(
             initialSettings: PlayerSettings?,
-            audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,
-            videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>>,
-            bufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame>>,
-            bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
-            playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-            samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
+            audioDecoderFactory: AudioDecoderFactory,
+            videoDecoderFactory: VideoDecoderFactory,
+            poolFactory: PoolFactory,
+            bufferFactory: BufferFactory,
+            bufferLoopFactory: BufferLoopFactory,
+            playbackLoopFactory: PlaybackLoopFactory,
+            samplerFactory: SamplerFactory
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,
                 audioDecoderFactory = audioDecoderFactory,
                 videoDecoderFactory = videoDecoderFactory,
+                poolFactory = poolFactory,
                 bufferFactory = bufferFactory,
                 bufferLoopFactory = bufferLoopFactory,
                 playbackLoopFactory = playbackLoopFactory,

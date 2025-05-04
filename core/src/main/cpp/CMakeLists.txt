@@ -10,6 +10,7 @@ set(LIB_FOLDER "${CMAKE_SOURCE_DIR}/lib")
 
 add_library(klarity SHARED
         src/common.cpp
+        src/data/com_github_numq_klarity_core_data_NativeData.cpp
         src/decoder/decoder.cpp
         src/decoder/hwaccel.cpp
         src/sampler/sampler.cpp
@@ -28,9 +29,9 @@ endif ()
 
 target_include_directories(klarity PRIVATE
         include
+        include/data
         include/decoder
         include/decoder/ffmpeg
-        include/memory
         include/sampler
         include/sampler/dsp
         include/sampler/portaudio

@@ -1,5 +1,6 @@
 package com.github.numq.klarity.core.decoder
 
+import com.github.numq.klarity.core.data.Data
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
@@ -14,29 +15,22 @@ internal class AudioDecoder(
 ) : Decoder<Media.Audio> {
     private val mutex = Mutex()
 
-    override suspend fun decode() = mutex.withLock {
-        nativeDecoder.decodeAudio().mapCatching { nativeFrame ->
+    override suspend fun decode(data: Data) = mutex.withLock {
+        nativeDecoder.decodeAudio(buffer = data.pointer, capacity = data.capacity).mapCatching { nativeFrame ->
             when (nativeFrame) {
                 null -> Frame.EndOfStream
 
-                else -> with(nativeFrame) {
-                    when (getType()) {
-                        null -> error("Unknown frame type")
+                else -> when (nativeFrame.getType()) {
+                    null -> error("Unknown frame type")
 
-                        NativeFrame.Type.AUDIO -> Frame.Content.Audio(
-                            buffer = buffer,
-                            size = size,
-                            timestamp = timestampMicros.microseconds,
-                            isClosed = {
-                                nativeDecoder.isClosed() || buffer < 0L || size <= 0
-                            },
-                            onClose = {
-                                nativeDecoder.releaseAudioBuffer(buffer)
-                            },
-                        )
+                    NativeFrame.Type.AUDIO -> Frame.Content.Audio(
+                        data = data,
+                        remaining = nativeFrame.remaining,
+                        timestamp = nativeFrame.timestampMicros.microseconds,
+                        isClosed = data::isClosed
+                    )
 
-                        NativeFrame.Type.VIDEO -> error("Video frame is not supported by decoder")
-                    }
+                    NativeFrame.Type.VIDEO -> error("Video frame is not supported by decoder")
                 }
             }
         }

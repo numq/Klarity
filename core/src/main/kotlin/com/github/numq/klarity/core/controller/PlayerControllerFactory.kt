@@ -1,30 +1,25 @@
 package com.github.numq.klarity.core.controller
 
-import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.buffer.BufferFactory
 import com.github.numq.klarity.core.decoder.AudioDecoderFactory
-import com.github.numq.klarity.core.decoder.Decoder
 import com.github.numq.klarity.core.decoder.VideoDecoderFactory
 import com.github.numq.klarity.core.factory.Factory
-import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.loop.buffer.BufferLoop
 import com.github.numq.klarity.core.loop.buffer.BufferLoopFactory
-import com.github.numq.klarity.core.loop.playback.PlaybackLoop
 import com.github.numq.klarity.core.loop.playback.PlaybackLoopFactory
-import com.github.numq.klarity.core.media.Media
-import com.github.numq.klarity.core.sampler.Sampler
+import com.github.numq.klarity.core.pool.PoolFactory
 import com.github.numq.klarity.core.sampler.SamplerFactory
 import com.github.numq.klarity.core.settings.PlayerSettings
 
 internal class PlayerControllerFactory : Factory<PlayerControllerFactory.Parameters, PlayerController> {
     data class Parameters(
         val initialSettings: PlayerSettings?,
-        val audioDecoderFactory: Factory<AudioDecoderFactory.Parameters, Decoder<Media.Audio>>,
-        val videoDecoderFactory: Factory<VideoDecoderFactory.Parameters, Decoder<Media.Video>>,
-        val bufferFactory: Factory<BufferFactory.Parameters, Buffer<Frame>>,
-        val bufferLoopFactory: Factory<BufferLoopFactory.Parameters, BufferLoop>,
-        val playbackLoopFactory: Factory<PlaybackLoopFactory.Parameters, PlaybackLoop>,
-        val samplerFactory: Factory<SamplerFactory.Parameters, Sampler>
+        val audioDecoderFactory: AudioDecoderFactory,
+        val videoDecoderFactory: VideoDecoderFactory,
+        val poolFactory: PoolFactory,
+        val bufferFactory: BufferFactory,
+        val bufferLoopFactory: BufferLoopFactory,
+        val playbackLoopFactory: PlaybackLoopFactory,
+        val samplerFactory: SamplerFactory
     )
 
     override fun create(parameters: Parameters) = with(parameters) {
@@ -32,6 +27,7 @@ internal class PlayerControllerFactory : Factory<PlayerControllerFactory.Paramet
             initialSettings = initialSettings,
             audioDecoderFactory = audioDecoderFactory,
             videoDecoderFactory = videoDecoderFactory,
+            poolFactory = poolFactory,
             bufferFactory = bufferFactory,
             bufferLoopFactory = bufferLoopFactory,
             playbackLoopFactory = playbackLoopFactory,

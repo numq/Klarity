@@ -1,8 +1,7 @@
 package com.github.numq.klarity.core.frame
 
 internal data class NativeFrame(
-    val buffer: Long,
-    val size: Int,
+    val remaining: Int,
     val timestampMicros: Long,
     val type: Int
 ) {

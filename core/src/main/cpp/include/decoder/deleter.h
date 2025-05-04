@@ -8,6 +8,12 @@ extern "C" {
 #include "libswscale/swscale.h"
 }
 
+struct AVBufferRefDeleter {
+    void operator()(AVBufferRef *p) const {
+        av_buffer_unref(&p);
+    }
+};
+
 struct AVFormatContextDeleter {
     void operator()(AVFormatContext *p) const {
         avformat_close_input(&p);

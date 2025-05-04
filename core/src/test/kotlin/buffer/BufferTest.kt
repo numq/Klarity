@@ -36,32 +36,6 @@ class BufferTest {
     }
 
     @Test
-    fun `peek on empty buffer should return null`() = runTest {
-        val buffer = Buffer.create<String>(1).getOrThrow()
-        val result = buffer.peek()
-        assertTrue(result.isSuccess)
-        assertEquals(null, result.getOrNull())
-    }
-
-    @Test
-    fun `peek should return item without removing it`() = runTest {
-        val buffer = Buffer.create<String>(1).getOrThrow()
-        buffer.put("test").getOrThrow()
-
-        val peekResult1 = buffer.peek()
-        assertTrue(peekResult1.isSuccess)
-        assertEquals("test", peekResult1.getOrNull())
-
-        val peekResult2 = buffer.peek()
-        assertTrue(peekResult2.isSuccess)
-        assertEquals("test", peekResult2.getOrNull())
-
-        val takeResult = buffer.take()
-        assertTrue(takeResult.isSuccess)
-        assertEquals("test", takeResult.getOrNull())
-    }
-
-    @Test
     fun `take on empty buffer should block until item is available`() = runTest {
         val buffer = Buffer.create<String>(1).getOrThrow()
 
@@ -82,9 +56,7 @@ class BufferTest {
         val result = buffer.put("test")
         assertTrue(result.isSuccess)
 
-        val peekResult = buffer.peek()
-        assertTrue(peekResult.isSuccess)
-        assertEquals("test", peekResult.getOrNull())
+        assertEquals("test", buffer.take().getOrNull())
     }
 
     @Test
@@ -104,9 +76,7 @@ class BufferTest {
 
         deferredPut.await()
 
-        val peekResult = buffer.peek()
-        assertTrue(peekResult.isSuccess)
-        assertEquals("test2", peekResult.getOrNull())
+        assertEquals("test2", buffer.take().getOrNull())
     }
 
     @Test
@@ -118,12 +88,15 @@ class BufferTest {
         val clearResult = buffer.clear()
         assertTrue(clearResult.isSuccess)
 
-        val peekResult = buffer.peek()
-        assertTrue(peekResult.isSuccess)
-        assertEquals(null, peekResult.getOrNull())
+        val deferredTake = async {
+            buffer.take().getOrThrow()
+        }
+
+        delay(100)
+        assertTrue(!deferredTake.isCompleted)
 
         buffer.put("test3").getOrThrow()
-        assertEquals("test3", buffer.peek().getOrNull())
+        assertEquals("test3", deferredTake.await())
     }
 
     @Test
@@ -136,19 +109,6 @@ class BufferTest {
         assertEquals(1, buffer.take().getOrThrow())
         assertEquals(2, buffer.take().getOrThrow())
         assertEquals(3, buffer.take().getOrThrow())
-    }
-
-    @Test
-    fun `peek should not affect buffer state`() = runTest {
-        val buffer = Buffer.create<String>(1).getOrThrow()
-        buffer.put("test").getOrThrow()
-
-        repeat(5) {
-            assertEquals("test", buffer.peek().getOrNull())
-        }
-
-        assertEquals("test", buffer.take().getOrNull())
-        assertEquals(null, buffer.peek().getOrNull())
     }
 
     @Test

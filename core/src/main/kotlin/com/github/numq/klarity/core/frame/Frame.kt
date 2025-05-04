@@ -1,51 +1,35 @@
 package com.github.numq.klarity.core.frame
 
-import java.io.Closeable
+import com.github.numq.klarity.core.data.Data
 import kotlin.time.Duration
 
 sealed interface Frame {
-    sealed interface Content : Frame, Closeable {
-        val buffer: Long
+    sealed interface Content : Frame {
+        val data: Data
 
-        val size: Int
+        val remaining: Int
 
         val timestamp: Duration
 
         val isClosed: () -> Boolean
 
-        val onClose: () -> Unit
-
         data class Audio(
-            override val buffer: Long,
-            override val size: Int,
+            override val data: Data,
+            override val remaining: Int,
             override val timestamp: Duration,
-            override val isClosed: () -> Boolean,
-            override val onClose: () -> Unit
-        ) : Content {
-            override fun close() {
-                // todo
-
-                onClose()
-            }
-        }
+            override val isClosed: () -> Boolean
+        ) : Content
 
         data class Video(
-            override val buffer: Long,
-            override val size: Int,
+            override val data: Data,
+            override val remaining: Int,
             override val timestamp: Duration,
             override val isClosed: () -> Boolean,
-            override val onClose: () -> Unit,
             val width: Int,
             val height: Int,
             val onRenderStart: (() -> Unit)? = null,
             val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
-        ) : Content {
-            override fun close() {
-                // todo
-
-                onClose()
-            }
-        }
+        ) : Content
     }
 
     data object EndOfStream : Frame

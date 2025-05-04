@@ -16,6 +16,8 @@ extern jclass decoderExceptionClass;
 
 extern jclass hardwareAccelerationExceptionClass;
 
+extern jclass poolExceptionClass;
+
 extern jclass samplerExceptionClass;
 
 extern jclass formatClass;
@@ -33,12 +35,12 @@ extern Sampler *getSamplerPointer(jlong handle);
 inline void handleException(JNIEnv *env, const std::function<void()> &call) {
     try {
         call();
-    } catch (const SamplerException &e) {
-        env->ThrowNew(samplerExceptionClass, e.what());
     } catch (const DecoderException &e) {
         env->ThrowNew(decoderExceptionClass, e.what());
     } catch (const HardwareAccelerationException &e) {
         env->ThrowNew(hardwareAccelerationExceptionClass, e.what());
+    } catch (const SamplerException &e) {
+        env->ThrowNew(samplerExceptionClass, e.what());
     } catch (const std::bad_alloc &e) {
         env->ThrowNew(runtimeExceptionClass, "Memory allocation failed");
     } catch (const std::exception &e) {
@@ -52,12 +54,12 @@ template<typename T>
 inline T handleException(JNIEnv *env, const std::function<T()> &call, T defaultValue) {
     try {
         return call();
-    } catch (const SamplerException &e) {
-        env->ThrowNew(samplerExceptionClass, e.what());
     } catch (const DecoderException &e) {
         env->ThrowNew(decoderExceptionClass, e.what());
     } catch (const HardwareAccelerationException &e) {
         env->ThrowNew(hardwareAccelerationExceptionClass, e.what());
+    } catch (const SamplerException &e) {
+        env->ThrowNew(samplerExceptionClass, e.what());
     } catch (const std::bad_alloc &e) {
         env->ThrowNew(runtimeExceptionClass, "Memory allocation failed");
     } catch (const std::exception &e) {
