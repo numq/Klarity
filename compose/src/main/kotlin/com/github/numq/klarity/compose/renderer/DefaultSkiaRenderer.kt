@@ -36,11 +36,7 @@ internal class DefaultSkiaRenderer(
 
     private val surface = Surface.makeRaster(imageInfo)
 
-    private val targetPixmap = Data.makeEmpty().use { buffer ->
-        Pixmap.make(
-            info = imageInfo, buffer = buffer, rowBytes = imageInfo.minRowBytes
-        )
-    }
+    private val targetPixmap = Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes)
 
     private fun isRenderable(cachedFrame: CachedFrame) =
         !isClosed.get() && !cachedFrame.pixmap.isClosed
