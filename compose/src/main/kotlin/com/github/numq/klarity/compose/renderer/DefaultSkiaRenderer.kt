@@ -80,13 +80,15 @@ internal class DefaultSkiaRenderer(
         }.onFailure {
             _generationId.value = DRAWS_NOTHING_ID
         }.onSuccess {
-            _generationId.value = surface.generationId
+            if (!surface.isClosed) {
+                _generationId.value = surface.generationId
+            }
         }
     }
 
     override suspend fun render(frame: Frame.Content.Video) = renderMutex.withLock {
         runCatching {
-            if (isClosed.get() || frame.isClosed() || frame.remaining < minByteSize) {
+            if (!isRenderable(frame)) {
                 return@runCatching
             }
 
@@ -96,7 +98,9 @@ internal class DefaultSkiaRenderer(
 
             targetPixmap.reset(info = imageInfo, addr = frame.data.pointer, rowBytes = imageInfo.minRowBytes)
 
-            surface.writePixels(targetPixmap, 0, 0)
+            if (!targetPixmap.isClosed) {
+                surface.writePixels(targetPixmap, 0, 0)
+            }
 
             val renderTime = System.nanoTime().nanoseconds - startTime
 
@@ -104,13 +108,15 @@ internal class DefaultSkiaRenderer(
         }.onFailure {
             _generationId.value = DRAWS_NOTHING_ID
         }.onSuccess {
-            _generationId.value = surface.generationId
+            if (!surface.isClosed) {
+                _generationId.value = surface.generationId
+            }
         }
     }
 
     override suspend fun save(frame: Frame.Content.Video) = cacheMutex.withLock {
         runCatching {
-            if (isRenderable(frame)) {
+            if (!isRenderable(frame)) {
                 return@runCatching
             }
 
@@ -135,10 +141,8 @@ internal class DefaultSkiaRenderer(
             targetPixmap.reset()
 
             surface.canvas.clear(color)
-        }.onFailure {
+
             _generationId.value = DRAWS_NOTHING_ID
-        }.onSuccess {
-            _generationId.value = surface.generationId
         }
     }
 
