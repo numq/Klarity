@@ -1,10 +1,7 @@
 name: Build PortAudio and FFmpeg
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 env:
   PORTAUDIO_VERSION: 19.7.0
