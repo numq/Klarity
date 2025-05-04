@@ -39,9 +39,12 @@ internal class DefaultSkiaRenderer(
     private val targetPixmap = Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes)
 
     private fun isRenderable(cachedFrame: CachedFrame) =
-        !isClosed.get() && !cachedFrame.pixmap.isClosed
+        !isClosed.get() && !surface.isClosed && !cachedFrame.pixmap.isClosed
 
     private fun isRenderable(frame: Frame.Content.Video) =
+        !isClosed.get() && !surface.isClosed && !targetPixmap.isClosed && !frame.isClosed() && frame.remaining >= minByteSize
+
+    private fun isSaveable(frame: Frame.Content.Video) =
         !isClosed.get() && !frame.isClosed() && frame.remaining >= minByteSize
 
     private val _generationId = MutableStateFlow(DRAWS_NOTHING_ID)
@@ -94,9 +97,7 @@ internal class DefaultSkiaRenderer(
 
             targetPixmap.reset(info = imageInfo, addr = frame.data.pointer, rowBytes = imageInfo.minRowBytes)
 
-            if (!targetPixmap.isClosed) {
-                surface.writePixels(targetPixmap, 0, 0)
-            }
+            surface.writePixels(targetPixmap, 0, 0)
 
             val renderTime = System.nanoTime().nanoseconds - startTime
 
@@ -112,7 +113,7 @@ internal class DefaultSkiaRenderer(
 
     override suspend fun save(frame: Frame.Content.Video) = cacheMutex.withLock {
         runCatching {
-            if (!isRenderable(frame)) {
+            if (!isSaveable(frame)) {
                 return@runCatching
             }
 
