@@ -11,7 +11,7 @@ import kotlin.time.Duration
  * Provides frame capture functionality for video media at specified timestamps.
  */
 object SnapshotManager {
-    private const val POOL_CAPACITY = 2
+    private const val POOL_CAPACITY = 1
 
     /**
      * Captures multiple video frames at specified timestamps.
@@ -48,7 +48,7 @@ object SnapshotManager {
                 try {
                     validTimestamps.forEach { timestamp ->
                         if (timestamp.isPositive()) {
-                            decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrDefault(Unit)
+                            decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
                         }
 
                         val data = pool.acquire().getOrThrow()
@@ -62,9 +62,9 @@ object SnapshotManager {
                         }
                     }
                 } finally {
-                    pool.close().getOrDefault(Unit)
+                    decoder.close().getOrThrow()
 
-                    decoder.close().getOrDefault(Unit)
+                    pool.close().getOrThrow()
                 }
             }
         }

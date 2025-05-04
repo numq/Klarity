@@ -6,22 +6,22 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_data_NativeData_00024N
         jint capacity
 ) {
     return handleException<jlong>(env, [&] {
-        auto pointer = malloc(capacity);
+        auto handle = malloc(capacity);
 
-        if (!pointer) {
+        if (!handle) {
             throw std::runtime_error("Could not allocate native data");
         }
 
-        return reinterpret_cast<jlong>(pointer);
+        return reinterpret_cast<jlong>(handle);
     }, -1);
 }
 
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_data_NativeData_00024Native_free(
         JNIEnv *env,
         jclass thisClass,
-        jlong pointer
+        jlong handle
 ) {
     return handleException(env, [&] {
-        free(reinterpret_cast<void *>(pointer));
+        free(reinterpret_cast<void *>(handle));
     });
 }

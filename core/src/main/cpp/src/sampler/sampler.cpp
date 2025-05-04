@@ -90,7 +90,7 @@ int Sampler::start() {
     return static_cast<int>(totalLatency * 1'000'000);
 }
 
-void Sampler::play(const uint8_t *buffer, uint64_t size) {
+void Sampler::write(const uint8_t *buffer, const uint64_t size) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream || Pa_IsStreamActive(stream.get()) <= 0) {
@@ -134,7 +134,7 @@ void Sampler::play(const uint8_t *buffer, uint64_t size) {
     samples.clear();
 }
 
-void Sampler::pause() {
+void Sampler::stop() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream) {
@@ -144,7 +144,7 @@ void Sampler::pause() {
     auto isStreamActive = Pa_IsStreamActive(stream.get());
 
     if (isStreamActive == 1) {
-        PaError err = Pa_AbortStream(stream.get());
+        PaError err = Pa_StopStream(stream.get());
 
         if (err != paNoError) {
             throw SamplerException("Failed to abort PortAudio stream: " + std::string(Pa_GetErrorText(err)));
@@ -154,11 +154,43 @@ void Sampler::pause() {
     }
 }
 
-void Sampler::stop() {
+void Sampler::flush() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream) {
         throw SamplerException("Unable to stop uninitialized sampler");
+    }
+
+    auto isStreamActive = Pa_IsStreamActive(stream.get());
+
+    if (isStreamActive == 1) {
+        PaError err = Pa_AbortStream(stream.get());
+
+        if (err != paNoError) {
+            throw SamplerException("Failed to stop PortAudio stream: " + std::string(Pa_GetErrorText(err)));
+        }
+    }
+
+    int outputSamples = stretch->outputLatency();
+
+    if (outputSamples > 0) {
+        std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
+
+        stretch->flush(outputBuffers, outputSamples);
+    }
+
+    stretch->reset();
+
+    samples.clear();
+
+    samples.shrink_to_fit();
+}
+
+void Sampler::drain() {
+    std::unique_lock<std::shared_mutex> lock(mutex);
+
+    if (!stretch || !stream) {
+        throw SamplerException("Unable to drain uninitialized sampler");
     }
 
     auto isStreamActive = Pa_IsStreamActive(stream.get());
@@ -177,6 +209,20 @@ void Sampler::stop() {
         std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));
 
         stretch->flush(outputBuffers, outputSamples);
+
+        if (samples.size() < outputSamples * channels) {
+            samples.resize(outputSamples * channels);
+        }
+
+        for (int sample = 0; sample < outputSamples; sample++) {
+            for (int channel = 0; channel < channels; channel++) {
+                samples[sample * channels + channel] = std::clamp(outputBuffers[channel][sample] * volume, -1.0f, 1.0f);
+            }
+        }
+
+        Pa_WriteStream(stream.get(), samples.data(), samples.size() / channels);
+
+        Pa_StopStream(stream.get());
     }
 
     stretch->reset();

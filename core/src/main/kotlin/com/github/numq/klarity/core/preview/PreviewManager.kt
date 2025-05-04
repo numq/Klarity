@@ -54,7 +54,7 @@ interface PreviewManager {
     suspend fun close(): Result<Unit>
 
     companion object {
-        private const val POOL_CAPACITY = 2
+        private const val POOL_CAPACITY = 1
 
         /**
          * Creates a new PreviewManager instance for the specified media file.

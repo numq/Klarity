@@ -13,11 +13,13 @@ interface Sampler {
 
     suspend fun start(): Result<Unit>
 
-    suspend fun play(frame: Frame.Content.Audio): Result<Unit>
-
-    suspend fun pause(): Result<Unit>
+    suspend fun write(frame: Frame.Content.Audio): Result<Unit>
 
     suspend fun stop(): Result<Unit>
+
+    suspend fun flush(): Result<Unit>
+
+    suspend fun drain(): Result<Unit>
 
     suspend fun close(): Result<Unit>
 

@@ -18,18 +18,14 @@ internal class DefaultSampler(
     override suspend fun getLatency() = mutex.withLock { Result.success(latency) }
 
     override suspend fun setPlaybackSpeed(factor: Float) = mutex.withLock {
-        runCatching {
-            sampler.setPlaybackSpeed(factor = factor).map {
-                playbackSpeedFactor = factor
-            }.getOrThrow()
+        sampler.setPlaybackSpeed(factor = factor).map {
+            playbackSpeedFactor = factor
         }
     }
 
     override suspend fun setVolume(value: Float) = mutex.withLock {
-        runCatching {
-            sampler.setVolume(value = value).map {
-                currentVolume = value
-            }.getOrThrow()
+        sampler.setVolume(value = value).map {
+            currentVolume = value
         }
     }
 
@@ -43,18 +39,20 @@ internal class DefaultSampler(
         }
     }
 
-    override suspend fun play(frame: Frame.Content.Audio) = mutex.withLock {
-        runCatching {
-            sampler.play(buffer = frame.data.pointer, size = frame.remaining).getOrThrow()
-        }
-    }
-
-    override suspend fun pause() = mutex.withLock {
-        sampler.pause()
+    override suspend fun write(frame: Frame.Content.Audio) = mutex.withLock {
+        sampler.write(buffer = frame.data.buffer, size = frame.size)
     }
 
     override suspend fun stop() = mutex.withLock {
         sampler.stop()
+    }
+
+    override suspend fun flush() = mutex.withLock {
+        sampler.flush()
+    }
+
+    override suspend fun drain() = mutex.withLock {
+        sampler.drain()
     }
 
     override suspend fun close() = mutex.withLock {

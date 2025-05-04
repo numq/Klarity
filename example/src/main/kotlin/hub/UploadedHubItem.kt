@@ -53,47 +53,33 @@ fun UploadedHubItem(
 
     var previewJob by remember { mutableStateOf<Job?>(null) }
 
+    var snapshotIndex by remember { mutableStateOf(0) }
+
     LaunchedEffect(state) {
-        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
+        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
 
         when (val currentState = state) {
             is PlayerState.Ready -> {
                 hubItem.renderer?.let { renderer ->
                     renderer.withCache { cache ->
-                        cache.firstOrNull()?.let { cachedFrame ->
-                            renderer.render(cachedFrame).getOrThrow()
-                        }
-
                         if (cache.size > 1) {
                             previewJob?.cancel()
 
                             previewJob = launch(Dispatchers.Default) {
-                                when (state) {
-                                    is PlayerState.Ready.Stopped -> {
-                                        hoverInteractionSource.interactions.collectLatest { interaction ->
-                                            when (interaction) {
-                                                is HoverInteraction.Enter -> {
-                                                    var snapshotIndex = 0
+                                hoverInteractionSource.interactions.collectLatest { interaction ->
+                                    when (interaction) {
+                                        is HoverInteraction.Enter -> {
+                                            while (isActive) {
+                                                snapshotIndex = (snapshotIndex + 1) % cache.size
 
-                                                    while (isActive) {
-                                                        cache.getOrNull(snapshotIndex)?.let { cachedFrame ->
-                                                            renderer.render(cachedFrame).getOrThrow()
-                                                        }
-
-                                                        snapshotIndex = (snapshotIndex + 1) % cache.size
-
-                                                        delay(500L)
-                                                    }
-                                                }
-
-                                                is HoverInteraction.Exit -> cache.firstOrNull()?.let { cachedFrame ->
-                                                    renderer.render(cachedFrame).getOrThrow()
-                                                }
+                                                delay(500L)
                                             }
                                         }
-                                    }
 
-                                    else -> return@launch
+                                        is HoverInteraction.Exit -> {
+                                            snapshotIndex = 0
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -103,7 +89,7 @@ fun UploadedHubItem(
                 when (currentState) {
                     is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
                         if (currentState is PlayerState.Ready.Completed) {
-                            hubItem.player.stop().getOrDefault(Unit)
+                            hubItem.player.stop().getOrThrow()
                         }
                     }
 
@@ -115,6 +101,16 @@ fun UploadedHubItem(
                 previewJob?.cancel()
 
                 previewJob = null
+            }
+        }
+    }
+
+    LaunchedEffect(snapshotIndex) {
+        hubItem.renderer?.let { renderer ->
+            renderer.withCache { cache ->
+                cache.getOrNull(snapshotIndex)?.let { cachedFrame ->
+                    renderer.render(cachedFrame).getOrThrow()
+                }
             }
         }
     }
@@ -136,15 +132,15 @@ fun UploadedHubItem(
                             coroutineScope.launch {
                                 with(hubItem.player) {
                                     when (state) {
-                                        is PlayerState.Empty -> play().getOrDefault(Unit)
+                                        is PlayerState.Empty -> play().getOrThrow()
 
-                                        is PlayerState.Ready.Playing -> stop().getOrDefault(Unit)
+                                        is PlayerState.Ready.Playing -> stop().getOrThrow()
 
-                                        is PlayerState.Ready.Stopped -> play().getOrDefault(Unit)
+                                        is PlayerState.Ready.Stopped -> play().getOrThrow()
 
                                         is PlayerState.Ready.Completed -> {
-                                            stop().getOrDefault(Unit)
-                                            play().getOrDefault(Unit)
+                                            stop().getOrThrow()
+                                            play().getOrThrow()
                                         }
 
                                         else -> Unit
@@ -154,7 +150,7 @@ fun UploadedHubItem(
                         },
                         onPress = {
                             awaitRelease()
-                            hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrDefault(Unit)
+                            hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
                         },
                         onLongPress = { (x, y) ->
                             if (state is PlayerState.Ready.Playing) {
@@ -163,7 +159,7 @@ fun UploadedHubItem(
                                 coroutineScope.launch {
                                     hubItem.player.changeSettings(
                                         settings = settings.copy(playbackSpeedFactor = playbackSpeedFactor)
-                                    ).getOrDefault(Unit)
+                                    ).getOrThrow()
                                 }
                             } else {
                                 delete()

@@ -3,7 +3,7 @@ package com.github.numq.klarity.core.data
 import java.io.Closeable
 
 data class Data(
-    val pointer: Long,
+    val buffer: Long,
     val capacity: Int,
     val isClosed: () -> Boolean,
     val close: () -> Unit
@@ -11,7 +11,7 @@ data class Data(
     companion object {
         fun allocate(capacity: Int) = with(NativeData.allocate(capacity)) {
             Data(
-                pointer = pointer,
+                buffer = getBuffer(),
                 capacity = capacity,
                 isClosed = ::isClosed,
                 close = ::close

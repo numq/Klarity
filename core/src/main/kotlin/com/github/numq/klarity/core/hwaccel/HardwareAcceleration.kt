@@ -52,6 +52,6 @@ sealed class HardwareAcceleration private constructor(internal val native: Nativ
                     values.find { it.native == native }
                 }
             }.filterNotNull()
-        }.getOrDefault(emptyList())
+        }
     }
 }

@@ -17,7 +17,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_data_NativeData_00024N
 JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_data_NativeData_00024Native_free(
         JNIEnv *env,
         jclass thisClass,
-        jlong pointer
+        jlong handle
 );
 
 #ifdef __cplusplus

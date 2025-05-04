@@ -7,7 +7,7 @@ sealed interface Frame {
     sealed interface Content : Frame {
         val data: Data
 
-        val remaining: Int
+        val size: Int
 
         val timestamp: Duration
 
@@ -15,14 +15,14 @@ sealed interface Frame {
 
         data class Audio(
             override val data: Data,
-            override val remaining: Int,
+            override val size: Int,
             override val timestamp: Duration,
             override val isClosed: () -> Boolean
         ) : Content
 
         data class Video(
             override val data: Data,
-            override val remaining: Int,
+            override val size: Int,
             override val timestamp: Duration,
             override val isClosed: () -> Boolean,
             val width: Int,

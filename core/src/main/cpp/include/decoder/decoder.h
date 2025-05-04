@@ -63,6 +63,8 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
+    std::map<int64_t, int64_t> keyframeCache;
+
 public:
     static AVPixelFormat _getHardwareAccelerationFormat(
             AVCodecContext *codecContext,

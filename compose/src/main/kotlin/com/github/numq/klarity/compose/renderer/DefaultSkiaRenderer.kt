@@ -42,10 +42,10 @@ internal class DefaultSkiaRenderer(
         !isClosed.get() && !surface.isClosed && !cachedFrame.pixmap.isClosed
 
     private fun isRenderable(frame: Frame.Content.Video) =
-        !isClosed.get() && !surface.isClosed && !targetPixmap.isClosed && !frame.isClosed() && frame.remaining >= minByteSize
+        !isClosed.get() && !surface.isClosed && !targetPixmap.isClosed && !frame.isClosed() && frame.size >= minByteSize
 
     private fun isSaveable(frame: Frame.Content.Video) =
-        !isClosed.get() && !frame.isClosed() && frame.remaining >= minByteSize
+        !isClosed.get() && !frame.isClosed() && frame.size >= minByteSize
 
     private val _generationId = MutableStateFlow(DRAWS_NOTHING_ID)
 
@@ -66,7 +66,7 @@ internal class DefaultSkiaRenderer(
             return
         }
 
-        callback(cache)
+        callback(cache.toList())
     }
 
     override suspend fun render(cachedFrame: CachedFrame) = renderMutex.withLock {
@@ -95,7 +95,7 @@ internal class DefaultSkiaRenderer(
 
             val startTime = System.nanoTime().nanoseconds
 
-            targetPixmap.reset(info = imageInfo, addr = frame.data.pointer, rowBytes = imageInfo.minRowBytes)
+            targetPixmap.reset(info = imageInfo, addr = frame.data.buffer, rowBytes = imageInfo.minRowBytes)
 
             surface.writePixels(targetPixmap, 0, 0)
 
@@ -118,7 +118,7 @@ internal class DefaultSkiaRenderer(
             }
 
             val cachedPixmap = Pixmap.make(
-                info = imageInfo, addr = frame.data.pointer, rowBytes = imageInfo.minRowBytes
+                info = imageInfo, addr = frame.data.buffer, rowBytes = imageInfo.minRowBytes
             ).use { pixmap ->
                 Pixmap.make(
                     info = imageInfo, buffer = Data.makeFromBytes(pixmap.buffer.bytes), rowBytes = imageInfo.minRowBytes
@@ -144,8 +144,12 @@ internal class DefaultSkiaRenderer(
     }
 
     override suspend fun close() = cacheMutex.withLock {
-        runCatching {
-            if (isClosed.compareAndSet(false, true)) {
+        renderMutex.withLock {
+            runCatching {
+                if (!isClosed.compareAndSet(false, true)) {
+                    return@runCatching
+                }
+
                 if (!surface.isClosed) {
                     surface.close()
                 }
@@ -154,21 +158,15 @@ internal class DefaultSkiaRenderer(
                     targetPixmap.close()
                 }
 
-                val iterator = cache.iterator()
-
-                while (iterator.hasNext()) {
-                    val cachedFrame = iterator.next()
-
+                cache.forEach { cachedFrame ->
                     if (!cachedFrame.pixmap.isClosed) {
                         cachedFrame.pixmap.close()
                     }
-
-                    iterator.remove()
                 }
 
-                _generationId.value = DRAWS_NOTHING_ID
+                cache.clear()
 
-                isClosed.set(true)
+                _generationId.value = DRAWS_NOTHING_ID
             }
         }
     }

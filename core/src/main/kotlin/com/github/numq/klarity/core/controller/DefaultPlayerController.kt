@@ -73,11 +73,11 @@ internal class DefaultPlayerController(
     override val settings = MutableStateFlow(initialSettings ?: defaultSettings)
 
     private suspend fun Sampler.applySettings(settings: PlayerSettings) {
-        setVolume(value = settings.volume).getOrDefault(Unit)
+        setVolume(value = settings.volume).getOrThrow()
 
-        setMuted(state = settings.isMuted).getOrDefault(Unit)
+        setMuted(state = settings.isMuted).getOrThrow()
 
-        setPlaybackSpeed(factor = settings.playbackSpeedFactor).getOrDefault(Unit)
+        setPlaybackSpeed(factor = settings.playbackSpeedFactor).getOrThrow()
     }
 
     private suspend fun applySettings(pipeline: Pipeline, settings: PlayerSettings) = runCatching {
@@ -251,7 +251,7 @@ internal class DefaultPlayerController(
                     val decoder = audioDecoderFactory.create(
                         parameters = AudioDecoderFactory.Parameters(location = location)
                     ).onFailure {
-                        pool.close().getOrDefault(Unit)
+                        pool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -259,9 +259,9 @@ internal class DefaultPlayerController(
                     val buffer = bufferFactory.create(
                         parameters = BufferFactory.Parameters(capacity = audioBufferSize)
                     ).onFailure {
-                        decoder.close().getOrDefault(Unit)
+                        decoder.close().getOrThrow()
 
-                        pool.close().getOrDefault(Unit)
+                        pool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -272,11 +272,11 @@ internal class DefaultPlayerController(
                             channels = format.channels
                         )
                     ).onFailure {
-                        buffer.close().getOrDefault(Unit)
+                        buffer.close().getOrThrow()
 
-                        decoder.close().getOrDefault(Unit)
+                        decoder.close().getOrThrow()
 
-                        pool.close().getOrDefault(Unit)
+                        pool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -304,7 +304,7 @@ internal class DefaultPlayerController(
                             hardwareAccelerationCandidates = hardwareAccelerationCandidates
                         )
                     ).onFailure {
-                        pool.close().getOrDefault(Unit)
+                        pool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -312,9 +312,9 @@ internal class DefaultPlayerController(
                     val buffer = bufferFactory.create(
                         parameters = BufferFactory.Parameters(capacity = videoBufferSize)
                     ).onFailure {
-                        decoder.close().getOrDefault(Unit)
+                        decoder.close().getOrThrow()
 
-                        pool.close().getOrDefault(Unit)
+                        pool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -341,7 +341,7 @@ internal class DefaultPlayerController(
                             bufferCapacity = media.videoFormat.bufferCapacity
                         )
                     ).onFailure {
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -350,9 +350,9 @@ internal class DefaultPlayerController(
                     val audioDecoder = audioDecoderFactory.create(
                         parameters = AudioDecoderFactory.Parameters(location = location)
                     ).onFailure {
-                        videoPool.close().getOrDefault(Unit)
+                        videoPool.close().getOrThrow()
 
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -363,11 +363,11 @@ internal class DefaultPlayerController(
                             hardwareAccelerationCandidates = hardwareAccelerationCandidates
                         )
                     ).onFailure {
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
-                        videoPool.close().getOrDefault(Unit)
+                        videoPool.close().getOrThrow()
 
-                        audioDecoder.close().getOrDefault(Unit)
+                        audioDecoder.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -375,13 +375,13 @@ internal class DefaultPlayerController(
                     val audioBuffer = bufferFactory.create(
                         parameters = BufferFactory.Parameters(capacity = audioBufferSize)
                     ).onFailure {
-                        videoDecoder.close().getOrDefault(Unit)
+                        videoDecoder.close().getOrThrow()
 
-                        audioDecoder.close().getOrDefault(Unit)
+                        audioDecoder.close().getOrThrow()
 
-                        videoPool.close().getOrDefault(Unit)
+                        videoPool.close().getOrThrow()
 
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -389,15 +389,15 @@ internal class DefaultPlayerController(
                     val videoBuffer = bufferFactory.create(
                         parameters = BufferFactory.Parameters(capacity = videoBufferSize)
                     ).onFailure {
-                        audioBuffer.clear().getOrDefault(Unit)
+                        audioBuffer.clear().getOrThrow()
 
-                        videoDecoder.close().getOrDefault(Unit)
+                        videoDecoder.close().getOrThrow()
 
-                        audioDecoder.close().getOrDefault(Unit)
+                        audioDecoder.close().getOrThrow()
 
-                        videoPool.close().getOrDefault(Unit)
+                        videoPool.close().getOrThrow()
 
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -407,17 +407,17 @@ internal class DefaultPlayerController(
                             sampleRate = audioFormat.sampleRate, channels = audioFormat.channels
                         )
                     ).onFailure {
-                        videoBuffer.clear().getOrDefault(Unit)
+                        videoBuffer.clear().getOrThrow()
 
-                        audioBuffer.clear().getOrDefault(Unit)
+                        audioBuffer.clear().getOrThrow()
 
-                        videoDecoder.close().getOrDefault(Unit)
+                        videoDecoder.close().getOrThrow()
 
-                        audioDecoder.close().getOrDefault(Unit)
+                        audioDecoder.close().getOrThrow()
 
-                        videoPool.close().getOrDefault(Unit)
+                        videoPool.close().getOrThrow()
 
-                        audioPool.close().getOrDefault(Unit)
+                        audioPool.close().getOrThrow()
 
                         throw it
                     }.getOrThrow()
@@ -443,7 +443,7 @@ internal class DefaultPlayerController(
             val bufferLoop = bufferLoopFactory.create(
                 parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
             ).onFailure {
-                pipeline.close().getOrDefault(Unit)
+                pipeline.close().getOrThrow()
 
                 throw it
             }.getOrThrow()
@@ -454,9 +454,9 @@ internal class DefaultPlayerController(
                     getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
                     getRenderer = { renderer })
             ).onFailure {
-                bufferLoop.close().getOrDefault(Unit)
+                bufferLoop.close().getOrThrow()
 
-                pipeline.close().getOrDefault(Unit)
+                pipeline.close().getOrThrow()
 
                 throw it
             }.getOrThrow()
@@ -505,11 +505,11 @@ internal class DefaultPlayerController(
         playbackLoop.stop().getOrThrow()
 
         when (val pipeline = pipeline) {
-            is Pipeline.Audio -> pipeline.sampler.pause().getOrThrow()
+            is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
 
             is Pipeline.Video -> Unit
 
-            is Pipeline.AudioVideo -> pipeline.sampler.pause().getOrThrow()
+            is Pipeline.AudioVideo -> pipeline.sampler.stop().getOrThrow()
 
         }
 
@@ -541,26 +541,43 @@ internal class DefaultPlayerController(
 
         when (val pipeline = pipeline) {
             is Pipeline.Audio -> with(pipeline) {
-                sampler.stop().getOrThrow()
+                sampler.flush().getOrThrow()
+
                 buffer.clear().getOrThrow()
+
                 pool.reset().getOrThrow()
+
                 decoder.reset().getOrThrow()
             }
 
             is Pipeline.Video -> with(pipeline) {
                 buffer.clear().getOrThrow()
+
                 pool.reset().getOrThrow()
+
                 decoder.reset().getOrThrow()
             }
 
             is Pipeline.AudioVideo -> with(pipeline) {
-                sampler.stop().getOrThrow()
-                audioBuffer.clear().getOrThrow()
-                videoBuffer.clear().getOrThrow()
-                audioPool.reset().getOrThrow()
-                videoPool.reset().getOrThrow()
-                audioDecoder.reset().getOrThrow()
-                videoDecoder.reset().getOrThrow()
+                val audioJob = controllerScope.launch {
+                    sampler.flush().getOrThrow()
+
+                    audioBuffer.clear().getOrThrow()
+
+                    audioPool.reset().getOrThrow()
+
+                    audioDecoder.reset().getOrThrow()
+                }
+
+                val videoJob = controllerScope.launch {
+                    videoBuffer.clear().getOrThrow()
+
+                    videoPool.reset().getOrThrow()
+
+                    videoDecoder.reset().getOrThrow()
+                }
+
+                joinAll(audioJob, videoJob)
             }
         }
 
@@ -580,7 +597,7 @@ internal class DefaultPlayerController(
 
         when (val pipeline = pipeline) {
             is Pipeline.Audio -> with(pipeline) {
-                sampler.stop().getOrThrow()
+                sampler.flush().getOrThrow()
 
                 buffer.clear().getOrThrow()
 
@@ -594,7 +611,7 @@ internal class DefaultPlayerController(
             }
 
             is Pipeline.AudioVideo -> with(pipeline) {
-                sampler.stop().getOrThrow()
+                sampler.flush().getOrThrow()
 
                 audioBuffer.clear().getOrThrow()
 
@@ -624,15 +641,15 @@ internal class DefaultPlayerController(
             }
 
             is Pipeline.AudioVideo -> with(pipeline) {
-                val seekAudioJob = controllerScope.launch {
+                val seekAudioJob = controllerScope.async {
                     audioDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
                 }
 
-                val seekVideoJob = controllerScope.launch {
+                val seekVideoJob = controllerScope.async {
                     videoDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
                 }
 
-                joinAll(seekAudioJob, seekVideoJob)
+                timestampAfterSeek = maxOf(seekAudioJob.await(), seekVideoJob.await())
             }
         }
 
@@ -774,9 +791,11 @@ internal class DefaultPlayerController(
                     -> Unit
 
                 is InternalPlayerState.Ready -> with(currentState) {
-                    playbackLoop.close().getOrDefault(Unit)
-                    bufferLoop.close().getOrDefault(Unit)
-                    pipeline.close().getOrDefault(Unit)
+                    playbackLoop.close().getOrThrow()
+
+                    bufferLoop.close().getOrThrow()
+
+                    pipeline.close().getOrThrow()
                 }
             }
         }

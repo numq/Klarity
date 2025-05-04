@@ -647,15 +647,36 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
-        return 0;
-    }
-
     if (timestampMicros < 0 || timestampMicros > format.durationMicros) {
         throw DecoderException("Timestamp out of bounds");
     }
 
-    int streamIndex = 0;
+    if (format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
+        return 0;
+    }
+
+    int streamIndex = (audioStream ? audioStream : videoStream)->index;
+
+    if (keyframesOnly && !keyframeCache.empty()) {
+        auto it = keyframeCache.lower_bound(timestampMicros);
+
+        if (it != keyframeCache.begin() &&
+            (it == keyframeCache.end() || timestampMicros - std::prev(it)->first < it->first - timestampMicros)) {
+            --it;
+        }
+
+        const auto cachedTimestamp = it->second;
+
+        const auto cachedTarget = av_rescale_q(
+                cachedTimestamp,
+                {1, AV_TIME_BASE},
+                formatContext->streams[streamIndex]->time_base
+        );
+
+        if (av_seek_frame(formatContext.get(), streamIndex, cachedTarget, AVSEEK_FLAG_BACKWARD) >= 0) {
+            return cachedTimestamp;
+        }
+    }
 
     const auto targetTimestamp = av_rescale_q(
             timestampMicros,
@@ -669,8 +690,108 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         seekFlags |= AVSEEK_FLAG_ANY;
     }
 
-    if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
-        throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+    if (keyframesOnly) {
+        if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
+            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
+        }
+
+        keyframeCache[timestampMicros] = targetTimestamp;
+
+        return timestampMicros;
+    }
+
+    int64_t low = 0;
+
+    int64_t high = format.durationMicros;
+
+    int64_t best_match = timestampMicros;
+
+    const int MAX_SEEK_ATTEMPTS = 5;
+
+    int attempts = 0;
+
+    while (low <= high && attempts++ < MAX_SEEK_ATTEMPTS) {
+        int64_t mid = low + (high - low) / 2;
+
+        const auto midTimestamp = av_rescale_q(
+                mid,
+                {1, AV_TIME_BASE},
+                formatContext->streams[streamIndex]->time_base
+        );
+
+        if (av_seek_frame(formatContext.get(), streamIndex, midTimestamp, seekFlags) < 0) {
+            high = mid - 1;
+
+            continue;
+        }
+
+        long actualTimestamp;
+
+        auto frame = av_frame_alloc();
+
+        const int MAX_FRAMES_TO_READ = 10;
+
+        int framesRead = 0;
+
+        try {
+            while (framesRead++ < MAX_FRAMES_TO_READ && av_read_frame(formatContext.get(), packet.get()) == 0) {
+                if (packet->stream_index == streamIndex) {
+                    auto codecContext = _hasVideo() ? videoCodecContext.get() : audioCodecContext.get();
+
+                    if (avcodec_send_packet(codecContext, packet.get()) < 0) {
+                        av_packet_unref(packet.get());
+
+                        continue;
+                    }
+
+                    av_packet_unref(packet.get());
+
+                    int ret = avcodec_receive_frame(codecContext, frame);
+                    if (ret >= 0) {
+                        int64_t frameTimestamp =
+                                frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp
+                                                                               : frame->pts;
+
+                        if (frameTimestamp != AV_NOPTS_VALUE) {
+                            actualTimestamp = av_rescale_q(
+                                    frameTimestamp,
+                                    formatContext->streams[streamIndex]->time_base,
+                                    {1, AV_TIME_BASE}
+                            );
+
+                            if (abs(actualTimestamp - timestampMicros) < abs(best_match - timestampMicros)) {
+                                best_match = actualTimestamp;
+                            }
+
+                            if (actualTimestamp < timestampMicros) {
+                                low = mid + 1;
+                            } else {
+                                high = mid - 1;
+                            }
+
+                            break;
+                        }
+                    }
+                } else {
+                    av_packet_unref(packet.get());
+                }
+            }
+
+            av_frame_free(&frame);
+        } catch (...) {
+            av_frame_free(&frame);
+            throw;
+        }
+    }
+
+    const auto bestTimestamp = av_rescale_q(
+            best_match,
+            {1, AV_TIME_BASE},
+            formatContext->streams[streamIndex]->time_base
+    );
+
+    if (av_seek_frame(formatContext.get(), streamIndex, bestTimestamp, seekFlags) < 0) {
+        throw DecoderException("Error seeking to best match timestamp");
     }
 
     if (packet) {
@@ -695,64 +816,9 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     if (videoCodecContext) {
         avcodec_flush_buffers(videoCodecContext.get());
-
-        long actualTimestamp = -1;
-
-        auto frame = av_frame_alloc();
-
-        if (!frame) {
-            throw DecoderException("Failed to allocate seeking frame");
-        }
-
-        try {
-            while (av_read_frame(formatContext.get(), packet.get()) == 0) {
-                if (packet->stream_index == streamIndex) {
-                    auto codecContext = videoCodecContext.get();
-
-                    if (avcodec_send_packet(codecContext, packet.get()) < 0) {
-                        av_packet_unref(packet.get());
-
-                        continue;
-                    }
-
-                    av_packet_unref(packet.get());
-
-                    int ret = avcodec_receive_frame(codecContext, frame);
-
-                    if (ret >= 0) {
-                        int64_t frameTimestamp =
-                                frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp
-                                                                               : frame->pts;
-
-                        if (frameTimestamp != AV_NOPTS_VALUE) {
-                            actualTimestamp = av_rescale_q(
-                                    frameTimestamp,
-                                    formatContext->streams[streamIndex]->time_base,
-                                    {1, AV_TIME_BASE}
-                            );
-
-                            break;
-                        }
-                    }
-                } else {
-                    av_packet_unref(packet.get());
-                }
-            }
-
-            av_frame_free(&frame);
-
-            if (actualTimestamp < 0) {
-                return timestampMicros;
-            }
-
-            return actualTimestamp;
-        } catch (...) {
-            av_frame_free(&frame);
-            throw;
-        }
     }
 
-    return timestampMicros;
+    return best_match;
 }
 
 void Decoder::reset() {
@@ -762,8 +828,12 @@ void Decoder::reset() {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (!_hasAudio() && !_hasVideo()) {
+    if (format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
         return;
+    }
+
+    if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_ANY) < 0) {
+        throw DecoderException("Error resetting stream");
     }
 
     if (packet) {
@@ -782,15 +852,11 @@ void Decoder::reset() {
         av_frame_unref(hwVideoFrame.get());
     }
 
-    if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_ANY) < 0) {
-        throw DecoderException("Error resetting stream");
-    }
-
-    if (_hasAudio()) {
+    if (audioCodecContext) {
         avcodec_flush_buffers(audioCodecContext.get());
     }
 
-    if (_hasVideo()) {
+    if (videoCodecContext) {
         avcodec_flush_buffers(videoCodecContext.get());
     }
 }

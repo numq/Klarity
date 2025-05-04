@@ -16,7 +16,7 @@ internal class AudioDecoder(
     private val mutex = Mutex()
 
     override suspend fun decode(data: Data) = mutex.withLock {
-        nativeDecoder.decodeAudio(buffer = data.pointer, capacity = data.capacity).mapCatching { nativeFrame ->
+        nativeDecoder.decodeAudio(buffer = data.buffer, capacity = data.capacity).mapCatching { nativeFrame ->
             when (nativeFrame) {
                 null -> Frame.EndOfStream
 
@@ -25,7 +25,7 @@ internal class AudioDecoder(
 
                     NativeFrame.Type.AUDIO -> Frame.Content.Audio(
                         data = data,
-                        remaining = nativeFrame.remaining,
+                        size = nativeFrame.remaining,
                         timestamp = nativeFrame.timestampMicros.microseconds,
                         isClosed = data::isClosed
                     )

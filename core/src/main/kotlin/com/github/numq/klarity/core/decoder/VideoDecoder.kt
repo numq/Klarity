@@ -17,7 +17,7 @@ internal class VideoDecoder(
 
     override suspend fun decode(data: Data) = mutex.withLock {
         nativeDecoder.format.mapCatching { format ->
-            nativeDecoder.decodeVideo(buffer = data.pointer, capacity = data.capacity).mapCatching { nativeFrame ->
+            nativeDecoder.decodeVideo(buffer = data.buffer, capacity = data.capacity).mapCatching { nativeFrame ->
                 when (nativeFrame) {
                     null -> Frame.EndOfStream
 
@@ -28,7 +28,7 @@ internal class VideoDecoder(
 
                         NativeFrame.Type.VIDEO -> Frame.Content.Video(
                             data = data,
-                            remaining = nativeFrame.remaining,
+                            size = nativeFrame.remaining,
                             timestamp = nativeFrame.timestampMicros.microseconds,
                             isClosed = data::isClosed,
                             width = format.width,

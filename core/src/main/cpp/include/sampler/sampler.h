@@ -45,11 +45,13 @@ public:
 
     int start();
 
-    void play(const uint8_t *buffer, uint64_t size);
-
-    void pause();
+    void write(const uint8_t *buffer, uint64_t size);
 
     void stop();
+
+    void flush();
+
+    void drain();
 };
 
 #endif //KLARITY_SAMPLER_H

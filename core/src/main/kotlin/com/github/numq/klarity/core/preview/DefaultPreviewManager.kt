@@ -45,7 +45,7 @@ internal class DefaultPreviewManager(
                 decoder.seekTo(
                     timestamp = timestamp.coerceIn(Duration.ZERO..decoder.media.duration),
                     keyframesOnly = keyframesOnly
-                ).getOrDefault(Unit)
+                ).getOrThrow()
             }
 
             val data = pool.acquire().getOrThrow()
@@ -67,8 +67,8 @@ internal class DefaultPreviewManager(
     override suspend fun close() = runCatching {
         coroutineScope.cancel()
 
-        pool.close().getOrDefault(Unit)
+        decoder.close().getOrThrow()
 
-        decoder.close().getOrDefault(Unit)
+        pool.close().getOrThrow()
     }
 }

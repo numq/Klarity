@@ -19,94 +19,85 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         external fun start(handle: Long): Long
 
         @JvmStatic
-        external fun play(handle: Long, buffer: Long, size: Int)
-
-        @JvmStatic
-        external fun pause(handle: Long)
+        external fun write(handle: Long, buffer: Long, size: Int)
 
         @JvmStatic
         external fun stop(handle: Long)
 
         @JvmStatic
+        external fun flush(handle: Long)
+
+        @JvmStatic
+        external fun drain(handle: Long)
+
+        @JvmStatic
         external fun delete(handle: Long)
     }
 
-    private val lock = Any()
-
     private val nativeHandle = AtomicLong(-1L)
+
+    private val cleanable = NativeCleaner.cleaner.register(this) {
+        val handle = nativeHandle.get()
+
+        if (handle != -1L && nativeHandle.compareAndSet(handle, -1L)) {
+            Native.delete(handle = handle)
+        }
+    }
 
     private fun ensureOpen() {
         check(nativeHandle.get() != -1L) { "Native sampler is closed" }
     }
 
     init {
-        synchronized(lock) {
-            require(sampleRate > 0) { "Invalid sample rate" }
+        require(sampleRate > 0) { "Invalid sample rate" }
 
-            require(channels > 0) { "Invalid channels" }
+        require(channels > 0) { "Invalid channels" }
 
-            nativeHandle.set(Native.create(sampleRate = sampleRate, channels = channels))
+        nativeHandle.set(Native.create(sampleRate = sampleRate, channels = channels))
 
-            require(nativeHandle.get() != -1L) { "Could not instantiate native sampler" }
-        }
+        require(nativeHandle.get() != -1L) { "Could not instantiate native sampler" }
     }
 
-    private val cleanable = NativeCleaner.cleaner.register(this) {
-        synchronized(lock) {
-            ensureOpen()
+    fun setPlaybackSpeed(factor: Float) = runCatching {
+        ensureOpen()
 
-            Native.delete(handle = nativeHandle.get())
-
-            nativeHandle.set(-1L)
-        }
+        Native.setPlaybackSpeed(handle = nativeHandle.get(), factor = factor)
     }
 
-    fun setPlaybackSpeed(factor: Float) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun setVolume(value: Float) = runCatching {
+        ensureOpen()
 
-            Native.setPlaybackSpeed(handle = nativeHandle.get(), factor = factor)
-        }
+        Native.setVolume(handle = nativeHandle.get(), value = value)
     }
 
-    fun setVolume(value: Float) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun start() = runCatching {
+        ensureOpen()
 
-            Native.setVolume(handle = nativeHandle.get(), value = value)
-        }
+        Native.start(handle = nativeHandle.get())
     }
 
-    fun start() = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun write(buffer: Long, size: Int) = runCatching {
+        ensureOpen()
 
-            Native.start(handle = nativeHandle.get())
-        }
+        Native.write(handle = nativeHandle.get(), buffer = buffer, size = size)
     }
 
-    fun play(buffer: Long, size: Int) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun stop() = runCatching {
+        ensureOpen()
 
-            Native.play(handle = nativeHandle.get(), buffer = buffer, size = size)
-        }
+        Native.stop(handle = nativeHandle.get())
     }
 
-    fun pause() = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun flush() = runCatching {
+        ensureOpen()
 
-            Native.pause(handle = nativeHandle.get())
-        }
+        Native.flush(handle = nativeHandle.get())
     }
 
-    fun stop() = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun drain() = runCatching {
+        ensureOpen()
 
-            Native.stop(handle = nativeHandle.get())
-        }
+        Native.drain(handle = nativeHandle.get())
     }
 
     override fun close() = cleanable.clean()

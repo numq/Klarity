@@ -29,7 +29,6 @@ internal class DefaultPlaybackLoop(
     private val videoClock = AtomicReference(Duration.INFINITE)
 
     private suspend fun handleAudioPlayback(
-        mediaDuration: Duration,
         pool: Pool<Data>,
         buffer: Buffer<Frame>,
         sampler: Sampler,
@@ -49,17 +48,13 @@ internal class DefaultPlaybackLoop(
 
                         audioClock.set(frameTime)
 
-                        sampler.play(frame).getOrThrow()
+                        sampler.write(frame).getOrThrow()
                     }
 
                     is Frame.EndOfStream -> {
                         currentCoroutineContext().ensureActive()
 
-                        val audioClockTime = audioClock.get()
-
-                        if (audioClockTime.isFinite()) {
-                            delay((mediaDuration - audioClockTime) / getPlaybackSpeedFactor())
-                        }
+                        sampler.drain().getOrThrow()
 
                         audioClock.set(Duration.INFINITE)
 
@@ -82,6 +77,8 @@ internal class DefaultPlaybackLoop(
         buffer: Buffer<Frame>,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
+        var isFirstFrame = true
+
         while (currentCoroutineContext().isActive) {
             val frame = buffer.take().getOrThrow()
 
@@ -95,6 +92,8 @@ internal class DefaultPlaybackLoop(
                         val videoClockTime = videoClock.get()
 
                         val masterClockTime = when {
+                            isFirstFrame -> Duration.INFINITE.also { isFirstFrame = false }
+
                             audioClockTime.isFinite() -> audioClockTime
 
                             videoClockTime.isFinite() -> videoClockTime
@@ -173,7 +172,6 @@ internal class DefaultPlaybackLoop(
                     with(pipeline) {
                         when (this) {
                             is Pipeline.Audio -> handleAudioPlayback(
-                                mediaDuration = media.duration,
                                 pool = pool,
                                 buffer = buffer,
                                 sampler = sampler,
@@ -192,7 +190,6 @@ internal class DefaultPlaybackLoop(
 
                                 val audioJob = launch {
                                     handleAudioPlayback(
-                                        mediaDuration = media.duration,
                                         pool = audioPool,
                                         buffer = audioBuffer,
                                         sampler = sampler,

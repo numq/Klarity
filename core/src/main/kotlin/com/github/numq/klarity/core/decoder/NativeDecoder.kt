@@ -51,83 +51,71 @@ internal class NativeDecoder(
         fun getAvailableHardwareAcceleration() = Native.getAvailableHardwareAcceleration() ?: intArrayOf()
     }
 
-    private val lock = Any()
-
     private val nativeHandle = AtomicLong(-1L)
 
+    private val cleanable = NativeCleaner.cleaner.register(this) {
+        val handle = nativeHandle.get()
+
+        if (handle != -1L && nativeHandle.compareAndSet(handle, -1L)) {
+            Native.delete(handle = handle)
+        }
+    }
+
     private fun ensureOpen() {
-        check(nativeHandle.get() != -1L) { "Native sampler is closed" }
+        check(nativeHandle.get() != -1L) { "Native decoder is closed" }
     }
 
     init {
-        synchronized(lock) {
-            nativeHandle.set(
-                Native.create(
-                    location = location,
-                    findAudioStream = findAudioStream,
-                    findVideoStream = findVideoStream,
-                    decodeAudioStream = decodeAudioStream,
-                    decodeVideoStream = decodeVideoStream,
-                    hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
-                )
+        nativeHandle.set(
+            Native.create(
+                location = location,
+                findAudioStream = findAudioStream,
+                findVideoStream = findVideoStream,
+                decodeAudioStream = decodeAudioStream,
+                decodeVideoStream = decodeVideoStream,
+                hardwareAccelerationCandidates = hardwareAccelerationCandidates ?: intArrayOf()
             )
+        )
 
-            require(nativeHandle.get() != -1L) { "Could not instantiate native decoder" }
-        }
+        require(nativeHandle.get() != -1L) { "Could not instantiate native decoder" }
     }
 
-    private val cleanable = NativeCleaner.cleaner.register(this) {
-        synchronized(lock) {
-            ensureOpen()
+    val format = runCatching {
+        ensureOpen()
 
-            Native.delete(handle = nativeHandle.get())
-
-            nativeHandle.set(-1L)
-        }
+        Native.getFormat(handle = nativeHandle.get())
     }
 
-    val format = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun getNativeHandle(): Long {
+        ensureOpen()
 
-            Native.getFormat(handle = nativeHandle.get())
-        }
+        return nativeHandle.get()
     }
 
-    fun getNativeHandle() = nativeHandle.get()
+    fun decodeAudio(buffer: Long, capacity: Int) = runCatching {
+        ensureOpen()
 
-    fun decodeAudio(buffer: Long, capacity: Int) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
-
-            Native.decodeAudio(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
-        }
+        Native.decodeAudio(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
     }
 
-    fun decodeVideo(buffer: Long, capacity: Int) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun decodeVideo(buffer: Long, capacity: Int) = runCatching {
+        ensureOpen()
 
-            Native.decodeVideo(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
-        }
+        Native.decodeVideo(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
     }
 
-    fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = runCatching {
+        ensureOpen()
 
-            Native.seekTo(
-                handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
-            ).takeIf { it >= 0 } ?: timestampMicros
-        }
+        Native.seekTo(
+            handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
+        ).takeIf { it >= 0 } ?: timestampMicros
     }
 
-    fun reset() = synchronized(lock) {
-        runCatching {
-            ensureOpen()
+    fun reset() = runCatching {
+        ensureOpen()
 
-            Native.reset(handle = nativeHandle.get())
-        }
+        Native.reset(handle = nativeHandle.get())
     }
 
     override fun close() = cleanable.clean()

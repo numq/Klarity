@@ -144,10 +144,11 @@ interface KlarityPlayer {
     suspend fun close(): Result<Unit>
 
     companion object {
-        const val MIN_AUDIO_BUFFER_SIZE = 2
+        const val MIN_AUDIO_BUFFER_SIZE = 4
 
         const val MIN_VIDEO_BUFFER_SIZE = 2
 
+        @Volatile
         private var isLoaded = false
 
         /**

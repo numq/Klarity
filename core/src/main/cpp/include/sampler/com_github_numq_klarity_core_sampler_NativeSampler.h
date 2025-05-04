@@ -38,7 +38,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
         jlong samplerHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_play(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_write(
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle,
@@ -46,13 +46,19 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_0
         jint bufferSize
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_pause(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_stop(
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle
 );
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_stop(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_flush(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong samplerHandle
+);
+
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_drain(
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle

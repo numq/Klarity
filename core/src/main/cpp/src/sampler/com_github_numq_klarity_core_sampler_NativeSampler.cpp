@@ -54,7 +54,7 @@ JNIEXPORT jlong JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_
     }, 0);
 }
 
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_play(
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_write(
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle,
@@ -64,19 +64,7 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_0
     return handleException(env, [&] {
         auto sampler = getSamplerPointer(samplerHandle);
 
-        sampler->play(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
-    });
-}
-
-JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_pause(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong samplerHandle
-) {
-    return handleException(env, [&] {
-        auto sampler = getSamplerPointer(samplerHandle);
-
-        sampler->pause();
+        sampler->write(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
     });
 }
 
@@ -89,6 +77,30 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_0
         auto sampler = getSamplerPointer(samplerHandle);
 
         sampler->stop();
+    });
+}
+
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_flush(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong samplerHandle
+) {
+    return handleException(env, [&] {
+        auto sampler = getSamplerPointer(samplerHandle);
+
+        sampler->flush();
+    });
+}
+
+JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_00024Native_drain(
+        JNIEnv *env,
+        jclass thisClass,
+        jlong samplerHandle
+) {
+    return handleException(env, [&] {
+        auto sampler = getSamplerPointer(samplerHandle);
+
+        sampler->drain();
     });
 }
 

@@ -7,6 +7,9 @@ import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pool.Pool
 import com.github.numq.klarity.core.sampler.Sampler
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 internal sealed interface Pipeline {
     val media: Media
@@ -22,7 +25,11 @@ internal sealed interface Pipeline {
     ) : Pipeline {
         override suspend fun close() = runCatching {
             sampler.close().getOrThrow()
+
+            buffer.close().getOrThrow()
+
             decoder.close().getOrThrow()
+
             pool.close().getOrThrow()
         }
     }
@@ -34,7 +41,10 @@ internal sealed interface Pipeline {
         val buffer: Buffer<Frame>
     ) : Pipeline {
         override suspend fun close() = runCatching {
+            buffer.close().getOrThrow()
+
             decoder.close().getOrThrow()
+
             pool.close().getOrThrow()
         }
     }
@@ -50,11 +60,29 @@ internal sealed interface Pipeline {
         val sampler: Sampler
     ) : Pipeline {
         override suspend fun close() = runCatching {
-            sampler.close().getOrThrow()
-            audioDecoder.close().getOrThrow()
-            videoDecoder.close().getOrThrow()
-            audioPool.close().getOrThrow()
-            videoPool.close().getOrThrow()
+            coroutineScope {
+                val audioJob = async {
+                    sampler.close()
+
+                    audioBuffer.close()
+
+                    audioDecoder.close()
+
+                    audioPool.close()
+                }
+
+                val videoJob = async {
+                    videoBuffer.close()
+
+                    videoDecoder.close()
+
+                    videoPool.close()
+                }
+
+                awaitAll(audioJob, videoJob).fold(Result.success(Unit)) { acc, result ->
+                    acc.fold(onSuccess = { result }, onFailure = { acc })
+                }.getOrThrow()
+            }
         }
     }
 }

@@ -13,7 +13,6 @@ internal interface Pool<T> {
 
     companion object {
         fun create(poolCapacity: Int, bufferCapacity: Int): Result<Pool<Data>> = runCatching {
-//            BlockingDataPool(poolCapacity = poolCapacity, bufferCapacity = bufferCapacity)
             DataPool(poolCapacity = poolCapacity, bufferCapacity = bufferCapacity)
         }
     }
