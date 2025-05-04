@@ -1,46 +1,258 @@
-name: Build FFmpeg with CUDA support
+name: Build PortAudio and FFmpeg
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PORTAUDIO_VERSION: 19.7.0
+  FFMPEG_VERSION: n6.1.1
+  BUILD_DIR: build
+  BIN_FOLDER: core/src/main/cpp/bin
+  LIB_FOLDER: core/src/main/cpp/lib
+  INCLUDE_FOLDER: core/src/main/cpp/include
 
 jobs:
   build:
-    runs-on: windows-latest
-
+    strategy:
+      matrix:
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout the repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Visual Studio
-        uses: microsoft/setup-msbuild@v1
-        with:
-          vs-version: 'latest'
-
-      - name: Install CUDA
+      - name: Create directories
         run: |
-          choco install cuda --version=11.2  # Ensure CUDA is installed (version 11.2 or as needed)
+          mkdir -p ${{ env.BUILD_DIR }}
+          mkdir -p ${{ env.BIN_FOLDER }}
+          mkdir -p ${{ env.LIB_FOLDER }}
+          mkdir -p ${{ env.INCLUDE_FOLDER }}
 
-      - name: Download FFmpeg source
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
-          git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-          cd ffmpeg
-          git checkout release/5.1 # You can adjust the release version as necessary
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libasound2-dev \
+            yasm \
+            nasm \
+            libx264-dev \
+            libx265-dev \
+            libvpx-dev \
+            libmp3lame-dev \
+            libopus-dev \
+            libfdk-aac-dev \
+            libass-dev \
+            libva-dev \
+            libvdpau-dev \
+            libdrm-dev \
+            libsdl2-dev
 
-      - name: Configure FFmpeg with CUDA support
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
         run: |
-          cd ffmpeg
-          ./configure --enable-nvenc --enable-nvdec --enable-cuda --enable-libnpp --enable-shared --prefix=%cd%/ffmpeg_build --extra-cflags="-I%cd%/ffmpeg_build/include" --extra-ldflags="-L%cd%/ffmpeg_build/lib"
+          brew update
+          brew install \
+            cmake \
+            ninja \
+            pkg-config \
+            yasm \
+            nasm \
+            x264 \
+            x265 \
+            libvpx \
+            lame \
+            opus \
+            fdk-aac \
+            libass \
+            sdl2
 
-      - name: Build FFmpeg with Visual Studio
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
         run: |
-          cd ffmpeg
-          msbuild /p:Configuration=Release /p:Platform=x64
+          choco install -y cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+          choco install -y ninja
+          choco install -y yasm
+          choco install -y nasm
+          choco install -y 7zip
 
-      - name: Upload FFmpeg artifacts
+      - name: Download and extract PortAudio
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          curl -L https://github.com/PortAudio/portaudio/archive/refs/tags/v${{ env.PORTAUDIO_VERSION }}.tar.gz -o portaudio.tar.gz
+          tar -xzf portaudio.tar.gz
+          mv portaudio-${{ env.PORTAUDIO_VERSION }} portaudio
+
+      - name: Build PortAudio (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd ${{ env.BUILD_DIR }}/portaudio
+          ./configure --enable-shared --prefix=$GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/portaudio-install
+          make -j$(nproc)
+          make install
+
+      - name: Build PortAudio (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd ${{ env.BUILD_DIR }}/portaudio
+          cmake -G "Ninja" -B build -DCMAKE_BUILD_TYPE=Release -DPA_BUILD_SHARED=ON
+          cmake --build build --config Release
+          mkdir -p portaudio-install
+          cp build/Release/portaudio.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp build/Release/portaudio.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp include/portaudio.h $GITHUB_WORKSPACE/${{ env.INCLUDE_FOLDER }}
+
+      - name: Copy PortAudio artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cp ${{ env.BUILD_DIR }}/portaudio-install/lib/libportaudio.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }} || true
+          cp ${{ env.BUILD_DIR }}/portaudio-install/lib/libportaudio.dylib* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }} || true
+          cp ${{ env.BUILD_DIR }}/portaudio-install/lib/libportaudio.a $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }} || true
+          cp ${{ env.BUILD_DIR }}/portaudio-install/include/portaudio.h $GITHUB_WORKSPACE/${{ env.INCLUDE_FOLDER }}
+
+      - name: Download and extract FFmpeg
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          curl -L https://github.com/FFmpeg/FFmpeg/archive/refs/tags/${{ env.FFMPEG_VERSION }}.tar.gz -o ffmpeg.tar.gz
+          tar -xzf ffmpeg.tar.gz
+          mv FFmpeg-${{ env.FFMPEG_VERSION }} ffmpeg
+
+      - name: Build FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd ${{ env.BUILD_DIR }}/ffmpeg
+          ./configure \
+            --prefix=$GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/ffmpeg-install \
+            --enable-shared \
+            --disable-static \
+            --enable-gpl \
+            --enable-version3 \
+            --enable-nonfree \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-libvpx \
+            --enable-libmp3lame \
+            --enable-libopus \
+            --enable-libfdk-aac \
+            --enable-libass \
+            --enable-vaapi \
+            --enable-vdpau \
+            --enable-hwaccels \
+            --enable-decoder=h264,h265,vp8,vp9 \
+            --enable-encoder=libx264,libx265,libvpx_vp8,libvpx_vp9
+          make -j$(nproc)
+          make install
+
+      - name: Build FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd ${{ env.BUILD_DIR }}/ffmpeg
+          ./configure \
+            --prefix=$GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/ffmpeg-install \
+            --enable-shared \
+            --disable-static \
+            --enable-gpl \
+            --enable-version3 \
+            --enable-nonfree \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-libvpx \
+            --enable-libmp3lame \
+            --enable-libopus \
+            --enable-libfdk-aac \
+            --enable-libass \
+            --enable-hwaccels \
+            --enable-videotoolbox \
+            --enable-decoder=h264,h265,vp8,vp9 \
+            --enable-encoder=libx264,libx265,libvpx_vp8,libvpx_vp9
+          make -j$(sysctl -n hw.ncpu)
+          make install
+
+      - name: Build FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd ${{ env.BUILD_DIR }}/ffmpeg
+          ./configure \
+            --toolchain=msvc \
+            --prefix=$GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/ffmpeg-install \
+            --enable-shared \
+            --disable-static \
+            --enable-gpl \
+            --enable-version3 \
+            --enable-nonfree \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-libvpx \
+            --enable-libmp3lame \
+            --enable-libopus \
+            --enable-libfdk-aac \
+            --enable-libass \
+            --enable-hwaccels \
+            --enable-d3d11va \
+            --enable-dxva2 \
+            --enable-decoder=h264,h265,vp8,vp9 \
+            --enable-encoder=libx264,libx265,libvpx_vp8,libvpx_vp9
+          make -j$(nproc)
+          make install
+
+      - name: Copy FFmpeg artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libavcodec.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libavdevice.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libavfilter.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libavformat.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libavutil.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libpostproc.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libswresample.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/libswscale.so* $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/pkgconfig/*.pc $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}/pkgconfig
+          cp -r ${{ env.BUILD_DIR }}/ffmpeg-install/include/* $GITHUB_WORKSPACE/${{ env.INCLUDE_FOLDER }}
+
+      - name: Copy FFmpeg artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/avcodec-61.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/avdevice-61.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/avfilter-10.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/avformat-61.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/avutil-59.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/postproc-58.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/swresample-5.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/bin/swscale-8.dll $GITHUB_WORKSPACE/${{ env.BIN_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/avcodec.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/avdevice.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/avfilter.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/avformat.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/avutil.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/postproc.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/swresample.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp ${{ env.BUILD_DIR }}/ffmpeg-install/lib/swscale.lib $GITHUB_WORKSPACE/${{ env.LIB_FOLDER }}
+          cp -r ${{ env.BUILD_DIR }}/ffmpeg-install/include/* $GITHUB_WORKSPACE/${{ env.INCLUDE_FOLDER }}
+
+      - name: Build CMake project
+        run: |
+          cd core/src/main/cpp
+          cmake -B $GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/cmake-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBIN_FOLDER=$GITHUB_WORKSPACE/${{ env.BIN_FOLDER }} \
+            -DLIB_FOLDER=$GITHUB_WORKSPACE/${{ env.LIB_FOLDER }} \
+            -DINCLUDE_FOLDER=$GITHUB_WORKSPACE/${{ env.INCLUDE_FOLDER }}
+          cmake --build $GITHUB_WORKSPACE/${{ env.BUILD_DIR }}/cmake-build --config Release
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-build-artifacts
+          name: built-libraries-${{ runner.os }}
           path: |
-            ffmpeg_build/include
-            ffmpeg_build/bin
-            ffmpeg_build/lib
+            ${{ env.BIN_FOLDER }}
+            ${{ env.LIB_FOLDER }}
+            ${{ env.INCLUDE_FOLDER }}
+          if-no-files-found: error

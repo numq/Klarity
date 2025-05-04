@@ -10,10 +10,10 @@ set(LIB_FOLDER "${CMAKE_SOURCE_DIR}/lib")
 
 add_library(klarity SHARED
         src/common.cpp
-        src/data/com_github_numq_klarity_core_data_NativeData.cpp
         src/decoder/decoder.cpp
         src/decoder/hwaccel.cpp
         src/sampler/sampler.cpp
+        src/data/com_github_numq_klarity_core_data_NativeData.cpp
         src/decoder/com_github_numq_klarity_core_decoder_NativeDecoder.cpp
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp
 )
