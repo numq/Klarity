@@ -26,13 +26,13 @@ jobs:
           git clone https://github.com/PortAudio/portaudio.git
           cd portaudio
           git checkout v19.7.0
-          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON
-          cmake --build build --config Release
+          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=build/out -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=build/out
+          cmake --build build
           mkdir -p ${{env.BUILD_DIR}}\bin\portaudio
           mkdir -p ${{env.BUILD_DIR}}\lib\portaudio
           mkdir -p ${{env.BUILD_DIR}}\include\portaudio
-          copy build\Release\portaudio.dll ${{env.BUILD_DIR}}\bin\portaudio\
-          copy build\Release\portaudio.lib ${{env.BUILD_DIR}}\lib\portaudio\
+          copy build\out\portaudio.dll ${{env.BUILD_DIR}}\bin\portaudio\
+          copy build\out\portaudio.lib ${{env.BUILD_DIR}}\lib\portaudio\
           xcopy /E /I /Y include\ ${{env.BUILD_DIR}}\include\portaudio\
 
       - name: Build FFmpeg
