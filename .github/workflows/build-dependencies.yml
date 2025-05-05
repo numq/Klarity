@@ -6,13 +6,11 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [ x86, x64 ]
     env:
       VCPKG_DIR: ${{ github.workspace }}\vcpkg
       BUILD_DIR: ${{ github.workspace }}\build
       BIN_FOLDER: ${{ github.workspace }}\bin
+      SOURCE_DIR: ${{ github.workspace }}\core\src\main\cpp
 
     steps:
       - name: Checkout project
@@ -21,7 +19,7 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: ${{ matrix.arch }}
+          arch: x64
 
       - name: Install dependencies
         run: choco install -y cmake ninja git
@@ -37,28 +35,28 @@ jobs:
           mkdir bin
           mkdir bin\klarity
           mkdir include
+          mkdir include\ffmpeg
+          mkdir include\portaudio
 
-      - name: Install FFmpeg with LGPL-compatible features and hardware acceleration
+      - name: Install FFmpeg
         run: |
-          ${{ env.VCPKG_DIR }}\vcpkg install ffmpeg[core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv]:${{ matrix.arch }}-windows --triplet=${{ matrix.arch }}-windows
-          # Copy FFmpeg files to our bin directory
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\bin ${{ env.BIN_FOLDER }}
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\include ${{ env.BIN_FOLDER }}\..\include
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\lib ${{ env.BIN_FOLDER }}
+          ${{ env.VCPKG_DIR }}\vcpkg install ffmpeg[core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv]:x64-windows
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\bin ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\include ${{ env.BIN_FOLDER }}\..\include\ffmpeg /E /NFL /NDL /NJH /NJS
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\lib ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
 
       - name: Install PortAudio
         run: |
-          ${{ env.VCPKG_DIR }}\vcpkg install portaudio:${{ matrix.arch }}-windows --triplet=${{ matrix.arch }}-windows
-          # Copy PortAudio files to our bin directory
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\bin\portaudio.dll ${{ env.BIN_FOLDER }}
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\include ${{ env.BIN_FOLDER }}\..\include\portaudio
-          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\lib ${{ env.BIN_FOLDER }}
+          ${{ env.VCPKG_DIR }}\vcpkg install portaudio:x64-windows
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\bin ${{ env.BIN_FOLDER }} portaudio.dll /NFL /NDL /NJH /NJS
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\include ${{ env.BIN_FOLDER }}\..\include\portaudio /E /NFL /NDL /NJH /NJS
+          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\lib ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
 
       - name: Build Klarity
         run: |
           mkdir ${{ env.BUILD_DIR }}
           cd ${{ env.BUILD_DIR }}
-          cmake .. -G "Ninja" `
+          cmake "${{ env.SOURCE_DIR }}" -G "Ninja" `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\klarity" `
             -DBIN_FOLDER="${{ env.BIN_FOLDER }}" `
@@ -69,7 +67,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-windows-${{ matrix.arch }}
+          name: klarity-windows-x64
           path: |
             bin
             include
