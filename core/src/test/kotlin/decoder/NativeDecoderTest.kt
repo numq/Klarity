@@ -36,7 +36,7 @@ class NativeDecoderTest : JNITest() {
             assert(decoder.format.isSuccess)
 
             decoder.close()
-            assertThrows<IllegalArgumentException> {
+            assertThrows<IllegalStateException> {
                 decoder.getNativeHandle()
             }
         }
