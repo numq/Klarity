@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -15,6 +15,7 @@ jobs:
 
       - name: Set up environment
         id: setup
+        shell: bash
         run: |
           # Common environment variables
           echo "FFMPEG_VERSION=6.1.1" >> $GITHUB_ENV
@@ -40,6 +41,7 @@ jobs:
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -77,6 +79,7 @@ jobs:
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: |
           brew update
           brew install \
@@ -91,16 +94,12 @@ jobs:
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
+        shell: powershell
         run: |
-          choco install -y \
-            cmake \
-            ninja \
-            pkgconfiglite \
-            nasm \
-            yasm \
-            openjdk17
+          choco install -y cmake ninja pkgconfiglite nasm yasm openjdk17
 
       - name: Build PortAudio
+        shell: bash
         run: |
           git clone https://github.com/PortAudio/portaudio.git
           cd portaudio
@@ -117,6 +116,7 @@ jobs:
           fi
 
       - name: Build FFmpeg
+        shell: bash
         run: |
           git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
           cd ffmpeg
@@ -154,6 +154,7 @@ jobs:
           make install
 
       - name: Build Klarity
+        shell: bash
         run: |
           mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/bin
           mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib
@@ -166,17 +167,20 @@ jobs:
           mkdir build
           cd build
           
-          cmake .. -G "${{ env.CMAKE_GENERATOR }}" \
-            -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
-            -DCMAKE_BUILD_TYPE=Release
-          
           if [ "$RUNNER_OS" == "Windows" ]; then
+            cmake .. -G "${{ env.CMAKE_GENERATOR }}" -A ${{ env.ARCH }} \
+              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
+              -DCMAKE_BUILD_TYPE=Release
             cmake --build . --config Release --target install
           else
+            cmake .. -G "${{ env.CMAKE_GENERATOR }}" \
+              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
+              -DCMAKE_BUILD_TYPE=Release
             cmake --build . --config Release --target install -- -j$(nproc)
           fi
 
       - name: Package artifacts
+        shell: bash
         run: |
           # Create the directory structure
           mkdir -p package/bin
@@ -192,7 +196,11 @@ jobs:
           cp -r $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/* package/include/ 2>/dev/null || :
           
           # Create zip file
-          zip -r klarity-$RUNNER_OS.zip package
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            7z a -r klarity-$RUNNER_OS.zip package
+          else
+            zip -r klarity-$RUNNER_OS.zip package
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
