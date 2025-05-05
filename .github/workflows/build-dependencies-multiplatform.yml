@@ -65,7 +65,7 @@ jobs:
 
       - name: Bootstrap vcpkg
         run: ${{ env.VCPKG_DIR }}/bootstrap-vcpkg
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Create directories
         run: |
@@ -73,13 +73,12 @@ jobs:
           mkdir -p ${{ env.JARS_FOLDER }}
           mkdir -p ${{ env.RESOURCES_BIN }}
           mkdir -p ${{ env.BUILD_DIR }}
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Install FFmpeg
         run: |
           ${{ env.VCPKG_DIR }}/vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
           
-          # Copy libraries with platform-specific patterns
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
@@ -87,7 +86,7 @@ jobs:
           else
             cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/*.so* ${{ env.BIN_FOLDER }} || true
           fi
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Install PortAudio
         run: |
@@ -100,13 +99,12 @@ jobs:
           else
             cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/libportaudio.so* ${{ env.BIN_FOLDER }}
           fi
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Build Klarity
         run: |
           cd ${{ env.BUILD_DIR }}
           
-          # Platform-specific CMake flags
           if [ "${{ matrix.platform }}" = "win64" ]; then
             cmake "${{ env.SOURCE_DIR }}" \
               -DCMAKE_BUILD_TYPE=Release \
@@ -127,7 +125,7 @@ jobs:
           fi
           
           cmake --build . --config Release --parallel
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Package native libraries
         run: |
@@ -143,7 +141,7 @@ jobs:
             cp ${{ env.BUILD_DIR }}/*.so ${{ env.RESOURCES_BIN }}
             cp ${{ env.BIN_FOLDER }}/*.so* ${{ env.RESOURCES_BIN }}
           fi
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Build JAR files
         run: |
@@ -152,13 +150,12 @@ jobs:
             -Dnative.platform=${{ matrix.platform }} \
             -Djavacpp.platform=${{ matrix.platform }}
           
-          # Copy JARs with platform classifier
           mkdir -p ${{ env.JARS_FOLDER }}
           for module in core compose example; do
             cp $module/target/*-${{ matrix.platform }}.jar ${{ env.JARS_FOLDER }} || \
             cp $module/target/*.jar ${{ env.JARS_FOLDER }}
           done
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
