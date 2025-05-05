@@ -8,23 +8,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
         include:
           - os: windows-latest
             platform: win64
             triplet: x64-windows
-            shell: powershell
             ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv"
           - os: ubuntu-latest
             platform: linux
             triplet: x64-linux
-            shell: bash
             ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,vaapi,vdpau,opencl,dav1d"
           - os: macos-latest
             platform: macos
             triplet: x64-osx
-            shell: bash
-            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,videotoolbox,opencl"
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,opencl"
 
     env:
       VCPKG_DIR: ${{ github.workspace }}/vcpkg
@@ -68,15 +65,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Create directories
-        run: |
-          mkdir -p ${{ env.BIN_FOLDER }}
-          mkdir -p ${{ env.JARS_FOLDER }}
-          mkdir -p ${{ env.RESOURCES_BIN }}
-          mkdir -p ${{ env.BUILD_DIR }}
-        shell: bash
-
-      - name: Install FFmpeg
+      - name: Install FFmpeg with platform-specific features
         run: |
           cd ${{ env.VCPKG_DIR }}
           ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
@@ -104,28 +93,16 @@ jobs:
           fi
         shell: bash
 
-      - name: Build Klarity
+      - name: Build Klarity native code
         run: |
+          mkdir -p ${{ env.BUILD_DIR }}
           cd ${{ env.BUILD_DIR }}
           
-          if [ "${{ matrix.platform }}" = "win64" ]; then
-            cmake "${{ env.SOURCE_DIR }}" \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DWITH_AMF=ON \
-              -DWITH_QSV=ON \
-              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
-          elif [ "${{ matrix.platform }}" = "linux" ]; then
-            cmake "${{ env.SOURCE_DIR }}" \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DWITH_VAAPI=ON \
-              -DWITH_VDPAU=ON \
-              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
-          else
-            cmake "${{ env.SOURCE_DIR }}" \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DWITH_VIDEOTOOLBOX=ON \
-              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
-          fi
+          cmake "${{ env.SOURCE_DIR }}" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake" \
+            $([ "${{ matrix.platform }}" = "win64" ] && echo "-DWITH_AMF=ON -DWITH_QSV=ON") \
+            $([ "${{ matrix.platform }}" = "linux" ] && echo "-DWITH_VAAPI=ON -DWITH_VDPAU=ON")
           
           cmake --build . --config Release --parallel
         shell: bash
@@ -146,7 +123,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Build JAR files
+      - name: Build Java modules
         run: |
           cd ${{ github.workspace }}
           mvn clean package -DskipTests -pl core,compose,example -am \
