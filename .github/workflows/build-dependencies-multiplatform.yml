@@ -58,13 +58,20 @@ jobs:
         shell: bash
 
       - name: Clone vcpkg
-        uses: actions/checkout@v4
-        with:
-          repository: microsoft/vcpkg
-          path: ${{ env.VCPKG_DIR }}
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            chmod +x ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.sh
+          fi
+        shell: bash
 
       - name: Bootstrap vcpkg
-        run: ${{ env.VCPKG_DIR }}/bootstrap-vcpkg
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.bat
+          else
+            ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.sh
+          fi
         shell: bash
 
       - name: Create directories
