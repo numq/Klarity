@@ -6,6 +6,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include "deleter.h"
 #include "exception.h"
 #include "format.h"
