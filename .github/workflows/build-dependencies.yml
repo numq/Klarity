@@ -5,69 +5,101 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
     env:
-      VCPKG_DIR: ${{ github.workspace }}\vcpkg
-      BUILD_DIR: ${{ github.workspace }}\build
-      BIN_FOLDER: ${{ github.workspace }}\bin
-      SOURCE_DIR: ${{ github.workspace }}\core\src\main\cpp
+      FFMPEG_VERSION: "7.1.1"
+      PORTAUDIO_VERSION: "pa_stable_v190700_20210406"
+      BIN_DIR: ${{ github.workspace }}/output/${{ matrix.os }}/bin
+      INCLUDE_DIR: ${{ github.workspace }}/output/${{ matrix.os }}/include
+      JAR_DIR: ${{ github.workspace }}/output/${{ matrix.os }}/jars
 
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install CMake, JDK, Gradle
+        uses: actions/setup-java@v4
         with:
-          arch: x64
+          distribution: 'temurin'
+          java-version: 17
 
-      - name: Install dependencies
-        run: choco install -y cmake ninja git
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v3
 
-      - name: Clone vcpkg
-        run: git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
+      - name: Install dependencies (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y yasm libasound2-dev pkg-config unzip
 
-      - name: Bootstrap vcpkg
-        run: ${{ env.VCPKG_DIR }}\bootstrap-vcpkg.bat
+      - name: Install dependencies (macOS only)
+        if: runner.os == 'macOS'
+        run: brew install yasm portaudio pkg-config
 
-      - name: Create dirs
+      - name: Install dependencies (Windows only)
+        if: runner.os == 'Windows'
+        run: choco install yasm --no-progress
+
+      - name: Download and build FFmpeg
         run: |
-          mkdir bin
-          mkdir bin\klarity
-          mkdir include
-          mkdir include\ffmpeg
-          mkdir include\portaudio
+          mkdir -p deps && cd deps
+          curl -L -o ffmpeg.tar.xz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${{ env.FFMPEG_VERSION }}.tar.gz
+          tar -xf ffmpeg.tar.xz
+          cd FFmpeg-${{ env.FFMPEG_VERSION }}
+          ./configure --enable-shared --disable-static --prefix="${{ env.BIN_DIR }}/ffmpeg" --extra-cflags="-fPIC"
+          make -j$(nproc || sysctl -n hw.logicalcpu)
+          make install
+        shell: bash
 
-      - name: Install FFmpeg
+      - name: Download and build PortAudio
         run: |
-          ${{ env.VCPKG_DIR }}\vcpkg install ffmpeg[core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv]:x64-windows
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\bin ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\include ${{ env.BIN_FOLDER }}\..\include\ffmpeg /E /NFL /NDL /NJH /NJS
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\lib ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
+          mkdir -p deps && cd deps
+          curl -L -o portaudio.zip https://app.assembla.com/spaces/portaudio/git/source/${{ env.PORTAUDIO_VERSION }}/?format=zip
+          unzip portaudio.zip -d portaudio-src
+          cd portaudio-src/*
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DPA_BUILD_SHARED=ON -DCMAKE_INSTALL_PREFIX="${{ env.BIN_DIR }}/portaudio"
+          cmake --build build --target install --config Release
+        shell: bash
 
-      - name: Install PortAudio
+      - name: Build Native Library with CMake
         run: |
-          ${{ env.VCPKG_DIR }}\vcpkg install portaudio:x64-windows
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\bin ${{ env.BIN_FOLDER }} portaudio.dll /NFL /NDL /NJH /NJS
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\include ${{ env.BIN_FOLDER }}\..\include\portaudio /E /NFL /NDL /NJH /NJS
-          robocopy ${{ env.VCPKG_DIR }}\installed\x64-windows\lib ${{ env.BIN_FOLDER }} /E /NFL /NDL /NJH /NJS
+          cmake -S core/src/main/cpp -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ env.BIN_DIR }}/klarity" \
+            -DCMAKE_PREFIX_PATH="${{ env.BIN_DIR }}/ffmpeg;${{ env.BIN_DIR }}/portaudio" \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="${{ env.BIN_DIR }}/klarity"
+          cmake --build build --target install --config Release
+        shell: bash
 
-      - name: Build Klarity
+      - name: Copy headers
         run: |
-          mkdir ${{ env.BUILD_DIR }}
-          cd ${{ env.BUILD_DIR }}
-          cmake "${{ env.SOURCE_DIR }}" -G "Ninja" `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\klarity" `
-            -DBIN_FOLDER="${{ env.BIN_FOLDER }}" `
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}\scripts\buildsystems\vcpkg.cmake"
-          cmake --build . --target klarity
-        shell: powershell
+          mkdir -p ${{ env.INCLUDE_DIR }}/ffmpeg
+          cp -r deps/FFmpeg-${{ env.FFMPEG_VERSION }}/include/* ${{ env.INCLUDE_DIR }}/ffmpeg/
+          mkdir -p ${{ env.INCLUDE_DIR }}/portaudio
+          cp -r deps/portaudio-src/*/include/* ${{ env.INCLUDE_DIR }}/portaudio/
+        shell: bash
 
-      - name: Upload build artifact
+      - name: Prepare shared libs for JAR resources
+        run: |
+          os=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+          mkdir -p core/src/main/resources/bin/$os
+          cp ${{ env.BIN_DIR }}/ffmpeg/lib/* core/src/main/resources/bin/$os/
+          cp ${{ env.BIN_DIR }}/portaudio/lib/* core/src/main/resources/bin/$os/
+          cp ${{ env.BIN_DIR }}/klarity/* core/src/main/resources/bin/$os/
+        shell: bash
+
+      - name: Build JARs
+        run: |
+          ./gradlew :compose:jar :example:jar :core:jar
+          mkdir -p ${{ env.JAR_DIR }}
+          cp compose/build/libs/*.jar ${{ env.JAR_DIR }}/compose.jar
+          cp example/build/libs/*.jar ${{ env.JAR_DIR }}/example.jar
+          cp core/build/libs/*.jar ${{ env.JAR_DIR }}/core.jar
+        shell: bash
+
+      - name: Archive Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-windows-x64
-          path: |
-            bin
-            include
+          name: klarity-${{ matrix.os }}
+          path: output/${{ matrix.os }}
