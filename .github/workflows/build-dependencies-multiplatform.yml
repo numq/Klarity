@@ -48,129 +48,93 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            choco install cmake -y --no-progress
-            choco install ninja -y --no-progress
-            choco install git -y --no-progress --ignore-dependencies
-            choco install yasm -y --no-progress
-            choco install pkgconfiglite -y --no-progress
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev nasm
-          else
-            brew install cmake ninja pkg-config nasm
-          fi
+          case "${{ matrix.os }}" in
+            windows-latest)
+              choco install cmake ninja git yasm pkgconfiglite -y --no-progress
+              ;;
+            ubuntu-latest)
+              sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev nasm
+              ;;
+            macos-latest)
+              brew install cmake ninja pkg-config nasm
+              ;;
+          esac
         shell: bash
 
       - name: Clone and bootstrap vcpkg
-        if: matrix.os == 'windows-latest'
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git "$env:VCPKG_DIR"
-          cd "$env:VCPKG_DIR"
-          .\bootstrap-vcpkg.bat -disableMetrics
-        shell: powershell
-
-      - name: Clone and bootstrap vcpkg
-        if: matrix.os != 'windows-latest'
         run: |
           git clone https://github.com/Microsoft/vcpkg.git "$VCPKG_DIR"
           cd "$VCPKG_DIR"
-          ./bootstrap-vcpkg.sh -disableMetrics
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command ".\\bootstrap-vcpkg.bat -disableMetrics"
+          else
+            ./bootstrap-vcpkg.sh -disableMetrics
+          fi
         shell: bash
 
-      - name: Install FFmpeg with validated features
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd "$env:VCPKG_DIR"
-          .\vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse
-          Copy-Item -Path "installed\${{ matrix.triplet }}\bin\*.dll" -Destination "$env:BIN_FOLDER" -Force
-        shell: powershell
-
-      - name: Install FFmpeg with validated features
-        if: matrix.os != 'windows-latest'
+      - name: Install FFmpeg
         run: |
           cd "$VCPKG_DIR"
-          ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse
-          cp installed/${{ matrix.triplet }}/lib/*.so* "$BIN_FOLDER" || true
-        shell: bash
+          ${{ matrix.shell == 'powershell' && 'powershell -Command' || '' }} \
+          "vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse"
+        shell: ${{ matrix.shell }}
 
       - name: Install PortAudio
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd "$env:VCPKG_DIR"
-          .\vcpkg install portaudio:${{ matrix.triplet }}
-          Copy-Item -Path "installed\${{ matrix.triplet }}\bin\portaudio.dll" -Destination "$env:BIN_FOLDER" -Force
-        shell: powershell
-
-      - name: Install PortAudio
-        if: matrix.os != 'windows-latest'
         run: |
           cd "$VCPKG_DIR"
-          ./vcpkg install portaudio:${{ matrix.triplet }}
-          cp installed/${{ matrix.triplet }}/lib/libportaudio.so* "$BIN_FOLDER" || true
+          ${{ matrix.shell == 'powershell' && 'powershell -Command' || '' }} \
+          "vcpkg install portaudio:${{ matrix.triplet }}"
+        shell: ${{ matrix.shell }}
+
+      - name: Copy dependency binaries
+        run: |
+          mkdir -p "$BIN_FOLDER"
+          case "${{ matrix.os }}" in
+            windows-latest)
+              cp "$VCPKG_DIR/installed/${{ matrix.triplet }}/bin/"*.dll "$BIN_FOLDER" || true
+              ;;
+            ubuntu-latest)
+              cp "$VCPKG_DIR/installed/${{ matrix.triplet }}/lib/"*.so* "$BIN_FOLDER" || true
+              ;;
+            macos-latest)
+              cp "$VCPKG_DIR/installed/${{ matrix.triplet }}/lib/"*.dylib "$BIN_FOLDER" || true
+              ;;
+          esac
         shell: bash
 
-      - name: Build Klarity native code (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          New-Item -ItemType Directory -Path "$env:BUILD_DIR" -Force
-          cd "$env:BUILD_DIR"
-          $cmakeArgs = @(
-            "$env:SOURCE_DIR",
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_DIR\scripts\buildsystems\vcpkg.cmake",
-            "-DWITH_AMF=ON",
-            "-DWITH_QSV=ON",
-            "-DCMAKE_CXX_STANDARD=17"
-          )
-          cmake @cmakeArgs
-          cmake --build . --config Release --parallel
-        shell: powershell
-
-      - name: Build Klarity native code (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Build Klarity native code
         run: |
           mkdir -p "$BUILD_DIR"
           cd "$BUILD_DIR"
+
           cmake "$SOURCE_DIR" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_DIR/scripts/buildsystems/vcpkg.cmake" \
             -DCMAKE_CXX_STANDARD=17 \
+            $([[ "${{ matrix.platform }}" == "win64" ]] && echo "-DWITH_AMF=ON -DWITH_QSV=ON") \
             -DCMAKE_CXX_FLAGS="-pthread" \
             -DCMAKE_EXE_LINKER_FLAGS="-pthread"
+
           cmake --build . --config Release --parallel
         shell: bash
 
-      - name: Package native libraries (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          New-Item -ItemType Directory -Path "$env:RESOURCES_BIN" -Force
-          Copy-Item -Path "$env:BUILD_DIR\*.dll" -Destination "$env:RESOURCES_BIN" -Force
-          Copy-Item -Path "$env:BIN_FOLDER\*.dll" -Destination "$env:RESOURCES_BIN" -Force
-        shell: powershell
-
-      - name: Package native libraries (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Package native libraries
         run: |
           mkdir -p "$RESOURCES_BIN"
-          cp "$BUILD_DIR"/*.so "$RESOURCES_BIN" || true
-          cp "$BIN_FOLDER"/*.so* "$RESOURCES_BIN" || true
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp "$BUILD_DIR"/*.dylib "$RESOURCES_BIN" || true
-            cp "$BIN_FOLDER"/*.dylib "$RESOURCES_BIN" || true
-          fi
+          cp "$BUILD_DIR"/*.{so,dll,dylib} "$RESOURCES_BIN" 2>/dev/null || true
+          cp "$BIN_FOLDER"/*.{so*,dll,dylib} "$RESOURCES_BIN" 2>/dev/null || true
         shell: bash
 
       - name: Build Java modules
         run: |
-          cd "${{ github.workspace }}"
           mvn clean package -DskipTests -pl core,compose,example -am \
             -Dnative.platform=${{ matrix.platform }} \
             -Djavacpp.platform=${{ matrix.platform }}
-          
+
           mkdir -p "${{ env.JARS_FOLDER }}"
           for module in core compose example; do
             cp $module/target/*-${{ matrix.platform }}.jar "${{ env.JARS_FOLDER }}" || \
-            cp $module/target/*.jar "${{ env.JARS_FOLDER }}"
+            cp $module/target/*.jar "${{ env.JARS_FOLDER }}" || true
           done
         shell: bash
 
