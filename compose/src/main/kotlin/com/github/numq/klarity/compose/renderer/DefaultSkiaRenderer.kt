@@ -14,7 +14,7 @@ internal class DefaultSkiaRenderer(
     override val format: VideoFormat
 ) : SkiaRenderer {
     companion object {
-        const val DRAWS_NOTHING_ID = -1
+        const val DRAWS_NOTHING_ID = 0
     }
 
     private val isClosed = AtomicBoolean(false)
@@ -47,6 +47,8 @@ internal class DefaultSkiaRenderer(
     private fun isSaveable(frame: Frame.Content.Video) =
         !isClosed.get() && !frame.isClosed() && frame.size >= minByteSize
 
+    private fun isFlushable() = !isClosed.get() && !surface.isClosed && !targetPixmap.isClosed
+
     private val _generationId = MutableStateFlow(DRAWS_NOTHING_ID)
 
     override val generationId = _generationId.asStateFlow()
@@ -54,18 +56,14 @@ internal class DefaultSkiaRenderer(
     override fun drawsNothing() = _generationId.value == DRAWS_NOTHING_ID
 
     override fun draw(callback: (Surface) -> Unit) {
-        if (isClosed.get()) {
+        if (isClosed.get() || surface.isClosed) {
             return
         }
 
         callback(surface)
     }
 
-    override suspend fun withCache(callback: suspend (List<CachedFrame>) -> Unit) = cacheMutex.withLock {
-        if (isClosed.get()) {
-            return
-        }
-
+    override suspend fun <T> withCache(callback: suspend (List<CachedFrame>) -> T) = cacheMutex.withLock {
         callback(cache.toList())
     }
 
@@ -129,16 +127,16 @@ internal class DefaultSkiaRenderer(
         }
     }
 
-    override suspend fun flush(color: Int) = renderMutex.withLock {
+    override suspend fun flush() = renderMutex.withLock {
         runCatching {
-            if (isClosed.get()) {
+            if (isFlushable()) {
                 return@runCatching
             }
 
             targetPixmap.reset()
 
-            surface.canvas.clear(color)
-
+            surface.flush()
+        }.onSuccess {
             _generationId.value = DRAWS_NOTHING_ID
         }
     }
@@ -165,7 +163,7 @@ internal class DefaultSkiaRenderer(
                 }
 
                 cache.clear()
-
+            }.onSuccess {
                 _generationId.value = DRAWS_NOTHING_ID
             }
         }
