@@ -1,0 +1,170 @@
+name: Build dependencies multiplatform
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+        include:
+          - os: windows-latest
+            platform: win64
+            triplet: x64-windows
+            shell: powershell
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv"
+          - os: ubuntu-latest
+            platform: linux
+            triplet: x64-linux
+            shell: bash
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,vaapi,vdpau,opencl,dav1d"
+          - os: macos-latest
+            platform: macos
+            triplet: x64-osx
+            shell: bash
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,videotoolbox,opencl"
+
+    env:
+      VCPKG_DIR: ${{ github.workspace }}/vcpkg
+      BUILD_DIR: ${{ github.workspace }}/build-${{ matrix.platform }}
+      BIN_FOLDER: ${{ github.workspace }}/bin-${{ matrix.platform }}
+      JARS_FOLDER: ${{ github.workspace }}/jars/${{ matrix.platform }}
+      RESOURCES_BIN: ${{ github.workspace }}/core/src/main/resources/bin/${{ matrix.platform }}
+      SOURCE_DIR: ${{ github.workspace }}/core/src/main/cpp
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install system dependencies
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            choco install -y cmake ninja git pkgconfig
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config libva-dev ocl-icd-opencl-dev
+          else
+            brew install cmake ninja pkg-config
+          fi
+        shell: bash
+
+      - name: Clone vcpkg
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          path: ${{ env.VCPKG_DIR }}
+
+      - name: Bootstrap vcpkg
+        run: ${{ env.VCPKG_DIR }}/bootstrap-vcpkg
+        shell: ${{ matrix.shell }}
+
+      - name: Create directories
+        run: |
+          mkdir -p ${{ env.BIN_FOLDER }}
+          mkdir -p ${{ env.JARS_FOLDER }}
+          mkdir -p ${{ env.RESOURCES_BIN }}
+          mkdir -p ${{ env.BUILD_DIR }}
+        shell: ${{ matrix.shell }}
+
+      - name: Install FFmpeg
+        run: |
+          ${{ env.VCPKG_DIR }}/vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
+          
+          # Copy libraries with platform-specific patterns
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/*.dylib ${{ env.BIN_FOLDER }} || true
+          else
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/*.so* ${{ env.BIN_FOLDER }} || true
+          fi
+        shell: ${{ matrix.shell }}
+
+      - name: Install PortAudio
+        run: |
+          ${{ env.VCPKG_DIR }}/vcpkg install portaudio:${{ matrix.triplet }}
+          
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/bin/portaudio.dll ${{ env.BIN_FOLDER }}
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/libportaudio*.dylib ${{ env.BIN_FOLDER }}
+          else
+            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/libportaudio.so* ${{ env.BIN_FOLDER }}
+          fi
+        shell: ${{ matrix.shell }}
+
+      - name: Build Klarity
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          
+          # Platform-specific CMake flags
+          if [ "${{ matrix.platform }}" = "win64" ]; then
+            cmake "${{ env.SOURCE_DIR }}" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DWITH_AMF=ON \
+              -DWITH_QSV=ON \
+              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
+          elif [ "${{ matrix.platform }}" = "linux" ]; then
+            cmake "${{ env.SOURCE_DIR }}" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DWITH_VAAPI=ON \
+              -DWITH_VDPAU=ON \
+              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
+          else
+            cmake "${{ env.SOURCE_DIR }}" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DWITH_VIDEOTOOLBOX=ON \
+              -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake"
+          fi
+          
+          cmake --build . --config Release --parallel
+        shell: ${{ matrix.shell }}
+
+      - name: Package native libraries
+        run: |
+          mkdir -p ${{ env.RESOURCES_BIN }}
+          
+          if [ "${{ matrix.platform }}" = "win64" ]; then
+            cp ${{ env.BUILD_DIR }}/*.dll ${{ env.RESOURCES_BIN }}
+            cp ${{ env.BIN_FOLDER }}/*.dll ${{ env.RESOURCES_BIN }}
+          elif [ "${{ matrix.platform }}" = "macos" ]; then
+            cp ${{ env.BUILD_DIR }}/*.dylib ${{ env.RESOURCES_BIN }}
+            cp ${{ env.BIN_FOLDER }}/*.dylib ${{ env.RESOURCES_BIN }}
+          else
+            cp ${{ env.BUILD_DIR }}/*.so ${{ env.RESOURCES_BIN }}
+            cp ${{ env.BIN_FOLDER }}/*.so* ${{ env.RESOURCES_BIN }}
+          fi
+        shell: ${{ matrix.shell }}
+
+      - name: Build JAR files
+        run: |
+          cd ${{ github.workspace }}
+          mvn clean package -DskipTests -pl core,compose,example -am \
+            -Dnative.platform=${{ matrix.platform }} \
+            -Djavacpp.platform=${{ matrix.platform }}
+          
+          # Copy JARs with platform classifier
+          mkdir -p ${{ env.JARS_FOLDER }}
+          for module in core compose example; do
+            cp $module/target/*-${{ matrix.platform }}.jar ${{ env.JARS_FOLDER }} || \
+            cp $module/target/*.jar ${{ env.JARS_FOLDER }}
+          done
+        shell: ${{ matrix.shell }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-${{ matrix.platform }}-build
+          path: |
+            ${{ env.JARS_FOLDER }}/*
+            ${{ env.RESOURCES_BIN }}/*
+            ${{ env.BIN_FOLDER }}/*
