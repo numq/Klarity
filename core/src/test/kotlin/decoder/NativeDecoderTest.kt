@@ -24,7 +24,7 @@ class NativeDecoderTest : JNITest() {
     fun `should create and close decoder`() = runTest {
         arrayOf(audioFile, videoFile, mediaFile).forEach { location ->
             val decoder = NativeDecoder(
-                location = mediaFile,
+                location = location,
                 findAudioStream = true,
                 findVideoStream = true,
                 decodeAudioStream = true,
