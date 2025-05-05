@@ -195,7 +195,7 @@ jobs:
           zip -r klarity-$RUNNER_OS.zip package
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: klarity-${{ runner.os }}
           path: klarity-$RUNNER_OS.zip
