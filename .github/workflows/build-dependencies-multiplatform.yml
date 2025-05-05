@@ -33,7 +33,6 @@ jobs:
       JARS_FOLDER: ${{ github.workspace }}/jars/${{ matrix.platform }}
       RESOURCES_BIN: ${{ github.workspace }}/core/src/main/resources/bin/${{ matrix.platform }}
       SOURCE_DIR: ${{ github.workspace }}/core/src/main/cpp
-      CXXFLAGS: -std=c++17 -pthread
 
     steps:
       - name: Checkout project
@@ -121,7 +120,7 @@ jobs:
             "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_DIR\scripts\buildsystems\vcpkg.cmake",
             "-DWITH_AMF=ON",
             "-DWITH_QSV=ON",
-            "-DCMAKE_CXX_FLAGS=-std=c++17"
+            "-DCMAKE_CXX_STANDARD=17"
           )
           cmake @cmakeArgs
           cmake --build . --config Release --parallel
@@ -135,7 +134,8 @@ jobs:
           cmake "$SOURCE_DIR" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_DIR/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_CXX_FLAGS="-std=c++17 -pthread"
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_CXX_FLAGS="-pthread"
           cmake --build . --config Release --parallel
         shell: bash
 
@@ -153,7 +153,6 @@ jobs:
           mkdir -p "$RESOURCES_BIN"
           cp "$BUILD_DIR"/*.so "$RESOURCES_BIN" || true
           cp "$BIN_FOLDER"/*.so* "$RESOURCES_BIN" || true
-          
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
             cp "$BUILD_DIR"/*.dylib "$RESOURCES_BIN" || true
             cp "$BIN_FOLDER"/*.dylib "$RESOURCES_BIN" || true
