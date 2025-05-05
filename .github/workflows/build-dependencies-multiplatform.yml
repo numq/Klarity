@@ -24,12 +24,12 @@ jobs:
             ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,opencl"
 
     env:
-      VCPKG_DIR: ${{ github.workspace }}/vcpkg
-      BUILD_DIR: ${{ github.workspace }}/build-${{ matrix.platform }}
-      BIN_FOLDER: ${{ github.workspace }}/bin-${{ matrix.platform }}
-      JARS_FOLDER: ${{ github.workspace }}/jars/${{ matrix.platform }}
-      RESOURCES_BIN: ${{ github.workspace }}/core/src/main/resources/bin/${{ matrix.platform }}
-      SOURCE_DIR: ${{ github.workspace }}/core/src/main/cpp
+      VCPKG_DIR: ${{ github.workspace }}\vcpkg
+      BUILD_DIR: ${{ github.workspace }}\build-${{ matrix.platform }}
+      BIN_FOLDER: ${{ github.workspace }}\bin-${{ matrix.platform }}
+      JARS_FOLDER: ${{ github.workspace }}\jars\${{ matrix.platform }}
+      RESOURCES_BIN: ${{ github.workspace }}\core\src\main\resources\bin\${{ matrix.platform }}
+      SOURCE_DIR: ${{ github.workspace }}\core\src\main\cpp
 
     steps:
       - name: Checkout project
@@ -60,91 +60,78 @@ jobs:
 
       - name: Clone and bootstrap vcpkg
         run: |
-          git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
-          cd ${{ env.VCPKG_DIR }}
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            ./bootstrap-vcpkg.bat -disableMetrics
-          else
-            ./bootstrap-vcpkg.sh -disableMetrics
-          fi
-        shell: bash
+          git clone https://github.com/Microsoft/vcpkg.git "$env:VCPKG_DIR"
+          cd "$env:VCPKG_DIR"
+          .\bootstrap-vcpkg.bat -disableMetrics
+        shell: powershell
 
       - name: Install FFmpeg with validated features
         run: |
-          cd ${{ env.VCPKG_DIR }}
-          ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse
+          cd "$env:VCPKG_DIR"
+          .\vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse
           
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp installed/${{ matrix.triplet }}/lib/*.dylib ${{ env.BIN_FOLDER }} || true
-          else
-            cp installed/${{ matrix.triplet }}/lib/*.so* ${{ env.BIN_FOLDER }} || true
-          fi
-        shell: bash
+          if ("${{ matrix.os }}" -eq "windows-latest") {
+            Copy-Item -Path "installed\${{ matrix.triplet }}\bin\*.dll" -Destination "$env:BIN_FOLDER" -Force
+          }
+        shell: powershell
 
       - name: Install PortAudio
         run: |
-          cd ${{ env.VCPKG_DIR }}
-          ./vcpkg install portaudio:${{ matrix.triplet }}
-          
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp installed/${{ matrix.triplet }}/bin/portaudio.dll ${{ env.BIN_FOLDER }}
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp installed/${{ matrix.triplet }}/lib/libportaudio*.dylib ${{ env.BIN_FOLDER }}
-          else
-            cp installed/${{ matrix.triplet }}/lib/libportaudio.so* ${{ env.BIN_FOLDER }}
-          fi
-        shell: bash
+          cd "$env:VCPKG_DIR"
+          .\vcpkg install portaudio:${{ matrix.triplet }}
+          Copy-Item -Path "installed\${{ matrix.triplet }}\bin\portaudio.dll" -Destination "$env:BIN_FOLDER" -Force
+        shell: powershell
 
       - name: Build Klarity native code
         run: |
-          mkdir -p ${{ env.BUILD_DIR }}
-          cd ${{ env.BUILD_DIR }}
+          New-Item -ItemType Directory -Path "$env:BUILD_DIR" -Force
+          cd "$env:BUILD_DIR"
           
-          cmake "${{ env.SOURCE_DIR }}" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake" \
-            $([ "${{ matrix.platform }}" = "win64" ] && echo "-DWITH_AMF=ON -DWITH_QSV=ON")
+          $cmakeArgs = @(
+            "$env:SOURCE_DIR",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_DIR\scripts\buildsystems\vcpkg.cmake"
+          )
           
+          if ("${{ matrix.platform }}" -eq "win64") {
+            $cmakeArgs += "-DWITH_AMF=ON", "-DWITH_QSV=ON"
+          }
+          
+          cmake @cmakeArgs
           cmake --build . --config Release --parallel
-        shell: bash
+        shell: powershell
 
       - name: Package native libraries
         run: |
-          mkdir -p ${{ env.RESOURCES_BIN }}
-          
-          if [ "${{ matrix.platform }}" = "win64" ]; then
-            cp ${{ env.BUILD_DIR }}/*.dll ${{ env.RESOURCES_BIN }}
-            cp ${{ env.BIN_FOLDER }}/*.dll ${{ env.RESOURCES_BIN }}
-          elif [ "${{ matrix.platform }}" = "macos" ]; then
-            cp ${{ env.BUILD_DIR }}/*.dylib ${{ env.RESOURCES_BIN }}
-            cp ${{ env.BIN_FOLDER }}/*.dylib ${{ env.RESOURCES_BIN }}
-          else
-            cp ${{ env.BUILD_DIR }}/*.so ${{ env.RESOURCES_BIN }}
-            cp ${{ env.BIN_FOLDER }}/*.so* ${{ env.RESOURCES_BIN }}
-          fi
-        shell: bash
+          New-Item -ItemType Directory -Path "$env:RESOURCES_BIN" -Force
+          Copy-Item -Path "$env:BUILD_DIR\*.dll" -Destination "$env:RESOURCES_BIN" -Force
+          Copy-Item -Path "$env:BIN_FOLDER\*.dll" -Destination "$env:RESOURCES_BIN" -Force
+        shell: powershell
 
       - name: Build Java modules
         run: |
-          cd ${{ github.workspace }}
-          mvn clean package -DskipTests -pl core,compose,example -am \
-            -Dnative.platform=${{ matrix.platform }} \
+          cd "$env:GITHUB_WORKSPACE"
+          mvn clean package -DskipTests -pl core,compose,example -am `
+            -Dnative.platform=${{ matrix.platform }} `
             -Djavacpp.platform=${{ matrix.platform }}
           
-          mkdir -p ${{ env.JARS_FOLDER }}
-          for module in core compose example; do
-            cp $module/target/*-${{ matrix.platform }}.jar ${{ env.JARS_FOLDER }} || \
-            cp $module/target/*.jar ${{ env.JARS_FOLDER }}
-          done
-        shell: bash
+          New-Item -ItemType Directory -Path "$env:JARS_FOLDER" -Force
+          foreach ($module in @("core", "compose", "example")) {
+            $jar = Get-ChildItem "$module\target\*-${{ matrix.platform }}.jar" -ErrorAction SilentlyContinue
+            if ($null -eq $jar) {
+              $jar = Get-ChildItem "$module\target\*.jar" | Select-Object -First 1
+            }
+            if ($null -ne $jar) {
+              Copy-Item -Path $jar.FullName -Destination "$env:JARS_FOLDER" -Force
+            }
+          }
+        shell: powershell
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: klarity-${{ matrix.platform }}-build
           path: |
-            ${{ env.JARS_FOLDER }}/*
-            ${{ env.RESOURCES_BIN }}/*
-            ${{ env.BIN_FOLDER }}/*
+            ${{ env.JARS_FOLDER }}
+            ${{ env.RESOURCES_BIN }}
+            ${{ env.BIN_FOLDER }}
