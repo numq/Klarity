@@ -76,7 +76,7 @@ jobs:
           7z a klarity-artifacts.zip ${{env.BUILD_DIR}}\bin\* ${{env.BUILD_DIR}}\lib\* ${{env.BUILD_DIR}}\include\*
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: klarity-artifacts
           path: klarity-artifacts.zip
