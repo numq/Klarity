@@ -10,8 +10,7 @@ jobs:
       matrix:
         arch: [ x86, x64 ]
     env:
-      FFMPEG_VERSION: "7.1.1"
-      PORTAUDIO_VERSION: "pa_stable_v190700_20210406"
+      VCPKG_DIR: ${{ github.workspace }}\vcpkg
       BUILD_DIR: ${{ github.workspace }}\build
       BIN_FOLDER: ${{ github.workspace }}\bin
 
@@ -25,50 +24,47 @@ jobs:
           arch: ${{ matrix.arch }}
 
       - name: Install dependencies
-        run: choco install -y cmake ninja yasm git
+        run: choco install -y cmake ninja git
+
+      - name: Clone vcpkg
+        run: git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
+
+      - name: Bootstrap vcpkg
+        run: ${{ env.VCPKG_DIR }}\bootstrap-vcpkg.bat
 
       - name: Create dirs
         run: |
           mkdir bin
-          mkdir bin\ffmpeg
-          mkdir bin\portaudio
           mkdir bin\klarity
           mkdir include
-          mkdir include\ffmpeg
-          mkdir include\portaudio
 
-      - name: Build FFmpeg
+      - name: Install FFmpeg with LGPL-compatible features and hardware acceleration
         run: |
-          git clone --depth=1 --branch=n${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
-          cd ffmpeg
-          ./configure --toolchain=msvc --arch=${{ matrix.arch }} --target-os=win32 --enable-shared --disable-static --prefix="${{ env.BIN_FOLDER }}\ffmpeg"
-          make -j
-          make install
-        shell: bash
+          ${{ env.VCPKG_DIR }}\vcpkg install ffmpeg[core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv]:${{ matrix.arch }}-windows --triplet=${{ matrix.arch }}-windows
+          # Copy FFmpeg files to our bin directory
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\bin ${{ env.BIN_FOLDER }}
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\include ${{ env.BIN_FOLDER }}\..\include
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\lib ${{ env.BIN_FOLDER }}
 
-      - name: Build PortAudio
+      - name: Install PortAudio
         run: |
-          git clone --depth=1 --branch=${{ env.PORTAUDIO_VERSION }} https://github.com/PortAudio/portaudio.git
-          cd portaudio
-          mkdir build
-          cd build
-          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\portaudio"
-          cmake --build . --target install
-        shell: bash
+          ${{ env.VCPKG_DIR }}\vcpkg install portaudio:${{ matrix.arch }}-windows --triplet=${{ matrix.arch }}-windows
+          # Copy PortAudio files to our bin directory
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\bin\portaudio.dll ${{ env.BIN_FOLDER }}
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\include ${{ env.BIN_FOLDER }}\..\include\portaudio
+          xcopy /E /Y ${{ env.VCPKG_DIR }}\installed\${{ matrix.arch }}-windows\lib ${{ env.BIN_FOLDER }}
 
       - name: Build Klarity
         run: |
           mkdir ${{ env.BUILD_DIR }}
           cd ${{ env.BUILD_DIR }}
-          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\klarity" -DBIN_FOLDER="${{ env.BIN_FOLDER }}"
+          cmake .. -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\klarity" `
+            -DBIN_FOLDER="${{ env.BIN_FOLDER }}" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}\scripts\buildsystems\vcpkg.cmake"
           cmake --build . --target klarity
-        shell: bash
-
-      - name: Copy FFmpeg headers
-        run: xcopy /E /I /Y ffmpeg /include ${{ env.BIN_FOLDER }}\..\include\ffmpeg
-
-      - name: Copy PortAudio headers
-        run: xcopy /E /I /Y portaudio\include ${{ env.BIN_FOLDER }}\..\include\portaudio
+        shell: powershell
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
