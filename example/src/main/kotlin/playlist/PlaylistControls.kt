@@ -21,7 +21,7 @@ import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun PlaylistControls(
@@ -62,12 +62,14 @@ fun PlaylistControls(
         IconButton(onClick = {
             interactionJob?.cancel()
             interactionJob = coroutineScope.launch {
-                if (playbackTimestamp > 2.milliseconds) {
+                if (playbackTimestamp < 2.seconds) {
+                    previous()
+                } else {
                     stop()
                     play()
-                } else previous()
+                }
             }
-        }, enabled = hasPrevious || playbackTimestamp > 2.milliseconds) {
+        }, enabled = hasPrevious || playbackTimestamp > 2.seconds) {
             Icon(Icons.Default.SkipPrevious, null, tint = color)
         }
         IconButton(onClick = {

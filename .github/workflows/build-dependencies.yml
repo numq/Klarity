@@ -6,83 +6,74 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     strategy:
       matrix:
-        arch: [x64, x86]
-
+        arch: [ x86, x64 ]
     env:
-      BUILD_DIR: ${{ github.workspace }}\build\${{ matrix.arch }}
+      FFMPEG_VERSION: "7.1.1"
+      PORTAUDIO_VERSION: "pa_stable_v190700_20210406"
+      BUILD_DIR: ${{ github.workspace }}\build
+      BIN_FOLDER: ${{ github.workspace }}\bin
 
     steps:
-      - name: Checkout repo
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Chocolatey)
-        run: choco install -y ninja cmake yasm nasm git 7zip
-
-      - name: Set up MSVC environment
+      - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
 
-      - name: Build PortAudio
+      - name: Install dependencies
+        run: choco install -y cmake ninja yasm git
+
+      - name: Create dirs
         run: |
-          git clone https://github.com/PortAudio/portaudio.git
-          cd portaudio
-          git checkout v19.7.0
-          powershell -Command "(Get-Content CMakeLists.txt) -replace 'CMAKE_MINIMUM_REQUIRED.*', 'cmake_minimum_required(VERSION 3.5)' | Set-Content CMakeLists.txt"
-          cmake -B build -G 'Ninja' -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=build/out -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=build/out
-          cmake --build build
-          mkdir -p ${{env.BUILD_DIR}}\bin\portaudio
-          mkdir -p ${{env.BUILD_DIR}}\lib\portaudio
-          mkdir -p ${{env.BUILD_DIR}}\include\portaudio
-          copy build\out\portaudio.dll ${{env.BUILD_DIR}}\bin\portaudio\
-          copy build\out\portaudio.lib ${{env.BUILD_DIR}}\lib\portaudio\
-          xcopy /E /I /Y include\ ${{env.BUILD_DIR}}\include\portaudio\
+          mkdir bin
+          mkdir bin\ffmpeg
+          mkdir bin\portaudio
+          mkdir bin\klarity
+          mkdir include
+          mkdir include\ffmpeg
+          mkdir include\portaudio
 
       - name: Build FFmpeg
-        shell: bash
         run: |
-          mkdir -p ffmpeg_build
-          cd ffmpeg_build
-          curl -LO https://ffmpeg.org/releases/ffmpeg-6.1.tar.bz2
-          tar -xjf ffmpeg-6.1.tar.bz2
-          cd ffmpeg-6.1
-          ./configure \
-            --toolchain=msvc \
-            --target-os=win64 \
-            --arch=${{ matrix.arch == 'x64' && 'x86_64' || 'x86' }} \
-            --enable-shared \
-            --disable-static \
-            --enable-hwaccels \
-            --enable-cuda \
-            --enable-cuvid \
-            --enable-d3d11va \
-            --enable-dxva2 \
-            --enable-libmfx \
-            --disable-programs
-          make -j$(nproc)
-          mkdir -p ${{env.BUILD_DIR}}/bin/ffmpeg
-          mkdir -p ${{env.BUILD_DIR}}/lib/ffmpeg
-          mkdir -p ${{env.BUILD_DIR}}/include/ffmpeg
-          cp *.dll ${{env.BUILD_DIR}}/bin/ffmpeg/
-          cp *.lib ${{env.BUILD_DIR}}/lib/ffmpeg/
-          cp -R ./include/* ${{env.BUILD_DIR}}/include/ffmpeg/
+          git clone --depth=1 --branch=n${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
+          cd ffmpeg
+          ./configure --toolchain=msvc --arch=${{ matrix.arch }} --target-os=win32 --enable-shared --disable-static --prefix="${{ env.BIN_FOLDER }}\ffmpeg"
+          make -j
+          make install
+        shell: bash
+
+      - name: Build PortAudio
+        run: |
+          git clone --depth=1 --branch=${{ env.PORTAUDIO_VERSION }} https://github.com/PortAudio/portaudio.git
+          cd portaudio
+          mkdir build
+          cd build
+          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\portaudio"
+          cmake --build . --target install
+        shell: bash
 
       - name: Build Klarity
         run: |
-          cmake -B klarity_build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE="${{env.BUILD_DIR}}\bin\klarity"
-          cmake --build klarity_build --config Release
-          mkdir -p ${{env.BUILD_DIR}}\lib\klarity
-          copy klarity_build\Release\klarity.lib ${{env.BUILD_DIR}}\lib\klarity\
+          mkdir ${{ env.BUILD_DIR }}
+          cd ${{ env.BUILD_DIR }}
+          cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${{ env.BIN_FOLDER }}\klarity" -DBIN_FOLDER="${{ env.BIN_FOLDER }}"
+          cmake --build . --target klarity
+        shell: bash
 
-      - name: Archive binaries
-        run: |
-          7z a klarity-${{ matrix.arch }}.zip ${{env.BUILD_DIR}}\bin\* ${{env.BUILD_DIR}}\lib\* ${{env.BUILD_DIR}}\include\*
+      - name: Copy FFmpeg headers
+        run: xcopy /E /I /Y ffmpeg /include ${{ env.BIN_FOLDER }}\..\include\ffmpeg
 
-      - name: Upload artifact
+      - name: Copy PortAudio headers
+        run: xcopy /E /I /Y portaudio\include ${{ env.BIN_FOLDER }}\..\include\portaudio
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-artifacts-${{ matrix.arch }}
-          path: klarity-${{ matrix.arch }}.zip
+          name: klarity-windows-${{ matrix.arch }}
+          path: |
+            bin
+            include
