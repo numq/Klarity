@@ -1,65 +1,77 @@
 package sampler
 
 import JNITest
+import com.github.numq.klarity.core.data.NativeData
 import com.github.numq.klarity.core.sampler.NativeSampler
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertDoesNotThrow
-import org.junit.jupiter.api.BeforeEach
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import kotlin.random.Random
+import org.junit.jupiter.api.assertThrows
 
 class NativeSamplerTest : JNITest() {
-    private lateinit var sampler: NativeSampler
-
-    @BeforeEach
-    fun beforeEach() {
-        sampler = NativeSampler(44100, 2)
-    }
-
-    @AfterEach
-    fun afterEach() {
-        sampler.close()
-    }
 
     @Test
-    fun `should create and close`() {
-        assertDoesNotThrow {
-            NativeSampler(sampleRate = 48_000, channels = 2).close()
+    fun `should create and close sampler`() = runTest {
+        val sampler = NativeSampler(sampleRate = 44100, channels = 2)
+        sampler.close()
+
+        assertThrows<IllegalStateException> {
+            sampler.setVolume(1.0f).getOrThrow()
         }
     }
 
     @Test
-    fun `change playbackSpeed`() {
-        sampler.start()
-        sampler.setPlaybackSpeed(2f)
-        sampler.stop()
+    fun `should allow setting playback speed and volume`() = runTest {
+        val sampler = NativeSampler(sampleRate = 48000, channels = 2)
+
+        val speedResult = sampler.setPlaybackSpeed(1.25f)
+        val volumeResult = sampler.setVolume(0.75f)
+
+        assert(speedResult.isSuccess)
+        assert(volumeResult.isSuccess)
+
+        sampler.close()
     }
 
     @Test
-    fun `change volume`() {
-        sampler.start()
-        sampler.setVolume(.5f)
-        sampler.stop()
+    fun `should start write and stop playback`() = runTest {
+        val bufferSize = 8192
+        val nativeBuffer = NativeData.allocate(bufferSize)
+
+        val sampler = NativeSampler(sampleRate = 48000, channels = 2)
+
+        val startResult = sampler.start()
+        val writeResult = sampler.write(nativeBuffer.getBuffer(), bufferSize)
+        val stopResult = sampler.stop()
+
+        assert(startResult.isSuccess)
+        assert(writeResult.isSuccess)
+        assert(stopResult.isSuccess)
+
+        nativeBuffer.close()
+        sampler.close()
     }
 
     @Test
-    fun `play bytes`() {
-        sampler.start()
-        val bytes = Random(System.currentTimeMillis()).nextBytes(10)
-        sampler.play(bytes, bytes.size)
-        sampler.stop()
+    fun `should flush and drain without error`() = runTest {
+        val sampler = NativeSampler(sampleRate = 44100, channels = 2)
+
+        val flushResult = sampler.flush()
+        val drainResult = sampler.drain()
+
+        assert(flushResult.isSuccess)
+        assert(drainResult.isSuccess)
+
+        sampler.close()
     }
 
     @Test
-    fun `start, pause and stop playback`() {
-        sampler.start()
-        sampler.pause()
-        sampler.stop()
-    }
+    fun `should fail with invalid arguments`() {
+        assertThrows<IllegalArgumentException> {
+            NativeSampler(sampleRate = 0, channels = 2)
+        }
 
-    @Test
-    fun `start and stop playback`() {
-        sampler.start()
-        sampler.stop()
+        assertThrows<IllegalArgumentException> {
+            NativeSampler(sampleRate = 44100, channels = 0)
+        }
     }
 }

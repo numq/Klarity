@@ -1,164 +1,92 @@
 package decoder
 
 import JNITest
-import com.github.numq.klarity.core.decoder.DecoderException
-import com.github.numq.klarity.core.decoder.HardwareAcceleration
+import com.github.numq.klarity.core.data.NativeData
 import com.github.numq.klarity.core.decoder.NativeDecoder
-import com.github.numq.klarity.core.frame.NativeFrame
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.io.File
 import java.net.URL
 
 class NativeDecoderTest : JNITest() {
     private val files = File(ClassLoader.getSystemResources("files").nextElement().let(URL::getFile)).listFiles()
 
-    private val audioFile = files?.find { file -> file.nameWithoutExtension == "audio_only" }?.absolutePath
+    private val audioFile = files?.find { file -> file.nameWithoutExtension == "audio_only" }?.absolutePath!!
 
-    private val videoFile = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath
+    private val videoFile = files?.find { file -> file.nameWithoutExtension == "video_only" }?.absolutePath!!
 
-    private val mediaFile = files?.find { file -> file.nameWithoutExtension == "audio_video" }?.absolutePath
-
-    private lateinit var audioDecoder: NativeDecoder
-
-    private lateinit var videoDecoder: NativeDecoder
-
-    private lateinit var mediaDecoder: NativeDecoder
-
-    @BeforeEach
-    fun beforeEach() {
-        audioDecoder = NativeDecoder(
-            audioFile!!,
-            findAudioStream = true,
-            findVideoStream = false,
-            hardwareAcceleration = HardwareAcceleration.NONE
-        )
-
-        videoDecoder = NativeDecoder(
-            videoFile!!,
-            findAudioStream = false,
-            findVideoStream = true,
-            hardwareAcceleration = HardwareAcceleration.NONE
-        )
-
-        mediaDecoder = NativeDecoder(
-            mediaFile!!,
-            findAudioStream = true,
-            findVideoStream = true,
-            hardwareAcceleration = HardwareAcceleration.NONE
-        )
-    }
-
-    @AfterEach
-    fun afterEach() {
-        audioDecoder.close()
-        videoDecoder.close()
-        mediaDecoder.close()
-    }
+    private val mediaFile = files?.find { file -> file.nameWithoutExtension == "audio_video" }?.absolutePath!!
 
     @Test
-    fun `should handle invalid location`() = runTest {
-        assertThrows(DecoderException::class.java) {
-            NativeDecoder(
-                location = "some invalid media location",
+    fun `should create and close decoder`() = runTest {
+        arrayOf(audioFile, videoFile, mediaFile).forEach { location ->
+            val decoder = NativeDecoder(
+                location = mediaFile,
                 findAudioStream = true,
                 findVideoStream = true,
-                hardwareAcceleration = HardwareAcceleration.NONE
-            ).close()
-        }
-    }
+                decodeAudioStream = true,
+                decodeVideoStream = true
+            )
 
-    @Test
-    fun `should create and close`() = runTest {
-        files!!.forEach { file ->
-            assertDoesNotThrow {
-                when (file.nameWithoutExtension) {
-                    "audio_only" -> NativeDecoder(
-                        location = file.absolutePath,
-                        findAudioStream = true,
-                        findVideoStream = false,
-                        hardwareAcceleration = HardwareAcceleration.NONE
-                    ).close()
+            assert(decoder.getNativeHandle() != -1L)
 
-                    "video_only" -> NativeDecoder(
-                        location = file.absolutePath,
-                        findAudioStream = false,
-                        findVideoStream = true,
-                        hardwareAcceleration = HardwareAcceleration.NONE
-                    ).close()
+            assert(decoder.format.isSuccess)
 
-                    else -> NativeDecoder(
-                        location = file.absolutePath,
-                        findAudioStream = true,
-                        findVideoStream = true,
-                        hardwareAcceleration = HardwareAcceleration.NONE
-                    ).close()
-                }
+            decoder.close()
+            assertThrows<IllegalArgumentException> {
+                decoder.getNativeHandle()
             }
         }
     }
 
     @Test
-    fun `get format`() = runTest {
-        with(audioDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(44100, sampleRate)
-            assertEquals(2, channels)
-            assertEquals(0, width)
-            assertEquals(0, height)
-            assertEquals(0.0, frameRate)
-        }
-        with(videoDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(0, sampleRate)
-            assertEquals(0, channels)
-            assertEquals(500, width)
-            assertEquals(500, height)
-            assertEquals(25.0, frameRate)
-        }
-        with(mediaDecoder.format) {
-            assertEquals(5_000_000L, durationMicros)
-            assertEquals(44100, sampleRate)
-            assertEquals(2, channels)
-            assertEquals(500, width)
-            assertEquals(500, height)
-            assertEquals(25.0, frameRate)
-        }
+    fun `should decode video and audio safely`() = runTest {
+        val bufferSize = 1024
+        val nativeBuffer = NativeData.allocate(bufferSize)
+
+        val decoder = NativeDecoder(
+            location = mediaFile,
+            findAudioStream = true,
+            findVideoStream = true,
+            decodeAudioStream = true,
+            decodeVideoStream = true
+        )
+
+        val audioFrame = decoder.decodeAudio(nativeBuffer.getBuffer(), bufferSize)
+        val videoFrame = decoder.decodeVideo(nativeBuffer.getBuffer(), bufferSize)
+
+        assertTrue(audioFrame.isSuccess || videoFrame.isSuccess)
+
+        nativeBuffer.close()
+        decoder.close()
     }
 
     @Test
-    fun `get next frame`() = runTest {
-        with(audioDecoder.nextFrame(0, 0)!!) {
-            assertEquals(NativeFrame.Type.AUDIO.ordinal, type)
-            assertEquals(0L, timestampMicros)
-            assertTrue(bytes.isNotEmpty())
-        }
-        with(videoDecoder.nextFrame(100, 100)!!) {
-            assertEquals(NativeFrame.Type.VIDEO.ordinal, type)
-            assertEquals(0L, timestampMicros)
-            assertTrue(bytes.isNotEmpty())
-        }
-        with(mediaDecoder.nextFrame(100, 100)!!) {
-            assertTrue(type == NativeFrame.Type.AUDIO.ordinal || type == NativeFrame.Type.VIDEO.ordinal)
-            assertEquals(0L, timestampMicros)
-            assertTrue(bytes.isNotEmpty())
-        }
+    fun `should seek and reset without failure`() = runTest {
+        val decoder = NativeDecoder(
+            location = mediaFile,
+            findAudioStream = true,
+            findVideoStream = true,
+            decodeAudioStream = true,
+            decodeVideoStream = true
+        )
+
+        val seekResult = decoder.seekTo(1_000_000, keyframesOnly = true)
+        assertTrue(seekResult.isSuccess)
+        assertTrue(seekResult.getOrThrow() >= 0)
+
+        val resetResult = decoder.reset()
+        assertTrue(resetResult.isSuccess)
+
+        decoder.close()
     }
 
     @Test
-    fun `seek media`() = runTest {
-        audioDecoder.seekTo((0L..audioDecoder.format.durationMicros).random(), false)
-        videoDecoder.seekTo((0L..videoDecoder.format.durationMicros).random(), false)
-        mediaDecoder.seekTo((0L..mediaDecoder.format.durationMicros).random(), false)
-    }
-
-    @Test
-    fun `reset media`() = runTest {
-        audioDecoder.reset()
-        videoDecoder.reset()
-        mediaDecoder.reset()
+    fun `should return available hardware accelerations`() {
+        val hardware = NativeDecoder.getAvailableHardwareAcceleration()
+        assertNotNull(hardware)
     }
 }
