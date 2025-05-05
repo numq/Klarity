@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, ubuntu-latest, macos-latest ]
+        os: [windows-latest, ubuntu-latest, macos-latest]
         include:
           - os: windows-latest
             platform: win64
@@ -57,20 +57,14 @@ jobs:
           fi
         shell: bash
 
-      - name: Clone vcpkg
+      - name: Clone and bootstrap vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            chmod +x ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.sh
-          fi
-        shell: bash
-
-      - name: Bootstrap vcpkg
-        run: |
+          cd ${{ env.VCPKG_DIR }}
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.bat
+            ./bootstrap-vcpkg.bat
           else
-            ${{ env.VCPKG_DIR }}/bootstrap-vcpkg.sh
+            ./bootstrap-vcpkg.sh
           fi
         shell: bash
 
@@ -84,27 +78,29 @@ jobs:
 
       - name: Install FFmpeg
         run: |
-          ${{ env.VCPKG_DIR }}/vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
+          cd ${{ env.VCPKG_DIR }}
+          ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
           
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
+            cp installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/*.dylib ${{ env.BIN_FOLDER }} || true
+            cp installed/${{ matrix.triplet }}/lib/*.dylib ${{ env.BIN_FOLDER }} || true
           else
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/*.so* ${{ env.BIN_FOLDER }} || true
+            cp installed/${{ matrix.triplet }}/lib/*.so* ${{ env.BIN_FOLDER }} || true
           fi
         shell: bash
 
       - name: Install PortAudio
         run: |
-          ${{ env.VCPKG_DIR }}/vcpkg install portaudio:${{ matrix.triplet }}
+          cd ${{ env.VCPKG_DIR }}
+          ./vcpkg install portaudio:${{ matrix.triplet }}
           
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/bin/portaudio.dll ${{ env.BIN_FOLDER }}
+            cp installed/${{ matrix.triplet }}/bin/portaudio.dll ${{ env.BIN_FOLDER }}
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/libportaudio*.dylib ${{ env.BIN_FOLDER }}
+            cp installed/${{ matrix.triplet }}/lib/libportaudio*.dylib ${{ env.BIN_FOLDER }}
           else
-            cp ${{ env.VCPKG_DIR }}/installed/${{ matrix.triplet }}/lib/libportaudio.so* ${{ env.BIN_FOLDER }}
+            cp installed/${{ matrix.triplet }}/lib/libportaudio.so* ${{ env.BIN_FOLDER }}
           fi
         shell: bash
 
