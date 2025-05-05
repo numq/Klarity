@@ -7,26 +7,32 @@ jobs:
   build:
     runs-on: windows-latest
 
+    strategy:
+      matrix:
+        arch: [x64, x86]
+
     env:
-      BUILD_DIR: ${{ github.workspace }}\build
+      BUILD_DIR: ${{ github.workspace }}\build\${{ matrix.arch }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Install dependencies (Chocolatey)
-        run: |
-          choco install -y ninja cmake yasm nasm git 7zip
+        run: choco install -y ninja cmake yasm nasm git 7zip
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
 
       - name: Build PortAudio
         run: |
           git clone https://github.com/PortAudio/portaudio.git
           cd portaudio
           git checkout v19.7.0
-          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=build/out -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=build/out
+          powershell -Command "(Get-Content CMakeLists.txt) -replace 'CMAKE_MINIMUM_REQUIRED.*', 'cmake_minimum_required(VERSION 3.5)' | Set-Content CMakeLists.txt"
+          cmake -B build -G 'Ninja' -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=build/out -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=build/out
           cmake --build build
           mkdir -p ${{env.BUILD_DIR}}\bin\portaudio
           mkdir -p ${{env.BUILD_DIR}}\lib\portaudio
@@ -46,7 +52,7 @@ jobs:
           ./configure \
             --toolchain=msvc \
             --target-os=win64 \
-            --arch=x86_64 \
+            --arch=${{ matrix.arch == 'x64' && 'x86_64' || 'x86' }} \
             --enable-shared \
             --disable-static \
             --enable-hwaccels \
@@ -73,10 +79,10 @@ jobs:
 
       - name: Archive binaries
         run: |
-          7z a klarity-artifacts.zip ${{env.BUILD_DIR}}\bin\* ${{env.BUILD_DIR}}\lib\* ${{env.BUILD_DIR}}\include\*
+          7z a klarity-${{ matrix.arch }}.zip ${{env.BUILD_DIR}}\bin\* ${{env.BUILD_DIR}}\lib\* ${{env.BUILD_DIR}}\include\*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-artifacts
-          path: klarity-artifacts.zip
+          name: klarity-artifacts-${{ matrix.arch }}
+          path: klarity-${{ matrix.arch }}.zip
