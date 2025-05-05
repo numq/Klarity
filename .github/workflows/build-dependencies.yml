@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -17,13 +17,11 @@ jobs:
         id: setup
         shell: bash
         run: |
-          # Common environment variables
           echo "FFMPEG_VERSION=6.1.1" >> $GITHUB_ENV
           echo "PORTAUDIO_VERSION=19.7.0" >> $GITHUB_ENV
           echo "BUILD_DIR=build" >> $GITHUB_ENV
           echo "INSTALL_DIR=install" >> $GITHUB_ENV
           
-          # OS-specific settings
           if [ "$RUNNER_OS" == "Windows" ]; then
             echo "CMAKE_GENERATOR=\"Visual Studio 17 2022\"" >> $GITHUB_ENV
             echo "ARCH=x64" >> $GITHUB_ENV
@@ -33,7 +31,8 @@ jobs:
             echo "CMAKE_GENERATOR=\"Unix Makefiles\"" >> $GITHUB_ENV
             echo "EXT=dylib" >> $GITHUB_ENV
             echo "LIBEXT=dylib" >> $GITHUB_ENV
-          else # Linux
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          else
             echo "CMAKE_GENERATOR=\"Unix Makefiles\"" >> $GITHUB_ENV
             echo "EXT=so" >> $GITHUB_ENV
             echo "LIBEXT=so" >> $GITHUB_ENV
@@ -109,8 +108,16 @@ jobs:
             cmake -B ${{ env.BUILD_DIR }} -G "${{ env.CMAKE_GENERATOR }}" -A ${{ env.ARCH }} \
               -DCMAKE_INSTALL_PREFIX=../${{ env.INSTALL_DIR }}
             cmake --build ${{ env.BUILD_DIR }} --config Release --target install
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cmake -B ${{ env.BUILD_DIR }} -G "${{ env.CMAKE_GENERATOR }}" \
+              -DCMAKE_INSTALL_PREFIX=../${{ env.INSTALL_DIR }} \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOSX_DEPLOYMENT_TARGET }} \
+              -DPA_USE_COREAUDIO=ON \
+              -DPA_BUILD_SHARED=ON \
+              -Wno-dev
+            cmake --build ${{ env.BUILD_DIR }} --config Release --target install
           else
-            ./configure --prefix=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} --enable-shared
+            ./configure --prefix=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} --enable-shared CFLAGS="-Wno-error"
             make -j$(nproc)
             make install
           fi
@@ -160,10 +167,8 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib
           mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include
           
-          # Copy FFmpeg and PortAudio headers
           cp -r $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/* $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/
           
-          # Build klarity
           mkdir build
           cd build
           
@@ -172,6 +177,12 @@ jobs:
               -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
               -DCMAKE_BUILD_TYPE=Release
             cmake --build . --config Release --target install
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cmake .. -G "${{ env.CMAKE_GENERATOR }}" \
+              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOSX_DEPLOYMENT_TARGET }}
+            cmake --build . --config Release --target install -- -j$(nproc)
           else
             cmake .. -G "${{ env.CMAKE_GENERATOR }}" \
               -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
@@ -182,20 +193,16 @@ jobs:
       - name: Package artifacts
         shell: bash
         run: |
-          # Create the directory structure
           mkdir -p package/bin
           mkdir -p package/lib
           mkdir -p package/include
           
-          # Copy binaries
           cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/bin/* package/bin/ 2>/dev/null || :
           cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib/*.${{ env.EXT }} package/bin/ 2>/dev/null || :
           cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib/*.${{ env.LIBEXT }} package/lib/ 2>/dev/null || :
           
-          # Copy headers
           cp -r $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/* package/include/ 2>/dev/null || :
           
-          # Create zip file
           if [ "$RUNNER_OS" == "Windows" ]; then
             7z a -r klarity-$RUNNER_OS.zip package
           else
