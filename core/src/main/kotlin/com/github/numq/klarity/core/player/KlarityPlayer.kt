@@ -15,6 +15,9 @@ import com.github.numq.klarity.core.settings.PlayerSettings
 import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlin.time.Duration
 
 /**
@@ -193,6 +196,83 @@ interface KlarityPlayer {
             System.load(klarity)
         }.onSuccess {
             isLoaded = true
+        }
+
+        /**
+         * Loads pre-installed native libraries based on the auto-detected operating system.
+         *
+         * This method must be called before creating an instance.
+         *
+         * @return A [Result] containing either a new [KlarityPlayer] instance or an error if creation fails.
+         */
+        fun load() = runCatching {
+            if (isLoaded) {
+                return@runCatching
+            }
+
+            val osName = System.getProperty("os.name").lowercase()
+
+            val osFolder = when {
+                osName.contains("win") -> "windows"
+
+                osName.contains("mac") -> "macos"
+
+                osName.contains("nux") || osName.contains("nix") -> "linux"
+
+                else -> error("Unsupported OS: $osName")
+            }
+
+            val libs = listOf(
+                "avutil-59",
+                "postproc-58",
+                "swresample-5",
+                "swscale-8",
+                "avcodec-61",
+                "avformat-61",
+                "avfilter-10",
+                "avdevice-61",
+                "portaudio",
+                "klarity"
+            )
+
+            val tmpDir = Files.createTempDirectory("binaries").toFile().apply { deleteOnExit() }
+
+            libs.map { lib ->
+                val ext = when (osFolder) {
+                    "windows" -> ".dll"
+
+                    "linux" -> ".so"
+
+                    "macos" -> ".dylib"
+
+                    else -> ""
+                }
+
+                val libName = "$lib$ext"
+
+                val resPath = "/bin/$osFolder/$libName"
+
+                val tmpFile = File(tmpDir, libName)
+
+                KlarityPlayer::class.java.getResourceAsStream(resPath)?.use { input ->
+                    Files.copy(input, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                } ?: error("Library not found in resources: $resPath")
+
+                tmpFile.absolutePath
+            }.let { paths ->
+                load(
+                    avutil = paths[0],
+                    postproc = paths[1],
+                    swresample = paths[2],
+                    swscale = paths[3],
+                    avcodec = paths[4],
+                    avformat = paths[5],
+                    avfilter = paths[6],
+                    avdevice = paths[7],
+                    portaudio = paths[8],
+                    klarity = paths[9],
+                )
+            }
         }
 
         /**
