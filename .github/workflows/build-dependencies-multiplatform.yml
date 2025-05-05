@@ -46,11 +46,11 @@ jobs:
       - name: Install system dependencies
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            choco install -y cmake ninja git pkgconfig
+            choco install -y cmake ninja git pkgconfig yasm
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev
+            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev nasm
           else
-            brew install cmake ninja pkg-config
+            brew install cmake ninja pkg-config nasm
           fi
         shell: bash
 
@@ -68,7 +68,7 @@ jobs:
       - name: Install FFmpeg with validated features
         run: |
           cd ${{ env.VCPKG_DIR }}
-          ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
+          ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }} --recurse
           
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp installed/${{ matrix.triplet }}/bin/*.dll ${{ env.BIN_FOLDER }} || true
