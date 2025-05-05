@@ -5,170 +5,78 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
+
+    env:
+      BUILD_DIR: ${{ github.workspace }}\build
+
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up environment
-        id: setup
-        shell: bash
+      - name: Install dependencies (Chocolatey)
         run: |
-          echo "FFMPEG_VERSION=6.1.1" >> $GITHUB_ENV
-          echo "PORTAUDIO_VERSION=19.7.0" >> $GITHUB_ENV
-          echo "BUILD_DIR=build" >> $GITHUB_ENV
-          echo "INSTALL_DIR=install" >> $GITHUB_ENV
-          
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            echo "CMAKE_GENERATOR=Visual Studio 17 2022" >> $GITHUB_ENV
-            echo "ARCH=x64" >> $GITHUB_ENV
-            echo "EXT=dll" >> $GITHUB_ENV
-            echo "LIBEXT=lib" >> $GITHUB_ENV
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            echo "CMAKE_GENERATOR=Unix Makefiles" >> $GITHUB_ENV
-            echo "EXT=dylib" >> $GITHUB_ENV
-            echo "LIBEXT=dylib" >> $GITHUB_ENV
-            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
-          else
-            echo "CMAKE_GENERATOR=Unix Makefiles" >> $GITHUB_ENV
-            echo "EXT=so" >> $GITHUB_ENV
-            echo "LIBEXT=so" >> $GITHUB_ENV
-          fi
+          choco install -y ninja cmake yasm nasm git 7zip
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          brew update
-          brew install \
-            cmake \
-            pkg-config \
-            nasm \
-            yasm \
-            libtool \
-            automake \
-            openjdk@17
-          brew link openjdk@17 --force
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build PortAudio
-        shell: bash
         run: |
           git clone https://github.com/PortAudio/portaudio.git
           cd portaudio
-          git checkout v${{ env.PORTAUDIO_VERSION }}
-          
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake -B ${{ env.BUILD_DIR }} -G "${{ env.CMAKE_GENERATOR }}" -A ${{ env.ARCH }} \
-              -DCMAKE_INSTALL_PREFIX=../${{ env.INSTALL_DIR }}
-            cmake --build ${{ env.BUILD_DIR }} --config Release --target install
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            # Use CMake for macOS with explicit generator and additional flags
-            cmake -B ${{ env.BUILD_DIR }} -G ${{ env.CMAKE_GENERATOR }} \
-              -DCMAKE_INSTALL_PREFIX=../${{ env.INSTALL_DIR }} \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOSX_DEPLOYMENT_TARGET }} \
-              -DPA_USE_COREAUDIO=ON \
-              -DPA_BUILD_SHARED=ON \
-              -DPA_DLL_LINK_WITH_STATIC_RUNTIME=OFF \
-              -Wno-dev
-            cmake --build ${{ env.BUILD_DIR }} --config Release --target install -- -j$(sysctl -n hw.ncpu)
-          else
-            ./configure --prefix=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} --enable-shared CFLAGS="-Wno-error"
-            make -j$(nproc)
-            make install
-          fi
+          git checkout v19.7.0
+          cmake -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON
+          cmake --build build --config Release
+          mkdir -p ${{env.BUILD_DIR}}\bin\portaudio
+          mkdir -p ${{env.BUILD_DIR}}\lib\portaudio
+          mkdir -p ${{env.BUILD_DIR}}\include\portaudio
+          copy build\Release\portaudio.dll ${{env.BUILD_DIR}}\bin\portaudio\
+          copy build\Release\portaudio.lib ${{env.BUILD_DIR}}\lib\portaudio\
+          xcopy /E /I /Y include\ ${{env.BUILD_DIR}}\include\portaudio\
 
       - name: Build FFmpeg
         shell: bash
         run: |
-          git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-          cd ffmpeg
-          git checkout n${{ env.FFMPEG_VERSION }}
-          
-          EXTRA_FLAGS=""
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            EXTRA_FLAGS="--enable-vaapi --enable-vdpau --enable-vulkan --enable-opencl --enable-cuda --enable-cuvid --enable-nvenc --enable-libdrm"
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            EXTRA_FLAGS="--enable-videotoolbox --enable-opencl --enable-metal"
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-            EXTRA_FLAGS="--enable-d3d11va --enable-dxva2 --enable-nvenc --enable-cuda --enable-cuvid"
-          fi
-          
+          mkdir -p ffmpeg_build
+          cd ffmpeg_build
+          curl -LO https://ffmpeg.org/releases/ffmpeg-6.1.tar.bz2
+          tar -xjf ffmpeg-6.1.tar.bz2
+          cd ffmpeg-6.1
           ./configure \
-            --prefix=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
+            --toolchain=msvc \
+            --target-os=win64 \
+            --arch=x86_64 \
             --enable-shared \
             --disable-static \
-            --enable-gpl \
-            --enable-version3 \
-            --enable-nonfree \
-            --enable-libx264 \
-            --enable-libx265 \
-            --enable-libvpx \
-            --enable-libmp3lame \
-            --enable-libopus \
-            --enable-libvorbis \
-            --enable-libass \
-            --enable-openssl \
-            --enable-libfreetype \
-            --enable-libfontconfig \
-            $EXTRA_FLAGS
-          
+            --enable-hwaccels \
+            --enable-cuda \
+            --enable-cuvid \
+            --enable-d3d11va \
+            --enable-dxva2 \
+            --enable-libmfx \
+            --disable-programs
           make -j$(nproc)
-          make install
+          mkdir -p ${{env.BUILD_DIR}}/bin/ffmpeg
+          mkdir -p ${{env.BUILD_DIR}}/lib/ffmpeg
+          mkdir -p ${{env.BUILD_DIR}}/include/ffmpeg
+          cp *.dll ${{env.BUILD_DIR}}/bin/ffmpeg/
+          cp *.lib ${{env.BUILD_DIR}}/lib/ffmpeg/
+          cp -R ./include/* ${{env.BUILD_DIR}}/include/ffmpeg/
 
       - name: Build Klarity
-        shell: bash
         run: |
-          mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/bin
-          mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib
-          mkdir -p $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include
-          
-          cp -r $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/* $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/
-          
-          mkdir build
-          cd build
-          
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            cmake .. -G "${{ env.CMAKE_GENERATOR }}" -A ${{ env.ARCH }} \
-              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
-              -DCMAKE_BUILD_TYPE=Release
-            cmake --build . --config Release --target install
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            cmake .. -G ${{ env.CMAKE_GENERATOR }} \
-              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.MACOSX_DEPLOYMENT_TARGET }}
-            cmake --build . --config Release --target install -- -j$(sysctl -n hw.ncpu)
-          else
-            cmake .. -G ${{ env.CMAKE_GENERATOR }} \
-              -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/${{ env.INSTALL_DIR }} \
-              -DCMAKE_BUILD_TYPE=Release
-            cmake --build . --config Release --target install -- -j$(nproc)
-          fi
+          cmake -B klarity_build -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE="${{env.BUILD_DIR}}\bin\klarity"
+          cmake --build klarity_build --config Release
+          mkdir -p ${{env.BUILD_DIR}}\lib\klarity
+          copy klarity_build\Release\klarity.lib ${{env.BUILD_DIR}}\lib\klarity\
 
-      - name: Package artifacts
-        shell: bash
+      - name: Archive binaries
         run: |
-          mkdir -p package/bin
-          mkdir -p package/lib
-          mkdir -p package/include
-          
-          cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/bin/* package/bin/ 2>/dev/null || :
-          cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib/*.${{ env.EXT }} package/bin/ 2>/dev/null || :
-          cp $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/lib/*.${{ env.LIBEXT }} package/lib/ 2>/dev/null || :
-          
-          cp -r $GITHUB_WORKSPACE/${{ env.INSTALL_DIR }}/include/* package/include/ 2>/dev/null || :
-          
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a -r klarity-$RUNNER_OS.zip package
-          else
-            zip -r klarity-$RUNNER_OS.zip package
-          fi
+          7z a klarity-artifacts.zip ${{env.BUILD_DIR}}\bin\* ${{env.BUILD_DIR}}\lib\* ${{env.BUILD_DIR}}\include\*
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: klarity-${{ runner.os }}
-          path: klarity-$RUNNER_OS.zip
+          name: klarity-artifacts
+          path: klarity-artifacts.zip
