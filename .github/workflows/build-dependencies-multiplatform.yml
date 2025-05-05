@@ -17,7 +17,7 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             triplet: x64-linux
-            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,vaapi,opencl,dav1d"
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,opencl,dav1d"
           - os: macos-latest
             platform: macos
             triplet: x64-osx
@@ -48,7 +48,7 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             choco install -y cmake ninja git pkgconfig
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config libva-dev ocl-icd-opencl-dev
+            sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev
           else
             brew install cmake ninja pkg-config
           fi
@@ -101,8 +101,7 @@ jobs:
           cmake "${{ env.SOURCE_DIR }}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake" \
-            $([ "${{ matrix.platform }}" = "win64" ] && echo "-DWITH_AMF=ON -DWITH_QSV=ON") \
-            $([ "${{ matrix.platform }}" = "linux" ] && echo "-DWITH_VAAPI=ON")
+            $([ "${{ matrix.platform }}" = "win64" ] && echo "-DWITH_AMF=ON -DWITH_QSV=ON")
           
           cmake --build . --config Release --parallel
         shell: bash
