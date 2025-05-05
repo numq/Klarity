@@ -13,11 +13,11 @@ jobs:
           - os: windows-latest
             platform: win64
             triplet: x64-windows
-            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,opencl,dav1d,qsv"
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,amf,qsv,opencl,dav1d"
           - os: ubuntu-latest
             platform: linux
             triplet: x64-linux
-            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,vaapi,vdpau,opencl,dav1d"
+            ffmpeg_features: "core,avcodec,avdevice,avfilter,avformat,swresample,swscale,vaapi,opencl,dav1d"
           - os: macos-latest
             platform: macos
             triplet: x64-osx
@@ -59,13 +59,13 @@ jobs:
           git clone https://github.com/Microsoft/vcpkg.git ${{ env.VCPKG_DIR }}
           cd ${{ env.VCPKG_DIR }}
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            ./bootstrap-vcpkg.bat
+            ./bootstrap-vcpkg.bat -disableMetrics
           else
-            ./bootstrap-vcpkg.sh
+            ./bootstrap-vcpkg.sh -disableMetrics
           fi
         shell: bash
 
-      - name: Install FFmpeg with platform-specific features
+      - name: Install FFmpeg with validated features
         run: |
           cd ${{ env.VCPKG_DIR }}
           ./vcpkg install ffmpeg[${{ matrix.ffmpeg_features }}]:${{ matrix.triplet }}
@@ -102,7 +102,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_DIR }}/scripts/buildsystems/vcpkg.cmake" \
             $([ "${{ matrix.platform }}" = "win64" ] && echo "-DWITH_AMF=ON -DWITH_QSV=ON") \
-            $([ "${{ matrix.platform }}" = "linux" ] && echo "-DWITH_VAAPI=ON -DWITH_VDPAU=ON")
+            $([ "${{ matrix.platform }}" = "linux" ] && echo "-DWITH_VAAPI=ON")
           
           cmake --build . --config Release --parallel
         shell: bash
