@@ -46,7 +46,11 @@ jobs:
       - name: Install system dependencies
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            choco install -y cmake ninja git pkgconfig yasm
+            choco install cmake -y --no-progress
+            choco install ninja -y --no-progress
+            choco install git -y --no-progress --ignore-dependencies
+            choco install yasm -y --no-progress
+            choco install pkgconfiglite -y --no-progress
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update && sudo apt-get install -y cmake ninja-build git pkg-config ocl-icd-opencl-dev nasm
           else
