@@ -43,9 +43,9 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            "${{ env.VCPKG_ROOT }}/vcpkg.exe" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}" --no-downloads --only-release
+            "${{ env.VCPKG_ROOT }}/vcpkg.exe" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
           else
-            "${{ env.VCPKG_ROOT }}/vcpkg" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}" --no-downloads --only-release
+            "${{ env.VCPKG_ROOT }}/vcpkg" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
           fi
 
       - name: Configure CMake
