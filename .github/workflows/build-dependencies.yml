@@ -29,16 +29,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-#      - name: Install vcpkg
-#        shell: bash
-#        run: |
-#          git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
-#          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-#          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
-#          else
-#          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.sh" -disableMetrics
-#          fi
-#
+      - name: Install vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+          else
+          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
 #      - name: Install dependencies using vcpkg
 #        shell: bash
 #        run: |
