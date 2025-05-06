@@ -30,6 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install vcpkg
+        shell: bash
         run: |
           git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
@@ -39,6 +40,7 @@ jobs:
           fi
 
       - name: Install dependencies using vcpkg
+        shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             "${{ env.VCPKG_ROOT }}/vcpkg.exe" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}" --no-downloads --only-release
