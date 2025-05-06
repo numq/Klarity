@@ -51,7 +51,7 @@ jobs:
           mkdir -p $FFMPEG_ROOT
           curl -L -o ffmpeg.tar.gz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${{ env.FFMPEG_VERSION }}.tar.gz
           tar -xf ffmpeg.tar.gz
-          cd FFmpeg-${{ env.FFMPEG_VERSION }}
+          cd ffmpeg-n${{ env.FFMPEG_VERSION }}
           ./configure --enable-shared --disable-static --prefix=$FFMPEG_ROOT --extra-cflags="-fPIC"
           make -j$(nproc || sysctl -n hw.logicalcpu)
           make install
