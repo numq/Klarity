@@ -8,11 +8,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        include:
+          - os: ubuntu-latest
+            triplet: x64-linux
+            os_folder: linux
+          - os: macos-latest
+            triplet: x64-osx
+            os_folder: macos
+          - os: windows-latest
+            triplet: x64-windows
+            os_folder: windows
 
     env:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       INSTALL_DIR: ${{ github.workspace }}/install
+      VCPKG_TRIPLET: ${{ matrix.triplet }}
+      OS_FOLDER: ${{ matrix.os_folder }}
 
     steps:
       - name: Checkout repo
@@ -20,49 +31,50 @@ jobs:
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ env.VCPKG_ROOT }}
-          vcpkgGitCommitId: '2025.04.09'
-          runVcpkgInstall: true
-          vcpkgJsonGlob: '**/vcpkg.json'
 
       - name: Install ffmpeg and portaudio
         run: |
-          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg[avdevice,avfilter,avformat,swresample,swscale,postproc] portaudio --triplet ${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}
+          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}
 
       - name: Configure CMake
         run: |
           cmake -S core/src/main/cpp -B build \
             -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_DIR }}
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_DIR }} \
+            -DBIN_FOLDER=${{ github.workspace }}/build/bin
+
 
       - name: Build native library
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release
 
-      - name: Copy binaries
+      - name: Copy platform-specific binaries to resources
         run: |
-          mkdir -p artifacts/${{ matrix.os }}/bin/klarity
-          mkdir -p artifacts/${{ matrix.os }}/bin/ffmpeg
-          mkdir -p artifacts/${{ matrix.os }}/bin/portaudio
-          mkdir -p artifacts/${{ matrix.os }}/include/ffmpeg
-          mkdir -p artifacts/${{ matrix.os }}/include/portaudio
+          mkdir -p core/src/main/resources/bin/${{ env.OS_FOLDER }}
 
-          cp build/*.so* artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
-          cp build/*.dylib artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
-          cp build/*.dll artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
-
-          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/bin/*ffmpeg* artifacts/${{ matrix.os }}/bin/ffmpeg/ || true
-          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/bin/*portaudio* artifacts/${{ matrix.os }}/bin/portaudio/ || true
-
-          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/include/ffmpeg artifacts/${{ matrix.os }}/include/ || true
-          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/include/portaudio artifacts/${{ matrix.os }}/include/ || true
+          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ env.OS_FOLDER }}/ 2>/dev/null || true
+          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
+          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
 
       - name: Build JARs
         run: |
           ./gradlew :core:shadowJar
           ./gradlew :compose:shadowJar
           ./gradlew :example:shadowJar
+
+      - name: Copy binaries
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}/bin
+
+          cp build/*.so* artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+          cp build/*.dylib artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+          cp build/*.dll artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* artifacts/${{ matrix.os }}/bin/ffmpeg/ || true
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* artifacts/${{ matrix.os }}/bin/portaudio/ || true
+
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/include/ffmpeg artifacts/${{ matrix.os }}/include/ || true
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/include/portaudio artifacts/${{ matrix.os }}/include/ || true
 
       - name: Copy JARs
         run: |
