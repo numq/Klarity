@@ -20,8 +20,8 @@ jobs:
             os_folder: windows
 
     env:
-      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
-      INSTALL_DIR: ${{ github.workspace }}\install
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      INSTALL_DIR: ${{ github.workspace }}/install
       VCPKG_TRIPLET: ${{ matrix.triplet }}
       OS_FOLDER: ${{ matrix.os_folder }}
 
@@ -30,13 +30,20 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install vcpkg
+        shell: pwsh
         run: |
-          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
-          ./vcpkg/bootstrap-vcpkg.sh || ./vcpkg/bootstrap-vcpkg.bat
+          git clone https://github.com/microsoft/vcpkg.git $env:VCPKG_ROOT
+          & "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+          # Verify vcpkg exists
+          if (-not (Test-Path "$env:VCPKG_ROOT/vcpkg.exe")) {
+           Write-Error "vcpkg.exe was not created!"
+           exit 1
+          }
 
       - name: Install dependencies using vcpkg
+        shell: pwsh
         run: |
-          ${{ env.VCPKG_ROOT }} install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}
+          & "$env:VCPKG_ROOT/vcpkg.exe" install ffmpeg portaudio --triplet $env:VCPKG_TRIPLET
 
       - name: Configure CMake
         run: |
