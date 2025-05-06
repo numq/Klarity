@@ -51,11 +51,15 @@ jobs:
       - name: Configure CMake
         shell: bash
         run: |
+          VCPKG_CMAKE_FILE="${VCPKG_ROOT//\\/\/}/scripts/buildsystems/vcpkg.cmake"
+          INSTALL_PATH="${INSTALL_DIR//\\/\/}"
+          BIN_PATH="${GITHUB_WORKSPACE//\\/\/}/build/bin"
+
           cmake -S core/src/main/cpp -B build \
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_CMAKE_FILE" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="${{ env.INSTALL_DIR }}" \
-            -DBIN_FOLDER="${{ github.workspace }}/build/bin"
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_PATH" \
+            -DBIN_FOLDER="$BIN_PATH"
 
       - name: Build native library
         run: cmake --build build --config Release
