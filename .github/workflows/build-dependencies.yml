@@ -20,8 +20,8 @@ jobs:
             os_folder: windows
 
     env:
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      INSTALL_DIR: ${{ github.workspace }}/install
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+      INSTALL_DIR: ${{ github.workspace }}\install
       VCPKG_TRIPLET: ${{ matrix.triplet }}
       OS_FOLDER: ${{ matrix.os_folder }}
 
