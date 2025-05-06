@@ -29,14 +29,22 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          brew install nasm yasm pkg-config
+          fi
+
       - name: Install vcpkg
-        shell: bash
         run: |
           git clone https://github.com/microsoft/vcpkg.git "${{ env.VCPKG_ROOT }}"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
+            "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.bat" -disableMetrics
           else
-          "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.sh" -disableMetrics
+            "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.sh" -disableMetrics
           fi
 
       - name: Install dependencies using vcpkg
