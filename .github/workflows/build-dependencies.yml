@@ -9,12 +9,12 @@ jobs:
     strategy:
       matrix:
         include:
-          #          - os: ubuntu-latest
-          #            triplet: x64-linux
-          #            os_folder: linux
-          #          - os: macos-latest
-          #            triplet: x64-osx
-          #            os_folder: macos
+          - os: ubuntu-latest
+            triplet: x64-linux
+            os_folder: linux
+          - os: macos-latest
+            triplet: x64-osx
+            os_folder: macos
           - os: windows-latest
             triplet: x64-windows
             os_folder: windows
@@ -39,14 +39,14 @@ jobs:
           "${{ env.VCPKG_ROOT }}/bootstrap-vcpkg.sh" -disableMetrics
           fi
 
-#      - name: Install dependencies using vcpkg
-#        shell: bash
-#        run: |
-#          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-#            "${{ env.VCPKG_ROOT }}/vcpkg.exe" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
-#          else
-#            "${{ env.VCPKG_ROOT }}/vcpkg" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
-#          fi
+      - name: Install dependencies using vcpkg
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            "${{ env.VCPKG_ROOT }}/vcpkg.exe" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
+          else
+            "${{ env.VCPKG_ROOT }}/vcpkg" install ffmpeg portaudio --triplet "${{ env.VCPKG_TRIPLET }}"
+          fi
 
       - name: Configure CMake
         shell: bash
