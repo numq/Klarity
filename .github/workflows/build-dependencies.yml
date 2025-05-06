@@ -9,12 +9,12 @@ jobs:
     strategy:
       matrix:
         include:
-#          - os: ubuntu-latest
-#            triplet: x64-linux
-#            os_folder: linux
-#          - os: macos-latest
-#            triplet: x64-osx
-#            os_folder: macos
+          #          - os: ubuntu-latest
+          #            triplet: x64-linux
+          #            os_folder: linux
+          #          - os: macos-latest
+          #            triplet: x64-osx
+          #            os_folder: macos
           - os: windows-latest
             triplet: x64-windows
             os_folder: windows
@@ -36,7 +36,7 @@ jobs:
 
       - name: Install dependencies using vcpkg
         run: |
-          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}      
+          & "${{ env.VCPKG_ROOT }}\vcpkg" install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}
 
       - name: Configure CMake
         run: |
