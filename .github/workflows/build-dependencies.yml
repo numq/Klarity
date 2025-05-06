@@ -5,110 +5,74 @@ on:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
+
     env:
-      FFMPEG_VERSION: "7.1.1"
-      PORTAUDIO_VERSION: "pa_stable_v190700_20210406"
-      OUT_DIR: ${{ github.workspace }}/output/${{ matrix.os }}
-      FFMPEG_ROOT: ${{ github.workspace }}/ffmpeg
-      PORTAUDIO_ROOT: ${{ github.workspace }}/portaudio
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      INSTALL_DIR: ${{ github.workspace }}/install
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
         with:
-          distribution: 'temurin'
-          java-version: 17
+          vcpkgDirectory: ${{ env.VCPKG_ROOT }}
+          vcpkgGitCommitId: '2025.04.09'
+          runVcpkgInstall: true
+          vcpkgJsonGlob: '**/vcpkg.json'
 
-      - name: Set up Gradle
-        uses: gradle/gradle-build-action@v3
-
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install ffmpeg and portaudio
         run: |
-          sudo apt update
-          sudo apt install -y yasm libasound2-dev pkg-config unzip
+          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg[avdevice,avfilter,avformat,swresample,swscale,postproc] portaudio --triplet ${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install yasm portaudio pkg-config
-
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install yasm unzip --no-progress
-
-      - name: Download and install FFmpeg (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p $FFMPEG_ROOT
-          curl -L -o ffmpeg.tar.gz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${{ env.FFMPEG_VERSION }}.tar.gz
-          tar -xf ffmpeg.tar.gz
-          cd ffmpeg-n${{ env.FFMPEG_VERSION }}
-          ./configure --enable-shared --disable-static --prefix=$FFMPEG_ROOT --extra-cflags="-fPIC"
-          make -j$(nproc || sysctl -n hw.logicalcpu)
-          make install
-
-      - name: Download and extract Gyan.dev FFmpeg (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-          unzip ffmpeg.zip -d ffmpeg_extracted
-          mv ffmpeg_extracted/ffmpeg-* $FFMPEG_ROOT
-
-      - name: Download and build PortAudio
-        run: |
-          curl -L -o portaudio.zip https://app.assembla.com/spaces/portaudio/git/source/${{ env.PORTAUDIO_VERSION }}/?format=zip
-          unzip portaudio.zip -d portaudio_src
-          cd portaudio_src/*
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DPA_BUILD_SHARED=ON -DCMAKE_INSTALL_PREFIX=$PORTAUDIO_ROOT
-          cmake --build build --target install --config Release
-
-      - name: Build native library
+      - name: Configure CMake
         run: |
           cmake -S core/src/main/cpp -B build \
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DFFMPEG_ROOT=$FFMPEG_ROOT \
-            -DPORTAUDIO_ROOT=$PORTAUDIO_ROOT
-          cmake --build build --config Release
-        shell: bash
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_DIR }}
 
-      - name: Copy native libs to resources
+      - name: Build native library
+        run: cmake --build build --config Release --parallel
+
+      - name: Copy binaries
         run: |
-          os=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
-          mkdir -p core/src/main/resources/bin/$os
-          if [ "$os" = "windows" ]; then
-            cp $FFMPEG_ROOT/bin/*.dll core/src/main/resources/bin/$os/
-            cp $PORTAUDIO_ROOT/bin/*.dll core/src/main/resources/bin/$os/
-            cp build/Release/klarity.dll core/src/main/resources/bin/$os/
-          elif [ "$os" = "macos" ]; then
-            cp $FFMPEG_ROOT/lib/*.dylib core/src/main/resources/bin/$os/
-            cp $PORTAUDIO_ROOT/lib/*.dylib core/src/main/resources/bin/$os/
-            cp build/klarity.dylib core/src/main/resources/bin/$os/
-          else
-            cp $FFMPEG_ROOT/lib/*.so* core/src/main/resources/bin/$os/
-            cp $PORTAUDIO_ROOT/lib/*.so* core/src/main/resources/bin/$os/
-            cp build/libklarity.so core/src/main/resources/bin/$os/
-          fi
-        shell: bash
+          mkdir -p artifacts/${{ matrix.os }}/bin/klarity
+          mkdir -p artifacts/${{ matrix.os }}/bin/ffmpeg
+          mkdir -p artifacts/${{ matrix.os }}/bin/portaudio
+          mkdir -p artifacts/${{ matrix.os }}/include/ffmpeg
+          mkdir -p artifacts/${{ matrix.os }}/include/portaudio
+
+          cp build/*.so* artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+          cp build/*.dylib artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+          cp build/*.dll artifacts/${{ matrix.os }}/bin/klarity/ 2>/dev/null || true
+
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/bin/*ffmpeg* artifacts/${{ matrix.os }}/bin/ffmpeg/ || true
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/bin/*portaudio* artifacts/${{ matrix.os }}/bin/portaudio/ || true
+
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/include/ffmpeg artifacts/${{ matrix.os }}/include/ || true
+          cp -r ${{ env.VCPKG_ROOT }}/installed/${{ matrix.os == 'windows-latest' && 'x64-windows' || matrix.os == 'macos-latest' && 'x64-osx' || 'x64-linux' }}/include/portaudio artifacts/${{ matrix.os }}/include/ || true
 
       - name: Build JARs
         run: |
-          ./gradlew :core:jar :example:jar :compose:jar
-          mkdir -p ${{ env.OUT_DIR }}/jars
-          cp core/build/libs/*.jar ${{ env.OUT_DIR }}/jars/core.jar
-          cp example/build/libs/*.jar ${{ env.OUT_DIR }}/jars/example.jar
-          cp compose/build/libs/*.jar ${{ env.OUT_DIR }}/jars/compose.jar
+          ./gradlew :core:shadowJar
+          ./gradlew :compose:shadowJar
+          ./gradlew :example:shadowJar
 
-      - name: Archive output
+      - name: Copy JARs
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}/jar
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/jar/core.jar || true
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/jar/compose.jar || true
+          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/jar/example.jar || true
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: klarity-${{ matrix.os }}
-          path: ${{ env.OUT_DIR }}
+          path: artifacts/${{ matrix.os }}
