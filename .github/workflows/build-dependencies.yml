@@ -44,8 +44,8 @@ jobs:
       - name: Download and build FFmpeg
         run: |
           mkdir -p deps && cd deps
-          curl -L -o ffmpeg.tar.xz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${{ env.FFMPEG_VERSION }}.tar.gz
-          tar -xf ffmpeg.tar.xz
+          curl -L -o ffmpeg.tar.gz https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n${{ env.FFMPEG_VERSION }}.tar.gz
+          tar -xf ffmpeg.tar.gz
           cd FFmpeg-${{ env.FFMPEG_VERSION }}
           ./configure --enable-shared --disable-static --prefix="${{ env.BIN_DIR }}/ffmpeg" --extra-cflags="-fPIC"
           make -j$(nproc || sysctl -n hw.logicalcpu)
@@ -67,8 +67,10 @@ jobs:
           cmake -S core/src/main/cpp -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${{ env.BIN_DIR }}/klarity" \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="${{ env.BIN_DIR }}/klarity" \
             -DCMAKE_PREFIX_PATH="${{ env.BIN_DIR }}/ffmpeg;${{ env.BIN_DIR }}/portaudio" \
-            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="${{ env.BIN_DIR }}/klarity"
+            -DCMAKE_LIBRARY_PATH="${{ env.BIN_DIR }}/ffmpeg/lib;${{ env.BIN_DIR }}/portaudio/lib" \
+            -DCMAKE_BUILD_RPATH="${{ env.BIN_DIR }}/ffmpeg/lib;${{ env.BIN_DIR }}/portaudio/lib"
           cmake --build build --target install --config Release
         shell: bash
 
