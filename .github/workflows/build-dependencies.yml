@@ -29,12 +29,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-
-      - name: Install ffmpeg and portaudio
+      - name: Install vcpkg
         run: |
-          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}
+          git clone https://github.com/microsoft/vcpkg.git ${{ env.VCPKG_ROOT }}
+          ./vcpkg/bootstrap-vcpkg.sh || ./vcpkg/bootstrap-vcpkg.bat
+
+      - name: Install dependencies using vcpkg
+        run: |
+          ${{ env.VCPKG_ROOT }}/vcpkg install ffmpeg portaudio --triplet ${{ env.VCPKG_TRIPLET }}      
 
       - name: Configure CMake
         run: |
