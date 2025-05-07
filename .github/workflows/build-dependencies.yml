@@ -12,9 +12,11 @@ jobs:
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: .so
+            nasm_cmd: sudo apt-get install -y nasm
           - os: macos-latest
             triplet: x64-osx
             binary_ext: .dylib
+            nasm_cmd: brew install nasm
           - os: windows-latest
             triplet: x64-windows
             binary_ext: .dll
@@ -31,6 +33,16 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Install build dependencies
+        run: |
+          if [[ "${{ matrix.nasm_cmd }}" != "" ]]; then
+            ${{ matrix.nasm_cmd }}
+          fi
+          
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            sudo apt-get install -y cmake build-essential pkg-config
+          fi
 
       - name: Install vcpkg
         run: |
