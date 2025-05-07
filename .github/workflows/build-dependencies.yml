@@ -24,7 +24,6 @@ jobs:
       VCPKG_TRIPLET: ${{ matrix.triplet }}
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-      MANIFEST_DIR: ${{ github.workspace }}/core/src/main/cpp
 
     steps:
       - name: Checkout repo
@@ -39,50 +38,50 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11.5
+
       - name: Set up CMake
-        uses: jwlawson/actions-setup-cmake@v2
+        uses: lukka/get-cmake@latest
+
+      - name: Run CMake
+        uses: lukka/run-cmake@v10.8
         with:
-          cmake-version: '3.17.5'
+          cmakeListsTxtPath: ${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt
+          configurePresetAdditionalArgs: '[-DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }}]'
 
-      - name: Clone vcpkg
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
-          cd ${{ github.workspace }}/vcpkg
-          ./bootstrap-vcpkg.sh
-          ./vcpkg install --triplet ${{ env.VCPKG_TRIPLET }} --x-manifest-root=${{ env.MANIFEST_DIR }} --x-install-root=${{ env.VCPKG_ROOT }}/installed
-
-      - name: Configure CMake
-        run: |
-          cmake -S . -B build \
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }} \
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=ON
-
-      - name: Build native library
-        run: cmake --build build --config Release
-
-      - name: Copy platform-specific binaries to resources
-        run: |
-          mkdir -p core/src/main/resources/bin/${{ env.OS_FOLDER }}
-          
-          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ env.OS_FOLDER }}/ 2>/dev/null || true
-          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
-          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
-
-      - name: Build JARs
-        run: |
-          ./gradlew :core:shadowJar
-          ./gradlew :compose:shadowJar
-
-      - name: Copy JARs
-        run: |
-          mkdir -p artifacts/${{ matrix.os }}/jar
-          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/libs/core.jar || true
-          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/libs/compose.jar || true
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: klarity-${{ matrix.os }}
-          path: artifacts/${{ matrix.os }}
+#      - name: Configure CMake
+#        run: |
+#          cmake -S . -B build \
+#          -DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }} \
+#          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} \
+#          -DCMAKE_BUILD_TYPE=Release \
+#          -DBUILD_SHARED_LIBS=ON
+#
+#      - name: Build native library
+#        run: cmake --build build --config Release
+#
+#      - name: Copy platform-specific binaries to resources
+#        run: |
+#          mkdir -p core/src/main/resources/bin/${{ env.OS_FOLDER }}
+#
+#          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ env.OS_FOLDER }}/ 2>/dev/null || true
+#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
+#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
+#
+#      - name: Build JARs
+#        run: |
+#          ./gradlew :core:shadowJar
+#          ./gradlew :compose:shadowJar
+#
+#      - name: Copy JARs
+#        run: |
+#          mkdir -p artifacts/${{ matrix.os }}/jar
+#          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/libs/core.jar || true
+#          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/libs/compose.jar || true
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: klarity-${{ matrix.os }}
+#          path: artifacts/${{ matrix.os }}
