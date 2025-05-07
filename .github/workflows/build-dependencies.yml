@@ -19,12 +19,6 @@ jobs:
             triplet: x64-windows
             os_folder: windows
 
-    env:
-      OS_FOLDER: ${{ matrix.os_folder }}
-      VCPKG_TRIPLET: ${{ matrix.triplet }}
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      TOOLCHAIN_FILE: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -47,13 +41,13 @@ jobs:
       - name: Run CMake
         uses: lukka/run-cmake@v10.8
         with:
-          cmakeListsTxtPath: ${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt
+          cmakeListsTxtPath: '${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt'
           configurePreset: 'ninja-multi-vcpkg'
           configurePresetAdditionalArgs: "[
             '-DBUILD_SHARED_LIBS=ON',
             '-DCMAKE_BUILD_TYPE=Release',
-            '-DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }}',
-            '-DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }}'
+            '-DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}',
+            '-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake'
           ]"
 
 #      - name: Configure CMake
@@ -69,11 +63,11 @@ jobs:
 #
 #      - name: Copy platform-specific binaries to resources
 #        run: |
-#          mkdir -p core/src/main/resources/bin/${{ env.OS_FOLDER }}
+#          mkdir -p core/src/main/resources/bin/${{ matrix.os_folder }}
 #
-#          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ env.OS_FOLDER }}/ 2>/dev/null || true
-#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
-#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ env.OS_FOLDER }}/ || true
+#          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ matrix.os_folder }}/ 2>/dev/null || true
+#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ matrix.os_folder }}/ || true
+#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ matrix.os_folder }}/ || true
 #
 #      - name: Build JARs
 #        run: |
