@@ -16,6 +16,7 @@ import com.github.numq.klarity.core.state.PlayerState
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
+import java.net.JarURLConnection
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.time.Duration
@@ -209,52 +210,70 @@ interface KlarityPlayer {
 
             val osName = System.getProperty("os.name").lowercase()
 
-            val osFolder = when {
-                osName.contains("win") -> "windows"
+            val extension = when {
+                osName.contains("win") -> ".dll"
 
-                osName.contains("mac") -> "macos"
+                osName.contains("mac") -> ".dylib"
 
-                osName.contains("nux") || osName.contains("nix") -> "linux"
+                osName.contains("nux") || osName.contains("nix") -> ".so"
 
                 else -> error("Unsupported OS: $osName")
             }
 
-            val libs = listOf(
-                "avutil-59",
-                "swresample-5",
-                "swscale-8",
-                "avcodec-61",
-                "avformat-61",
-                "avfilter-10",
-                "avdevice-61",
+            val libraryNames = listOf(
+                "avutil",
+                "swresample",
+                "swscale",
+                "avcodec",
+                "avformat",
+                "avfilter",
+                "avdevice",
                 "portaudio",
                 "klarity"
             )
 
-            val tmpDir = Files.createTempDirectory("binaries").toFile().apply { deleteOnExit() }
+            val tempDir = Files.createTempDirectory("binaries").toFile().apply { deleteOnExit() }
 
-            libs.map { lib ->
-                val ext = when (osFolder) {
-                    "windows" -> ".dll"
+            libraryNames.map { libraryName ->
+                val resourcePath = "/bin/"
 
-                    "linux" -> ".so"
+                val resources = KlarityPlayer::class.java.classLoader.getResources(resourcePath)
 
-                    "macos" -> ".dylib"
+                var resourceName: String? = null
 
-                    else -> ""
+                while (resources.hasMoreElements()) {
+                    if (resourceName != null) {
+                        break
+                    }
+
+                    val url = resources.nextElement()
+                    if (url.protocol == "jar") {
+                        val jarConnection = url.openConnection() as JarURLConnection
+
+                        val jarFile = jarConnection.jarFile
+
+                        jarFile.entries().iterator().forEach { entry ->
+                            if (entry.name.startsWith(resourcePath.removePrefix("/"))) {
+                                val fileName = entry.name.substringAfterLast('/')
+                                if (fileName.startsWith(libraryName) && fileName.endsWith(extension)) {
+                                    resourceName = fileName
+
+                                    return@forEach
+                                }
+                            }
+                        }
+                    }
                 }
 
-                val libName = "$lib$ext"
+                val tempFile = resourceName?.let { name ->
+                    File(tempDir, name)
+                } ?: error("Library not found in resources: $libraryName with extension $extension")
 
-                val resPath = "/bin/$osFolder/$libName"
+                KlarityPlayer::class.java.getResourceAsStream("$resourcePath$resourceName")?.use { input ->
+                    Files.copy(input, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                } ?: error("Failed to copy library: $resourceName")
 
-                val tmpFile = File(tmpDir, libName)
-
-                KlarityPlayer::class.java.getResourceAsStream(resPath)?.use { input ->
-                    Files.copy(input, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                } ?: error("Library not found in resources: $resPath")
-
-                tmpFile.absolutePath
+                tempFile.absolutePath
             }.let { paths ->
                 load(
                     avutil = paths[0],
