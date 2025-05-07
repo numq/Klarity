@@ -11,13 +11,13 @@ jobs:
         include:
           - os: ubuntu-latest
             triplet: x64-linux
-            os_folder: linux
+            binary_ext: .so
           - os: macos-latest
             triplet: x64-osx
-            os_folder: macos
+            binary_ext: .dylib
           - os: windows-latest
             triplet: x64-windows
-            os_folder: windows
+            binary_ext: .dll
 
     steps:
       - name: Checkout repo
@@ -37,53 +37,47 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.bat || ./vcpkg/bootstrap-vcpkg.sh
 
-#      - name: Set up CMake
-#        uses: lukka/get-cmake@latest
-#
-#      - name: Run CMake
-#        uses: lukka/run-cmake@v10.8
-#        with:
-#          cmakeListsTxtPath: '${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt'
-#          configurePreset: 'ninja-multi-vcpkg'
-#          configurePresetAdditionalArgs: "[
-#            '-DBUILD_SHARED_LIBS=ON',
-#            '-DCMAKE_BUILD_TYPE=Release',
-#            '-DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}',
-#            '-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake'
-#          ]"
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=ON
 
-#      - name: Configure CMake
-#        run: |
-#          cmake -S . -B build \
-#          -DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }} \
-#          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} \
-#          -DCMAKE_BUILD_TYPE=Release \
-#          -DBUILD_SHARED_LIBS=ON
-#
-#      - name: Build native library
-#        run: cmake --build build --config Release
-#
-#      - name: Copy platform-specific binaries to resources
-#        run: |
-#          mkdir -p core/src/main/resources/bin/${{ matrix.os_folder }}
-#
-#          cp build/*.{dll,so,dylib} core/src/main/resources/bin/${{ matrix.os_folder }}/ 2>/dev/null || true
-#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*ffmpeg* core/src/main/resources/bin/${{ matrix.os_folder }}/ || true
-#          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.VCPKG_TRIPLET }}/bin/*portaudio* core/src/main/resources/bin/${{ matrix.os_folder }}/ || true
-#
-#      - name: Build JARs
-#        run: |
-#          ./gradlew :core:shadowJar
-#          ./gradlew :compose:shadowJar
-#
-#      - name: Copy JARs
-#        run: |
-#          mkdir -p artifacts/${{ matrix.os }}/jar
-#          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/libs/core.jar || true
-#          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/libs/compose.jar || true
-#
-#      - name: Upload artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: klarity-${{ matrix.os }}
-#          path: artifacts/${{ matrix.os }}
+      - name: Build native library
+        run: cmake --build build --config Release
+
+      - name: Prepare resources
+        run: |
+          rm -rf core/src/main/resources/bin
+          mkdir -p core/src/main/resources/bin
+          
+          cp build/*klarity${{ matrix.binary_ext }} core/src/main/resources/bin/klarity${{ matrix.binary_ext }} || true
+          
+          for lib in avutil swresample swscale avcodec avformat avfilter avdevice portaudio; do
+            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
+          done
+
+      - name: Build JARs
+        run: |
+          ./gradlew :core:shadowJar
+          ./gradlew :compose:shadowJar
+          ./gradlew :example:shadowJar
+
+      - name: Clean up resources
+        run: |
+          rm -rf core/src/main/resources/bin
+
+      - name: Copy JARs
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}/jar
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/libs/core.jar || true
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/libs/compose.jar || true
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/libs/example.jar || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-${{ matrix.os }}
+          path: artifacts/${{ matrix.os }}
