@@ -46,7 +46,7 @@ jobs:
 
       - name: Clone vcpkg
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
+          git clone https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
           cd ${{ github.workspace }}/vcpkg
           ./bootstrap-vcpkg.sh
           ./vcpkg install --triplet ${{ env.VCPKG_TRIPLET }} --x-manifest-root=${{ env.MANIFEST_DIR }} --x-install-root=${{ env.VCPKG_ROOT }}/installed
