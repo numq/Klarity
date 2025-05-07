@@ -48,6 +48,7 @@ jobs:
         uses: lukka/run-cmake@v10.8
         with:
           cmakeListsTxtPath: ${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt
+          configurePreset: 'ninja-multi-vcpkg'
           configurePresetAdditionalArgs: '[-DCMAKE_TOOLCHAIN_FILE=${{ env.TOOLCHAIN_FILE }}]'
 
 #      - name: Configure CMake
