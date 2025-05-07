@@ -38,7 +38,6 @@ fun main() {
 
     KlarityPlayer.load(
         avutil = "$pathToBinaries\\avutil-59.dll",
-        postproc = "$pathToBinaries\\postproc-58.dll",
         swresample = "$pathToBinaries\\swresample-5.dll",
         swscale = "$pathToBinaries\\swscale-8.dll",
         avcodec = "$pathToBinaries\\avcodec-61.dll",
@@ -46,7 +45,7 @@ fun main() {
         avfilter = "$pathToBinaries\\avfilter-10.dll",
         avdevice = "$pathToBinaries\\avdevice-61.dll",
         portaudio = "$pathToBinaries\\portaudio.dll",
-        klarity = "$pathToBinaries\\klarity.dll",
+        klarity = "$pathToBinaries\\klarity.dll"
     ).getOrThrow()
 
     val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))

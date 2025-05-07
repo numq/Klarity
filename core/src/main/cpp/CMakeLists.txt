@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
-set(BIN_FOLDER "${CMAKE_SOURCE_DIR}/bin")
+find_package(JNI REQUIRED)
+
+find_package(FFMPEG REQUIRED)
+
+find_package(PORTAUDIO REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp
@@ -17,15 +21,6 @@ add_library(klarity SHARED
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp
 )
 
-find_package(JNI REQUIRED)
-if (JNI_FOUND)
-    message(STATUS "JNI_INCLUDE_DIRS=${JNI_INCLUDE_DIRS}")
-    message(STATUS "JNI_LIBRARIES=${JNI_LIBRARIES}")
-    target_include_directories(klarity PRIVATE ${JNI_INCLUDE_DIRS})
-else ()
-    message(FATAL_ERROR "JNI not found.")
-endif ()
-
 target_include_directories(klarity PRIVATE
         include
         include/data
@@ -35,18 +30,13 @@ target_include_directories(klarity PRIVATE
         include/sampler/dsp
         include/sampler/portaudio
         include/sampler/stretch
+        ${JNI_INCLUDE_DIRS}
+        ${FFMPEG_INCLUDE_DIRS}
+        ${PORTAUDIO_INCLUDE_DIRS}
 )
 
-target_link_directories(klarity PRIVATE ${BIN_FOLDER})
-
 target_link_libraries(klarity PRIVATE
-        avutil
-        postproc
-        swresample
-        swscale
-        avcodec
-        avformat
-        avfilter
-        avdevice
+        ${JNI_LIBRARIES}
+        ${FFMPEG_LIBRARIES}
         portaudio
 )

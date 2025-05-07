@@ -160,7 +160,6 @@ interface KlarityPlayer {
          * This method must be called before creating an instance.
          *
          * @param avutil The path to the `avutil-59` binary.
-         * @param postproc The path to the `postproc-58` binary.
          * @param swresample The path to the `swresample-5` binary.
          * @param swscale The path to the `swscale-8` binary.
          * @param avcodec The path to the `avcodec-61` binary.
@@ -174,7 +173,6 @@ interface KlarityPlayer {
          */
         fun load(
             avutil: String,
-            postproc: String,
             swscale: String,
             swresample: String,
             avcodec: String,
@@ -185,7 +183,6 @@ interface KlarityPlayer {
             klarity: String,
         ) = runCatching {
             System.load(avutil)
-            System.load(postproc)
             System.load(swresample)
             System.load(swscale)
             System.load(avcodec)
@@ -224,7 +221,6 @@ interface KlarityPlayer {
 
             val libs = listOf(
                 "avutil-59",
-                "postproc-58",
                 "swresample-5",
                 "swscale-8",
                 "avcodec-61",
@@ -262,15 +258,14 @@ interface KlarityPlayer {
             }.let { paths ->
                 load(
                     avutil = paths[0],
-                    postproc = paths[1],
-                    swresample = paths[2],
-                    swscale = paths[3],
-                    avcodec = paths[4],
-                    avformat = paths[5],
-                    avfilter = paths[6],
-                    avdevice = paths[7],
-                    portaudio = paths[8],
-                    klarity = paths[9],
+                    swresample = paths[1],
+                    swscale = paths[2],
+                    avcodec = paths[3],
+                    avformat = paths[4],
+                    avfilter = paths[5],
+                    avdevice = paths[6],
+                    portaudio = paths[7],
+                    klarity = paths[8],
                 )
             }
         }
