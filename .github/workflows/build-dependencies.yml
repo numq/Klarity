@@ -39,7 +39,7 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -S . -B build \
+          cmake -S core/src/main/cpp -B build \
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
           -DCMAKE_BUILD_TYPE=Release \
