@@ -44,14 +44,12 @@ jobs:
         with:
           cmake-version: '3.17.5'
 
-      - name: Build vcpkg
-        id: vcpkg
-        uses: johnwason/vcpkg-action@v6
-        with:
-          manifest-dir: ${{ env.MANIFEST_DIR }}
-          triplet: ${{ env.VCPKG_TRIPLET }}
-          token: ${{ github.token }}
-          github-binarycache: true
+      - name: Clone vcpkg
+        run: |
+          git clone --depth=1 https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
+          cd ${{ github.workspace }}/vcpkg
+          ./bootstrap-vcpkg.sh
+          ./vcpkg install --triplet ${{ env.VCPKG_TRIPLET }} --x-manifest-root=${{ env.MANIFEST_DIR }} --x-install-root=${{ env.VCPKG_ROOT }}/installed
 
       - name: Configure CMake
         run: |
