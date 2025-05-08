@@ -9,75 +9,81 @@ jobs:
     strategy:
       matrix:
         include:
-          #          - os: ubuntu-latest
-          #            triplet: x64-linux
-          #            binary_ext: .so
-          #          - os: macos-latest
-          #            triplet: x64-osx
-          #            binary_ext: .dylib
           - os: windows-latest
             triplet: x64-windows
             binary_ext: .dll
+          - os: ubuntu-latest
+            triplet: x64-linux
+            binary_ext: .so
+          - os: macos-latest
+            triplet: x64-osx
+            binary_ext: .dylib
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      #      - name: Set up Java
-      #        uses: actions/setup-java@v4
-      #        with:
-      #          distribution: 'temurin'
-      #          java-version: 17
-      #
-      #      - name: Set up Gradle
-      #        uses: gradle/actions/setup-gradle@v4
+      - name: Install dependencies (Linux/macOS only)
+        if: runner.os != 'Windows'
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y unzip curl pkg-config cmake ninja-build || true
 
-      - name: Clone vcpkg
-        run: git clone https://github.com/microsoft/vcpkg.git
-
-      - name: Set up vcpkg
-        run: .\vcpkg\bootstrap-vcpkg.bat
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: '**/vcpkg.json'
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+          runVcpkgInstall: true
 
       - name: Configure CMake
-        run: cmake -S core/src/main/cpp -B build \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=ON \
+        shell: bash
+        run: cmake -S core/src/main/cpp -B build `
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake `
+          -DCMAKE_BUILD_TYPE=Release
 
       - name: Build native library
         run: cmake --build build --config Release
 
-#      - name: Prepare resources
-#        run: |
-#          rm -rf core/src/main/resources/bin
-#          mkdir -p core/src/main/resources/bin
-#
-#          cp build/*klarity${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
-#
-#          for lib in avutil swresample swscale avcodec avformat avfilter avdevice portaudio; do
-#            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
-#          done
-#
-#      - name: Build JARs
-#        run: |
-#          ./gradlew :core:shadowJar
-#          ./gradlew :compose:shadowJar
-#          ./gradlew :example:shadowJar
-#
-#      - name: Clean up resources
-#        run: |
-#          rm -rf core/src/main/resources/bin
-#
-#      - name: Copy JARs
-#        run: |
-#          mkdir -p artifacts/${{ matrix.os }}
-#          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/core.jar
-#          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/compose.jar
-#          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/example.jar
-#
-#      - name: Upload artifacts
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: klarity-${{ matrix.os }}
-#          path: artifacts/${{ matrix.os }}
+      - name: Prepare resources
+        run: |
+          rm -rf core/src/main/resources/bin
+          mkdir -p core/src/main/resources/bin
+
+          cp build/*klarity${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
+
+          for lib in avutil swresample swscale avcodec avformat avfilter avdevice portaudio; do
+            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
+          done
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build JARs
+        run: |
+          ./gradlew :core:shadowJar
+          ./gradlew :compose:shadowJar
+          ./gradlew :example:shadowJar
+
+      - name: Clean up resources
+        run: |
+          rm -rf core/src/main/resources/bin
+
+      - name: Copy JARs
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/core.jar
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/compose.jar
+          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/example.jar
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: klarity-${{ matrix.os }}
+          path: artifacts/${{ matrix.os }}
