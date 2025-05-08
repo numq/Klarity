@@ -255,6 +255,14 @@ Decoder::Decoder(
                     throw DecoderException("Could not copy parameters to audio codec context");
                 }
 
+                audioCodecContext->thread_count = 0;
+
+                if (audioDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+                    audioCodecContext->thread_type = FF_THREAD_FRAME;
+                } else if (audioDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+                    audioCodecContext->thread_type = FF_THREAD_SLICE;
+                }
+
                 if (avcodec_open2(audioCodecContext.get(), audioDecoder, nullptr) < 0) {
                     throw DecoderException("Could not open audio decoder");
                 }
@@ -280,16 +288,6 @@ Decoder::Decoder(
                 format.audioBufferCapacity = audioBufferCapacity;
 
                 if (decodeAudioStream) {
-                    audioCodecContext->thread_count = static_cast<int>(
-                            std::min(4U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
-                    );
-
-                    if (audioDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-                        audioCodecContext->thread_type = FF_THREAD_FRAME;
-                    } else if (audioDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-                        audioCodecContext->thread_type = FF_THREAD_SLICE;
-                    }
-
                     SwrContext *rawSwrContext = nullptr;
 
                     if (swr_alloc_set_opts2(
@@ -349,6 +347,14 @@ Decoder::Decoder(
                     }
                 }
 
+                videoCodecContext->thread_count = 0;
+
+                if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+                    videoCodecContext->thread_type = FF_THREAD_FRAME;
+                } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+                    videoCodecContext->thread_type = FF_THREAD_SLICE;
+                }
+
                 if (avcodec_open2(videoCodecContext.get(), videoDecoder, nullptr) < 0) {
                     throw DecoderException("Could not open video decoder");
                 }
@@ -377,16 +383,6 @@ Decoder::Decoder(
                 format.videoBufferCapacity = videoBufferCapacity;
 
                 if (decodeVideoStream) {
-                    videoCodecContext->thread_count = static_cast<int>(
-                            std::min(4U, static_cast<unsigned int>(std::thread::hardware_concurrency()))
-                    );
-
-                    if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-                        videoCodecContext->thread_type = FF_THREAD_FRAME;
-                    } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-                        videoCodecContext->thread_type = FF_THREAD_SLICE;
-                    }
-
                     swsContext = std::unique_ptr<SwsContext, SwsContextDeleter>(
                             sws_getContext(
                                     videoCodecContext->width,
