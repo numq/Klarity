@@ -23,11 +23,15 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux/macOS only)
-        if: runner.os != 'Windows'
+      - name: Install dependencies (Linux only)
+        if: runner.os == 'Linux'
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y unzip curl pkg-config cmake ninja-build || true
+          sudo apt-get update
+          sudo apt-get install -y unzip curl pkg-config cmake ninja-build nasm
+
+      - name: Install dependencies (macOS only)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja nasm pkg-config
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
