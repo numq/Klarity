@@ -9,6 +9,8 @@ find_package(JNI REQUIRED)
 
 find_package(FFMPEG REQUIRED)
 
+find_package(PORTAUDIO REQUIRED)
+
 add_library(klarity SHARED
         src/common.cpp
         src/decoder/decoder.cpp
