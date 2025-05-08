@@ -33,7 +33,7 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install cmake ninja nasm pkg-config
 
-      - name: Setup vcpkg
+      - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgJsonGlob: '**/vcpkg.json'
