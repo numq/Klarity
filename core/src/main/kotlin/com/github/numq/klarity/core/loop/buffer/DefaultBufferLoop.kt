@@ -2,9 +2,7 @@ package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.data.Data
-import com.github.numq.klarity.core.decoder.AudioDecoder
 import com.github.numq.klarity.core.decoder.Decoder
-import com.github.numq.klarity.core.decoder.VideoDecoder
 import com.github.numq.klarity.core.frame.Frame
 import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
@@ -27,10 +25,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
 
-            val frame = (decoder as AudioDecoder).decode(data = data).getOrThrow()
-
             try {
-                when (frame) {
+                when (val frame = decoder.decode(data = data).getOrThrow()) {
                     is Frame.Content.Audio -> {
                         currentCoroutineContext().ensureActive()
 
@@ -52,9 +48,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     else -> error("Unsupported frame type: ${frame::class}")
                 }
             } catch (t: Throwable) {
-                if (frame is Frame.Content.Audio) {
-                    pool.release(item = data).getOrThrow()
-                }
+                pool.release(item = data).getOrThrow()
 
                 throw t
             }
@@ -67,10 +61,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
 
-            val frame = (decoder as VideoDecoder).decode(data = data).getOrThrow()
-
             try {
-                when (frame) {
+                when (val frame = decoder.decode(data = data).getOrThrow()) {
                     is Frame.Content.Video -> {
                         currentCoroutineContext().ensureActive()
 
@@ -92,9 +84,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     else -> error("Unsupported frame type: ${frame::class}")
                 }
             } catch (t: Throwable) {
-                if (frame is Frame.Content.Video) {
-                    pool.release(item = data).getOrThrow()
-                }
+                pool.release(item = data).getOrThrow()
 
                 throw t
             }

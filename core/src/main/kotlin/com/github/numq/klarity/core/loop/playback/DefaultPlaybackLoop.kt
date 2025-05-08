@@ -91,28 +91,26 @@ internal class DefaultPlaybackLoop(
 
                         val videoClockTime = videoClock.get()
 
-                        val masterClockTime = when {
-                            isFirstFrame -> Duration.INFINITE.also { isFirstFrame = false }
-
-                            audioClockTime.isFinite() -> audioClockTime
-
-                            videoClockTime.isFinite() -> videoClockTime
-
-                            else -> Duration.INFINITE
-                        }
-
                         val frameTime = frame.timestamp
 
                         val playbackSpeedFactor = getPlaybackSpeedFactor()
 
-                        val adjustedFrameTime = frame.timestamp / playbackSpeedFactor
+                        if (isFirstFrame) {
+                            isFirstFrame = false
+                        } else {
+                            val masterClockTime = when {
+                                audioClockTime.isFinite() -> audioClockTime
 
-                        val adjustedMasterClockTime = masterClockTime / playbackSpeedFactor
+                                videoClockTime.isFinite() -> videoClockTime
 
-                        val deltaTime = adjustedFrameTime - adjustedMasterClockTime
+                                else -> Duration.INFINITE
+                            }
 
-                        if (deltaTime.isFinite()) {
-                            delay(deltaTime)
+                            if (masterClockTime.isFinite()) {
+                                val deltaTime = frameTime - masterClockTime
+
+                                delay(deltaTime / playbackSpeedFactor)
+                            }
                         }
 
                         currentCoroutineContext().ensureActive()
@@ -121,7 +119,7 @@ internal class DefaultPlaybackLoop(
 
                         onTimestamp(frameTime)
 
-                        videoClock.set(frameTime)
+                        videoClock.set(frame.timestamp)
                     }
 
                     is Frame.EndOfStream -> {
@@ -172,17 +170,11 @@ internal class DefaultPlaybackLoop(
                     with(pipeline) {
                         when (this) {
                             is Pipeline.Audio -> handleAudioPlayback(
-                                pool = pool,
-                                buffer = buffer,
-                                sampler = sampler,
-                                onTimestamp = onTimestamp
+                                pool = pool, buffer = buffer, sampler = sampler, onTimestamp = onTimestamp
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                mediaDuration = media.duration,
-                                pool = pool,
-                                buffer = buffer,
-                                onTimestamp = onTimestamp
+                                mediaDuration = media.duration, pool = pool, buffer = buffer, onTimestamp = onTimestamp
                             )
 
                             is Pipeline.AudioVideo -> {

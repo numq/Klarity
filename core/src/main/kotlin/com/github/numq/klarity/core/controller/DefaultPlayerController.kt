@@ -282,7 +282,7 @@ internal class DefaultPlayerController(
                     }.getOrThrow()
 
                     Pipeline.Audio(
-                        media = media.copy(format = decoder.media.format),
+                        media = media,
                         decoder = decoder,
                         pool = pool,
                         buffer = buffer,
@@ -320,7 +320,7 @@ internal class DefaultPlayerController(
                     }.getOrThrow()
 
                     Pipeline.Video(
-                        media = media.copy(format = decoder.media.format),
+                        media = media,
                         decoder = decoder,
                         pool = pool,
                         buffer = buffer
@@ -423,10 +423,7 @@ internal class DefaultPlayerController(
                     }.getOrThrow()
 
                     Pipeline.AudioVideo(
-                        media = media.copy(
-                            audioFormat = audioDecoder.media.format,
-                            videoFormat = videoDecoder.media.format
-                        ),
+                        media = media,
                         audioDecoder = audioDecoder,
                         videoDecoder = videoDecoder,
                         audioPool = audioPool,
