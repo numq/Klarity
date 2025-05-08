@@ -32,25 +32,27 @@ jobs:
       #      - name: Set up Gradle
       #        uses: gradle/actions/setup-gradle@v4
 
-      - name: Install dependencies (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          sudo apt-get update || true
-          sudo apt-get install -y nasm build-essential cmake gcc g++ || true
-
-      - name: Install vcpkg
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
+      - name: Clone vcpkg
+        run: git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg (Windows)
         if: matrix.os == 'windows-latest'
-        run: |
-          .\vcpkg\bootstrap-vcpkg.bat
+        run: .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Bootstrap vcpkg (Unix)
         if: matrix.os != 'windows-latest'
+        run: ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          ./vcpkg/bootstrap-vcpkg.sh
+          sudo apt-get update
+          sudo apt-get install -y nasm build-essential cmake gcc g++
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install nasm cmake make
 
       - name: Configure CMake
         run: |
