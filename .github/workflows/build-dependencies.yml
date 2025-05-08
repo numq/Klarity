@@ -33,7 +33,7 @@ jobs:
       #        uses: gradle/actions/setup-gradle@v4
 
       - name: Clone vcpkg
-        run: git clone https://github.com/microsoft/vcpkg.git \
+        run: git clone https://github.com/microsoft/vcpkg.git
 
       - name: Set up vcpkg
         run: .\vcpkg\bootstrap-vcpkg.bat
