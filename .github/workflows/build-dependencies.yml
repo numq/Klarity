@@ -41,8 +41,8 @@ jobs:
       - name: Configure CMake
         shell: bash
         run: |
-          FFMPEG_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
-          PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
+          FFMPEG_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include/ffmpeg"
+          PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include/portaudio"
           FFMPEG_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           PORTAUDIO_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           
