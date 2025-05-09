@@ -3,12 +3,9 @@ project(klarity VERSION 1.1.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 find_package(JNI REQUIRED)
-
-find_package(FFMPEG REQUIRED)
-
+find_package(FFMPEG REQUIRED COMPONENTS avcodec avformat avutil swresample swscale)
 find_package(PORTAUDIO REQUIRED)
 
 add_library(klarity SHARED
@@ -22,6 +19,9 @@ add_library(klarity SHARED
 )
 
 target_include_directories(klarity PRIVATE
+        ${JNI_INCLUDE_DIRS}
+        ${FFMPEG_INCLUDE_DIRS}
+        ${PORTAUDIO_INCLUDE_DIRS}
         include
         include/data
         include/decoder
@@ -30,13 +30,9 @@ target_include_directories(klarity PRIVATE
         include/sampler/dsp
         include/sampler/portaudio
         include/sampler/stretch
-        ${JNI_INCLUDE_DIRS}
-        ${FFMPEG_INCLUDE_DIRS}
-        ${PORTAUDIO_INCLUDE_DIRS}
 )
 
 target_link_libraries(klarity PRIVATE
-        ${JNI_LIBRARIES}
         ${FFMPEG_LIBRARIES}
         portaudio
 )
