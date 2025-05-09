@@ -45,7 +45,9 @@ jobs:
         run: |
           if [ $RUNNER_OS == 'Windows' ]; then
             cmd.exe /C vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-          else
+          elif [ $RUNNER_OS == 'Linux' ]; then
+            ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
+          elif [ $RUNNER_OS == 'macOS' ]; then
             ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
           fi
 
