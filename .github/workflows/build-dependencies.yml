@@ -23,6 +23,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install nasm (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm
+
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
