@@ -23,6 +23,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config cmake build-essential
+
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
@@ -46,7 +52,7 @@ jobs:
           -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
           -DFFMPEG_BIN="$FFMPEG_BIN" \
           -DPORTAUDIO_BIN="$PORTAUDIO_BIN" \
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=Debug
 
       - name: Check FFmpeg include path
         run: |
