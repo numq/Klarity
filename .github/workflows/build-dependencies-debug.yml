@@ -33,8 +33,8 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           cmakeListsTxtPath: '${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt'
-          configurePresetAdditionalArgs: '[`-DCMAKE_TOOLCHAIN_FILE`, `${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake`]'
-          buildPresetAdditionalArgs: '[`--config`, `Debug`]'
+          configurePresetAdditionalArgs: '["-DCMAKE_TOOLCHAIN_FILE", "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"]'
+          buildPresetAdditionalArgs: '["--config", "Debug"]'
 
       - name: Configure CMake
         run: cmake core/src/main/cpp --build
