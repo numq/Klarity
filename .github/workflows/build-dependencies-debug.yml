@@ -26,13 +26,6 @@ jobs:
       - name: Set up vcpkg
         run: git clone https://github.com/microsoft/vcpkg.git; cd vcpkg; .\bootstrap-vcpkg.bat
 
-      - name: Set up vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          doNotCache: 'false'
-          runVcpkgInstall: 'true'
-          vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
-
       - name: Configure CMake
         run: cmake -S core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=X:/vcpkg/scripts/buildsystems/vcpkg.cmake
 
