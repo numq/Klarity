@@ -36,8 +36,10 @@ jobs:
           runVcpkgInstall: 'true'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
-      - name: Check vcpkg installation
-        run: ls -la ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}
+      - name: Verify vcpkg installation
+        run: |
+          ls -la ${{ github.workspace }}/vcpkg
+          ${{ github.workspace }}/vcpkg/vcpkg list
 
       - name: Configure CMake
         shell: bash
