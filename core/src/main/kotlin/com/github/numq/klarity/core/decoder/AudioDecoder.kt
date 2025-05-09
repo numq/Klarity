@@ -2,7 +2,6 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.data.Data
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -16,21 +15,15 @@ internal class AudioDecoder(
     private val mutex = Mutex()
 
     override suspend fun decode(data: Data) = mutex.withLock {
-        nativeDecoder.decodeAudio(buffer = data.buffer, capacity = data.capacity).mapCatching { nativeFrame ->
+        nativeDecoder.decodeAudio().mapCatching { nativeFrame ->
             when (nativeFrame) {
                 null -> Frame.EndOfStream
 
-                else -> when (nativeFrame.getType()) {
-                    null -> error("Unknown frame type")
-
-                    NativeFrame.Type.AUDIO -> Frame.Content.Audio(
-                        data = data,
-                        size = nativeFrame.remaining,
-                        timestamp = nativeFrame.timestampMicros.microseconds,
-                        isClosed = data::isClosed
+                else -> with(nativeFrame) {
+                    Frame.Content.Audio(
+                        bytes = bytes,
+                        timestamp = timestampMicros.microseconds
                     )
-
-                    NativeFrame.Type.VIDEO -> error("Video frame is not supported by decoder")
                 }
             }
         }

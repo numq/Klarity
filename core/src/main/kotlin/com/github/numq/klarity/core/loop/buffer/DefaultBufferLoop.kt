@@ -2,9 +2,9 @@ package com.github.numq.klarity.core.loop.buffer
 
 import com.github.numq.klarity.core.buffer.Buffer
 import com.github.numq.klarity.core.data.Data
-import com.github.numq.klarity.core.decoder.Decoder
+import com.github.numq.klarity.core.decoder.AudioDecoder
+import com.github.numq.klarity.core.decoder.VideoDecoder
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.media.Media
 import com.github.numq.klarity.core.pipeline.Pipeline
 import com.github.numq.klarity.core.pool.Pool
 import kotlinx.coroutines.*
@@ -20,43 +20,35 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     override var isBuffering = false
 
     private suspend fun handleAudioBuffer(
-        decoder: Decoder<Media.Audio>, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: AudioDecoder, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
-            val data = pool.acquire().getOrThrow()
+            when (val frame = decoder.decode(data = Data.Empty).getOrThrow()) {
+                is Frame.Content.Audio -> {
+                    currentCoroutineContext().ensureActive()
 
-            try {
-                when (val frame = decoder.decode(data = data).getOrThrow()) {
-                    is Frame.Content.Audio -> {
-                        currentCoroutineContext().ensureActive()
+                    buffer.put(frame).getOrThrow()
 
-                        buffer.put(frame).getOrThrow()
+                    currentCoroutineContext().ensureActive()
 
-                        currentCoroutineContext().ensureActive()
-
-                        onTimestamp(frame.timestamp)
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        buffer.put(frame).getOrThrow()
-
-                        break
-                    }
-
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    onTimestamp(frame.timestamp)
                 }
-            } catch (t: Throwable) {
-                pool.release(item = data).getOrThrow()
 
-                throw t
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
+
+                    buffer.put(frame).getOrThrow()
+
+                    break
+                }
+
+                else -> error("Unsupported frame type: ${frame::class}")
             }
         }
     }
 
     private suspend fun handleVideoBuffer(
-        decoder: Decoder<Media.Video>, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: VideoDecoder, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
     ) {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
@@ -115,13 +107,18 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     when (pipeline) {
                         is Pipeline.Audio -> with(pipeline) {
                             handleAudioBuffer(
-                                decoder = decoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
+                                decoder = decoder as AudioDecoder,
+                                buffer = buffer,
+                                onTimestamp = onTimestamp
                             )
                         }
 
                         is Pipeline.Video -> with(pipeline) {
                             handleVideoBuffer(
-                                decoder = decoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
+                                decoder = decoder as VideoDecoder,
+                                pool = pool,
+                                buffer = buffer,
+                                onTimestamp = onTimestamp
                             )
                         }
 
@@ -130,8 +127,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
                             val audioJob = launch {
                                 handleAudioBuffer(
-                                    decoder = audioDecoder,
-                                    pool = audioPool,
+                                    decoder = audioDecoder as AudioDecoder,
                                     buffer = audioBuffer,
                                     onTimestamp = { frameTimestamp ->
                                         if (frameTimestamp > lastFrameTimestamp) {
@@ -144,7 +140,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
                             val videoJob = launch {
                                 handleVideoBuffer(
-                                    decoder = videoDecoder,
+                                    decoder = videoDecoder as VideoDecoder,
                                     pool = videoPool,
                                     buffer = videoBuffer,
                                     onTimestamp = { frameTimestamp ->

@@ -98,7 +98,6 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
                 static_cast<jint>(format.height),
                 static_cast<jdouble>(format.frameRate),
                 static_cast<jint>(format.hwDeviceType),
-                static_cast<jint>(format.audioBufferCapacity),
                 static_cast<jint>(format.videoBufferCapacity)
         );
 
@@ -111,25 +110,30 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeAudio(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle,
-        jlong buffer,
-        jint capacity
+        jlong decoderHandle
 ) {
     return handleException<jobject>(env, [&] {
         auto decoder = getDecoderPointer(decoderHandle);
 
-        auto frame = decoder->decodeAudio(reinterpret_cast<uint8_t *>(buffer), capacity);
+        auto frame = decoder->decodeAudio();
 
         if (!frame.has_value()) {
             return static_cast<jobject>(nullptr);
         }
 
+        auto bytes = frame->bytes;
+
+        auto len = static_cast<jsize>(bytes.size());
+
+        auto byteArray = env->NewByteArray(len);
+
+        env->SetByteArrayRegion(byteArray, 0, len, reinterpret_cast<const jbyte *>(bytes.data()));
+
         return env->NewObject(
-                frameClass,
-                frameConstructor,
-                static_cast<jint>(frame->remaining),
-                static_cast<jlong>(frame->timestampMicros),
-                static_cast<jint>(frame->type)
+                audioFrameClass,
+                audioFrameConstructor,
+                byteArray,
+                static_cast<jlong>(frame->timestampMicros)
         );
     }, nullptr);
 }
@@ -151,11 +155,10 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
         }
 
         return env->NewObject(
-                frameClass,
-                frameConstructor,
+                videoFrameClass,
+                videoFrameConstructor,
                 static_cast<jint>(frame->remaining),
-                static_cast<jlong>(frame->timestampMicros),
-                static_cast<jint>(frame->type)
+                static_cast<jlong>(frame->timestampMicros)
         );
     }, nullptr);
 }

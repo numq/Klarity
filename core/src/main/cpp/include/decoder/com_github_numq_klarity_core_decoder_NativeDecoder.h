@@ -38,9 +38,7 @@ JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecode
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeAudio(
         JNIEnv *env,
         jclass thisClass,
-        jlong decoderHandle,
-        jlong buffer,
-        jint capacity
+        jlong decoderHandle
 );
 
 JNIEXPORT jobject JNICALL Java_com_github_numq_klarity_core_decoder_NativeDecoder_00024Native_decodeVideo(

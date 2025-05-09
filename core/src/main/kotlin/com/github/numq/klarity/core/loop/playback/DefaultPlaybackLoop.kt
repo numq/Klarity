@@ -29,7 +29,6 @@ internal class DefaultPlaybackLoop(
     private val videoClock = AtomicReference(Duration.INFINITE)
 
     private suspend fun handleAudioPlayback(
-        pool: Pool<Data>,
         buffer: Buffer<Frame>,
         sampler: Sampler,
         onTimestamp: suspend (Duration) -> Unit,
@@ -37,36 +36,30 @@ internal class DefaultPlaybackLoop(
         while (currentCoroutineContext().isActive) {
             val frame = buffer.take().getOrThrow()
 
-            try {
-                when (frame) {
-                    is Frame.Content.Audio -> {
-                        currentCoroutineContext().ensureActive()
+            when (frame) {
+                is Frame.Content.Audio -> {
+                    currentCoroutineContext().ensureActive()
 
-                        val frameTime = frame.timestamp
+                    val frameTime = frame.timestamp
 
-                        onTimestamp(frameTime)
+                    onTimestamp(frameTime)
 
-                        audioClock.set(frameTime)
+                    audioClock.set(frameTime)
 
-                        sampler.write(frame).getOrThrow()
-                    }
-
-                    is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
-                        sampler.drain().getOrThrow()
-
-                        audioClock.set(Duration.INFINITE)
-
-                        break
-                    }
-
-                    else -> error("Unsupported frame type: ${frame::class}")
+                    sampler.write(frame).getOrThrow()
                 }
-            } finally {
-                if (frame is Frame.Content.Audio) {
-                    pool.release(item = frame.data).getOrThrow()
+
+                is Frame.EndOfStream -> {
+                    currentCoroutineContext().ensureActive()
+
+                    sampler.drain().getOrThrow()
+
+                    audioClock.set(Duration.INFINITE)
+
+                    break
                 }
+
+                else -> error("Unsupported frame type: ${frame::class}")
             }
         }
     }
@@ -170,7 +163,7 @@ internal class DefaultPlaybackLoop(
                     with(pipeline) {
                         when (this) {
                             is Pipeline.Audio -> handleAudioPlayback(
-                                pool = pool, buffer = buffer, sampler = sampler, onTimestamp = onTimestamp
+                                buffer = buffer, sampler = sampler, onTimestamp = onTimestamp
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
@@ -182,7 +175,6 @@ internal class DefaultPlaybackLoop(
 
                                 val audioJob = launch {
                                     handleAudioPlayback(
-                                        pool = audioPool,
                                         buffer = audioBuffer,
                                         sampler = sampler,
                                         onTimestamp = { frameTimestamp ->

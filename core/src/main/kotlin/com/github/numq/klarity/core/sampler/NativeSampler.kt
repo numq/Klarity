@@ -19,7 +19,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         external fun start(handle: Long): Long
 
         @JvmStatic
-        external fun write(handle: Long, buffer: Long, size: Int)
+        external fun write(handle: Long, bytes: ByteArray)
 
         @JvmStatic
         external fun stop(handle: Long)
@@ -76,10 +76,10 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         Native.start(handle = nativeHandle.get())
     }
 
-    fun write(buffer: Long, size: Int) = runCatching {
+    fun write(bytes: ByteArray) = runCatching {
         ensureOpen()
 
-        Native.write(handle = nativeHandle.get(), buffer = buffer, size = size)
+        Native.write(handle = nativeHandle.get(), bytes = bytes)
     }
 
     fun stop() = runCatching {

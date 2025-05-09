@@ -90,7 +90,7 @@ bool Decoder::_prepareHardwareAcceleration(const uint32_t deviceType) {
     return false;
 }
 
-int Decoder::_processAudio(uint8_t *buffer, int capacity) {
+int Decoder::_processAudio() {
     if (!audioFrame || !swrContext) {
         throw DecoderException("Invalid audio processing state");
     }
@@ -101,10 +101,36 @@ int Decoder::_processAudio(uint8_t *buffer, int capacity) {
         throw DecoderException("Invalid source audio frame");
     }
 
+    const int outSamples = swr_get_out_samples(swrContext.get(), src->nb_samples);
+
+    if (outSamples < 0) {
+        throw DecoderException("Failed to calculate output samples");
+    }
+
+    int bufferSize = av_samples_get_buffer_size(
+            nullptr,
+            audioCodecContext->ch_layout.nb_channels,
+            outSamples,
+            targetSampleFormat,
+            1
+    );
+
+    if (bufferSize <= 0) {
+        throw DecoderException("Invalid buffer size calculation");
+    }
+
+    bufferSize += AV_INPUT_BUFFER_PADDING_SIZE;
+
+    if (audioBuffer.size() < bufferSize) {
+        audioBuffer.resize(bufferSize);
+    }
+
+    auto ptr = audioBuffer.data();
+
     const int convertedSamples = swr_convert(
             swrContext.get(),
-            &buffer,
-            capacity,
+            &ptr,
+            outSamples,
             const_cast<const uint8_t **>(src->data),
             src->nb_samples
     );
@@ -270,22 +296,6 @@ Decoder::Decoder(
                 format.sampleRate = audioCodecContext->sample_rate;
 
                 format.channels = audioCodecContext->ch_layout.nb_channels;
-
-                auto audioBufferCapacity = av_samples_get_buffer_size(
-                        nullptr,
-                        audioCodecContext->ch_layout.nb_channels,
-                        8192,
-                        targetSampleFormat,
-                        1
-                );
-
-                if (audioBufferCapacity <= 0) {
-                    throw DecoderException("Invalid audio buffer capacity");
-                }
-
-                audioBufferCapacity += AV_INPUT_BUFFER_PADDING_SIZE;
-
-                format.audioBufferCapacity = audioBufferCapacity;
 
                 if (decodeAudioStream) {
                     SwrContext *rawSwrContext = nullptr;
@@ -455,7 +465,7 @@ Decoder::~Decoder() {
     formatContext.reset();
 }
 
-std::optional<Frame> Decoder::decodeAudio(uint8_t *buffer, int capacity) {
+std::optional<AudioFrame> Decoder::decodeAudio() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -464,14 +474,6 @@ std::optional<Frame> Decoder::decodeAudio(uint8_t *buffer, int capacity) {
 
     if (!_hasAudio()) {
         throw DecoderException("Could not find audio stream");
-    }
-
-    if (!buffer) {
-        throw DecoderException("Invalid buffer");
-    }
-
-    if (capacity <= 0) {
-        throw DecoderException("Invalid buffer capacity");
     }
 
     av_packet_unref(packet.get());
@@ -499,15 +501,16 @@ std::optional<Frame> Decoder::decodeAudio(uint8_t *buffer, int capacity) {
                             AVRational{1, 1'000'000}
                     );
 
-                    auto remaining = _processAudio(buffer, capacity);
+                    auto remaining = _processAudio();
 
                     av_frame_unref(audioFrame.get());
 
+                    std::vector<uint8_t> bytes(audioBuffer.begin(), audioBuffer.begin() + remaining);
+
                     return std::optional(
-                            Frame{
-                                    remaining,
-                                    timestampMicros,
-                                    FrameType::AUDIO
+                            AudioFrame{
+                                    bytes,
+                                    timestampMicros
                             }
                     );
                 }
@@ -534,7 +537,7 @@ std::optional<Frame> Decoder::decodeAudio(uint8_t *buffer, int capacity) {
     return std::nullopt;
 }
 
-std::optional<Frame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
+std::optional<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -602,10 +605,9 @@ std::optional<Frame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
                     );
 
                     return std::optional(
-                            Frame{
+                            VideoFrame{
                                     remaining,
-                                    timestampMicros,
-                                    FrameType::VIDEO
+                                    timestampMicros
                             }
                     );
                 }
@@ -814,6 +816,10 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         avcodec_flush_buffers(videoCodecContext.get());
     }
 
+    audioBuffer.clear();
+
+    audioBuffer.shrink_to_fit();
+
     return best_match;
 }
 
@@ -855,4 +861,8 @@ void Decoder::reset() {
     if (videoCodecContext) {
         avcodec_flush_buffers(videoCodecContext.get());
     }
+
+    audioBuffer.clear();
+
+    audioBuffer.shrink_to_fit();
 }

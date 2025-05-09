@@ -19,7 +19,6 @@ internal sealed interface Pipeline {
     data class Audio(
         override val media: Media.Audio,
         val decoder: Decoder<Media.Audio>,
-        val pool: Pool<Data>,
         val buffer: Buffer<Frame>,
         val sampler: Sampler,
     ) : Pipeline {
@@ -29,8 +28,6 @@ internal sealed interface Pipeline {
             buffer.close().getOrThrow()
 
             decoder.close().getOrThrow()
-
-            pool.close().getOrThrow()
         }
     }
 
@@ -53,7 +50,6 @@ internal sealed interface Pipeline {
         override val media: Media.AudioVideo,
         val audioDecoder: Decoder<Media.Audio>,
         val videoDecoder: Decoder<Media.Video>,
-        val audioPool: Pool<Data>,
         val videoPool: Pool<Data>,
         val audioBuffer: Buffer<Frame>,
         val videoBuffer: Buffer<Frame>,
@@ -67,8 +63,6 @@ internal sealed interface Pipeline {
                     audioBuffer.close()
 
                     audioDecoder.close()
-
-                    audioPool.close()
                 }
 
                 val videoJob = async {

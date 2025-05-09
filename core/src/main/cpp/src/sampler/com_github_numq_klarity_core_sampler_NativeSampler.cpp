@@ -58,13 +58,18 @@ JNIEXPORT void JNICALL Java_com_github_numq_klarity_core_sampler_NativeSampler_0
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle,
-        jlong bufferHandle,
-        jint bufferSize
+        jbyteArray bytes
 ) {
     return handleException(env, [&] {
         auto sampler = getSamplerPointer(samplerHandle);
 
-        sampler->write(reinterpret_cast<uint8_t *>(bufferHandle), bufferSize);
+        auto size = env->GetArrayLength(bytes);
+
+        std::vector<uint8_t> buffer(size);
+
+        env->GetByteArrayRegion(bytes, 0, size, reinterpret_cast<jbyte *>(buffer.data()));
+
+        sampler->write(buffer.data(), static_cast<int>(buffer.size()));
     });
 }
 

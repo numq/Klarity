@@ -40,7 +40,7 @@ internal class DefaultSampler(
     }
 
     override suspend fun write(frame: Frame.Content.Audio) = mutex.withLock {
-        sampler.write(buffer = frame.data.buffer, size = frame.size)
+        sampler.write(bytes = frame.bytes)
     }
 
     override suspend fun stop() = mutex.withLock {

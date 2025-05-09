@@ -9,6 +9,8 @@ data class Data(
     val close: () -> Unit
 ) : Closeable {
     companion object {
+        val Empty = Data(-1L, 0, { true }, {})
+
         fun allocate(capacity: Int) = with(NativeData.allocate(capacity)) {
             Data(
                 buffer = getBuffer(),

@@ -2,11 +2,9 @@
 #define KLARITY_DECODER_DECODER_H
 
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <string>
-#include <thread>
 #include "deleter.h"
 #include "exception.h"
 #include "format.h"
@@ -14,12 +12,9 @@
 #include "hwaccel.h"
 
 extern "C" {
-#include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
-#include "libavutil/imgutils.h"
-#include <libavutil/opt.h>
-#include "libswresample/swresample.h"
-#include "libswscale/swscale.h"
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/imgutils.h>
 }
 
 class Decoder {
@@ -64,6 +59,8 @@ private:
 
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
+    std::vector<uint8_t> audioBuffer;
+
     std::map<int64_t, int64_t> keyframeCache;
 
 public:
@@ -82,7 +79,7 @@ public:
 
     bool _prepareHardwareAcceleration(uint32_t deviceType);
 
-    int _processAudio(uint8_t *buffer, int capacity);
+    int _processAudio();
 
     int _processVideo(uint8_t *buffer);
 
@@ -104,9 +101,9 @@ public:
 
     Format format;
 
-    std::optional<Frame> decodeAudio(uint8_t *buffer, int capacity);
+    std::optional<AudioFrame> decodeAudio();
 
-    std::optional<Frame> decodeVideo(uint8_t *buffer, int capacity);
+    std::optional<VideoFrame> decodeVideo(uint8_t *buffer, int capacity);
 
     uint64_t seekTo(long timestampMicros, bool keyframesOnly);
 

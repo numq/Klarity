@@ -36,13 +36,9 @@ internal interface Decoder<Media> {
                 val format = decoder.format.getOrThrow()
 
                 val audioFormat = format.takeIf { fmt ->
-                    fmt.sampleRate > 0 && fmt.channels > 0 && fmt.audioBufferCapacity > 0
+                    fmt.sampleRate > 0 && fmt.channels > 0
                 }?.let { fmt ->
-                    AudioFormat(
-                        sampleRate = fmt.sampleRate,
-                        channels = fmt.channels,
-                        bufferCapacity = fmt.audioBufferCapacity
-                    )
+                    AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
                 }
 
                 val videoFormat = format.takeIf { fmt ->
@@ -98,12 +94,10 @@ internal interface Decoder<Media> {
                 val format = nativeDecoder.format.getOrThrow()
 
                 val audioFormat = format.takeIf { fmt ->
-                    fmt.sampleRate > 0 && fmt.channels > 0 && fmt.audioBufferCapacity > 0
+                    fmt.sampleRate > 0 && fmt.channels > 0
                 }?.let { fmt ->
                     AudioFormat(
-                        sampleRate = fmt.sampleRate,
-                        channels = fmt.channels,
-                        bufferCapacity = fmt.audioBufferCapacity
+                        sampleRate = fmt.sampleRate, channels = fmt.channels
                     )
                 }
 

@@ -2,7 +2,6 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.data.Data
 import com.github.numq.klarity.core.frame.Frame
-import com.github.numq.klarity.core.frame.NativeFrame
 import com.github.numq.klarity.core.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,15 +20,11 @@ internal class VideoDecoder(
                 when (nativeFrame) {
                     null -> Frame.EndOfStream
 
-                    else -> when (nativeFrame.getType()) {
-                        null -> error("Unknown frame type")
-
-                        NativeFrame.Type.AUDIO -> error("Audio frame is not supported by decoder")
-
-                        NativeFrame.Type.VIDEO -> Frame.Content.Video(
+                    else -> with(nativeFrame) {
+                        Frame.Content.Video(
                             data = data,
-                            size = nativeFrame.remaining,
-                            timestamp = nativeFrame.timestampMicros.microseconds,
+                            size = remaining,
+                            timestamp = timestampMicros.microseconds,
                             isClosed = data::isClosed,
                             width = format.width,
                             height = format.height

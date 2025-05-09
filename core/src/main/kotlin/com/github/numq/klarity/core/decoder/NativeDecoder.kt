@@ -2,7 +2,8 @@ package com.github.numq.klarity.core.decoder
 
 import com.github.numq.klarity.core.cleaner.NativeCleaner
 import com.github.numq.klarity.core.format.NativeFormat
-import com.github.numq.klarity.core.frame.NativeFrame
+import com.github.numq.klarity.core.frame.NativeAudioFrame
+import com.github.numq.klarity.core.frame.NativeVideoFrame
 import java.io.Closeable
 import java.util.concurrent.atomic.AtomicLong
 
@@ -32,10 +33,10 @@ internal class NativeDecoder(
         external fun getFormat(handle: Long): NativeFormat
 
         @JvmStatic
-        external fun decodeAudio(handle: Long, buffer: Long, capacity: Int): NativeFrame?
+        external fun decodeAudio(handle: Long): NativeAudioFrame?
 
         @JvmStatic
-        external fun decodeVideo(handle: Long, buffer: Long, capacity: Int): NativeFrame?
+        external fun decodeVideo(handle: Long, buffer: Long, capacity: Int): NativeVideoFrame?
 
         @JvmStatic
         external fun seekTo(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
@@ -92,10 +93,10 @@ internal class NativeDecoder(
         return nativeHandle.get()
     }
 
-    fun decodeAudio(buffer: Long, capacity: Int) = runCatching {
+    fun decodeAudio() = runCatching {
         ensureOpen()
 
-        Native.decodeAudio(handle = nativeHandle.get(), buffer = buffer, capacity = capacity)
+        Native.decodeAudio(handle = nativeHandle.get())
     }
 
     fun decodeVideo(buffer: Long, capacity: Int) = runCatching {

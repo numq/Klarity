@@ -90,7 +90,7 @@ int Sampler::start() {
     return static_cast<int>(totalLatency * 1'000'000);
 }
 
-void Sampler::write(const uint8_t *buffer, const uint64_t size) {
+void Sampler::write(const uint8_t *buffer, const int size) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream || Pa_IsStreamActive(stream.get()) <= 0) {

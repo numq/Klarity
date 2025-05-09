@@ -1,14 +1,16 @@
 #ifndef KLARITY_DECODER_FRAME_H
 #define KLARITY_DECODER_FRAME_H
 
-enum FrameType {
-    AUDIO, VIDEO
+#include <vector>
+
+struct AudioFrame {
+    std::vector<uint8_t> bytes;
+    int64_t timestampMicros;
 };
 
-struct Frame {
+struct VideoFrame {
     int remaining;
     int64_t timestampMicros;
-    FrameType type;
 };
 
 #endif //KLARITY_DECODER_FRAME_H

@@ -5,8 +5,8 @@
 #include <mutex>
 #include <shared_mutex>
 #include "exception.h"
-#include "portaudio.h"
 #include "stretch/stretch.h"
+#include <portaudio.h>
 
 struct Sampler {
 private:
@@ -45,7 +45,7 @@ public:
 
     int start();
 
-    void write(const uint8_t *buffer, uint64_t size);
+    void write(const uint8_t *buffer, int size);
 
     void stop();
 
