@@ -31,6 +31,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y nasm
 
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install nasm
+
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: ./bootstrap-vcpkg.sh
