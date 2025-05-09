@@ -36,7 +36,7 @@ target_include_directories(klarity PRIVATE
         include/sampler/stretch
 )
 
-target_link_directories(
+target_link_directories(klarity PRIVATE
         ${FFMPEG_BIN}
         ${PORTAUDIO_BIN}
 )

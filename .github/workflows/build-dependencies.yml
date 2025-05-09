@@ -5,46 +5,54 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
-    #    runs-on: ${{ matrix.os }}
-    #    strategy:
-    #      matrix:
-    #        include:
-    #          - os: windows-latest
-    #            triplet: x64-windows
-    #            binary_ext: .dll
-    #          - os: ubuntu-latest
-    #            triplet: x64-linux
-    #            binary_ext: .so
-    #          - os: macos-latest
-    #            triplet: x64-osx
-    #            binary_ext: .dylib
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            triplet: x64-windows
+            binary_ext: .dll
+          - os: ubuntu-latest
+            triplet: x64-linux
+            binary_ext: .so
+          - os: macos-latest
+            triplet: x64-osx
+            binary_ext: .dylib
+
+    env:
+      VCPKG_PACKAGES=${{ github.workspace }}/vcpkg/packages
+      FFMPEG_INCLUDE=${{ env.VCPKG_PACKAGES }}/ffmpeg_${{ matrix.triplet }}/include
+      PORTAUDIO_INCLUDE=${{ env.VCPKG_PACKAGES }}/portaudio_${{ matrix.triplet }}/include
+      FFMPEG_BIN=${{ env.VCPKG_PACKAGES }}/ffmpeg_${{ matrix.triplet }}/bin
+      PORTAUDIO_BIN=${{ env.VCPKG_PACKAGES }}/portaudio_${{ matrix.triplet }}/bin
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl pkg-config cmake ninja-build nasm
-
-      - name: Install dependencies (macOS only)
-        if: runner.os == 'macOS'
-        run: brew install cmake ninja nasm pkg-config
+      #      - name: Install dependencies (Linux only)
+      #        if: runner.os == 'Linux'
+      #        run: |
+      #          sudo apt-get update
+      #          sudo apt-get install -y unzip curl pkg-config cmake ninja-build nasm
+      #
+      #      - name: Install dependencies (macOS only)
+      #        if: runner.os == 'macOS'
+      #        run: brew install cmake ninja nasm pkg-config
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'core/src/main/vcpkg.json'
 
       - name: Configure CMake
-        run: >
-          cmake -S core/src/main/cpp -B build
-          -DFFMPEG_INCLUDE=${{ github.workspace }}/vcpkg/packages/ffmpeg_x64-windows/include
-          -DPORTAUDIO_INCLUDE=${{ github.workspace }}/vcpkg/packages/portaudio_x64-windows/include
-          -DFFMPEG_BIN=${{ github.workspace }}/vcpkg/packages/ffmpeg_x64-windows/bin
-          -DPORTAUDIO_BIN=${{ github.workspace }}/vcpkg/packages/portaudio_x64-windows/bin
-          -DCMAKE_BUILD_TYPE=Release
+        run:
+          cmake -S core/src/main/cpp -B build /
+          -DFFMPEG_INCLUDE=${{ env.FFMPEG_INCLUDE }} /
+          -DPORTAUDIO_INCLUDE=${{ env.PORTAUDIO_INCLUDE }}${{ github.workspace }}/vcpkg/packages/portaudio_${{ matrix.triplet }}/include /
+          -DFFMPEG_BIN=${{ github.workspace }}/vcpkg/packages/ffmpeg_${{ matrix.triplet }}/bin /
+          -DPORTAUDIO_BIN=${{ github.workspace }}/vcpkg/packages/portaudio_${{ matrix.triplet }}/bin /
+          -DCMAKE_BUILD_TYPE=Release /
 
       - name: Build native library
         run: cmake --build build --config Release
