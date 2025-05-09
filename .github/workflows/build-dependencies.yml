@@ -9,15 +9,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            triplet: x64-windows
-            binary_ext: .dll
+#          - os: windows-latest
+#            triplet: x64-windows
+#            binary_ext: .dll
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: .so
-#          - os: macos-latest
-#            triplet: arm64-osx
-#            binary_ext: .dylib
+    #          - os: macos-latest
+    #            triplet: arm64-osx
+    #            binary_ext: .dylib
 
     steps:
       - name: Checkout repo
@@ -71,15 +71,19 @@ jobs:
           echo "PORTAUDIO_INCLUDE=$PORTAUDIO_INCLUDE" >> $GITHUB_ENV
           echo "FFMPEG_LIB=$FFMPEG_LIB" >> $GITHUB_ENV
           echo "PORTAUDIO_LIB=$PORTAUDIO_LIB" >> $GITHUB_ENV
+    
+          echo "Checking FFmpeg headers at: $FFMPEG_INCLUDE"
+          ls -la $FFMPEG_INCLUDE/libavcodec || true
 
           if [[ "${{ steps.cmake-cache.outputs.cache-hit }}" != 'true' ]]; then
             cmake -S core/src/main/cpp -B build \
               -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
+              -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+              -DCMAKE_BUILD_TYPE=Release \
               -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
               -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
               -DFFMPEG_LIB="$FFMPEG_LIB" \
-              -DPORTAUDIO_LIB="$PORTAUDIO_LIB" \
-              -DCMAKE_BUILD_TYPE=Release
+              -DPORTAUDIO_LIB="$PORTAUDIO_LIB"
           fi
 
       - name: Build native library
