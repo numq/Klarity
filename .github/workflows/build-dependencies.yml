@@ -43,10 +43,10 @@ jobs:
       - name: Configure CMake
         shell: bash
         run: |
-          FFMPEG_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
-          PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
-          FFMPEG_LIB="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
-          PORTAUDIO_LIB="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
+          FFMPEG_INCLUDE=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/include
+          PORTAUDIO_INCLUDE=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/include
+          FFMPEG_LIB=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/lib
+          PORTAUDIO_LIB=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/lib
           
           cmake -S core/src/main/cpp -B build \
           -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
@@ -67,7 +67,7 @@ jobs:
           mkdir -p core/src/main/resources/bin
           cp build/*klarity${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
           for lib in avutil swresample swscale avcodec avformat avfilter avdevice portaudio; do
-            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
+            cp $GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
           done
 
       - name: Set up Java
