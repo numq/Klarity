@@ -26,6 +26,7 @@ jobs:
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
+          runVcpkgInstall: 'true'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
       - name: Configure CMake
