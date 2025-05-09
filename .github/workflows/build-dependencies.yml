@@ -40,7 +40,10 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -S core/src/main/cpp -B build
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DFFMPEG_INCLUDE=${{ github.workspace }}/vcpkg/packages/ffmpeg_x64-windows/include
+          -DPORTAUDIO_INCLUDE=${{ github.workspace }}/vcpkg/packages/portaudio_x64-windows/include
+          -DFFMPEG_BIN=${{ github.workspace }}/vcpkg/packages/ffmpeg_x64-windows/bin
+          -DPORTAUDIO_BIN=${{ github.workspace }}/vcpkg/packages/portaudio_x64-windows/bin
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build native library
