@@ -41,15 +41,13 @@ jobs:
         run: .\bootstrap-vcpkg.bat
         working-directory: vcpkg
 
-      - name: Install dependencies via manifest
-        run: |
-          if [ $RUNNER_OS == 'Windows' ]; then
-            cmd.exe /C vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-          elif [ $RUNNER_OS == 'Linux' ]; then
-            ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-          elif [ $RUNNER_OS == 'macOS' ]; then
-            ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-          fi
+      - name: Install dependencies via manifest (Windows)
+        if: runner.os == 'Windows'
+        run: cmd.exe /C vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
+
+      - name: Install dependencies via manifest (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
 
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
