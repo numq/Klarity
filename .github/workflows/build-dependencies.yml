@@ -40,6 +40,25 @@ jobs:
           doNotCache: 'false'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
+      - name: Create build directory
+        shell: bash
+        run: mkdir -p build
+
+      - name: Cache CMake configuration
+        uses: actions/cache@v3
+        id: cmake-cache
+        with:
+          path: |
+            build/CMakeCache.txt
+            build/CMakeFiles
+            build/cmake_install.cmake
+            build/Makefile
+            build/*.ninja
+          key: ${{ runner.os }}-cmake-${{ matrix.triplet }}-${{ hashFiles('core/src/main/cpp/CMakeLists.txt', '**/vcpkg.json') }}-${{ hashFiles('core/src/main/cpp/**/*.h', 'core/src/main/cpp/**/*.cpp') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ matrix.triplet }}-
+            ${{ runner.os }}-cmake-
+
       - name: Configure CMake
         shell: bash
         run: |
@@ -47,14 +66,21 @@ jobs:
           PORTAUDIO_INCLUDE=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/include
           FFMPEG_LIB=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/lib
           PORTAUDIO_LIB=$GITHUB_WORKSPACE/vcpkg/installed/${{ matrix.triplet }}/lib
-          
-          cmake -S core/src/main/cpp -B build \
-          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
-          -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
-          -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
-          -DFFMPEG_LIB="$FFMPEG_LIB" \
-          -DPORTAUDIO_LIB="$PORTAUDIO_LIB" \
-          -DCMAKE_BUILD_TYPE=Release
+
+          echo "FFMPEG_INCLUDE=$FFMPEG_INCLUDE" >> $GITHUB_ENV
+          echo "PORTAUDIO_INCLUDE=$PORTAUDIO_INCLUDE" >> $GITHUB_ENV
+          echo "FFMPEG_LIB=$FFMPEG_LIB" >> $GITHUB_ENV
+          echo "PORTAUDIO_LIB=$PORTAUDIO_LIB" >> $GITHUB_ENV
+
+          if [[ "${{ steps.cmake-cache.outputs.cache-hit }}" != 'true' ]]; then
+            cmake -S core/src/main/cpp -B build \
+              -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
+              -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
+              -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
+              -DFFMPEG_LIB="$FFMPEG_LIB" \
+              -DPORTAUDIO_LIB="$PORTAUDIO_LIB" \
+              -DCMAKE_BUILD_TYPE=Release
+          fi
 
       - name: Build native library
         shell: bash
