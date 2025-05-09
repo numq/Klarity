@@ -12,27 +12,16 @@ jobs:
           - os: windows-latest
             triplet: x64-windows
             binary_ext: .dll
-          - os: ubuntu-latest
-            triplet: x64-linux
-            binary_ext: .so
-          - os: macos-latest
-            triplet: x64-osx
-            binary_ext: .dylib
+    #          - os: ubuntu-latest
+    #            triplet: x64-linux
+    #            binary_ext: .so
+    #          - os: macos-latest
+    #            triplet: x64-osx
+    #            binary_ext: .dylib
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Install Linux build dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y nasm yasm pkg-config cmake build-essential
-
-      - name: Install macOS dependencies
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install nasm pkg-config cmake
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
