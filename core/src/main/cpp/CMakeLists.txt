@@ -4,9 +4,13 @@ project(klarity VERSION 1.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(FFMPEG_INCLUDE "")
+set(PORTAUDIO_INCLUDE "")
+
+set(FFMPEG_BIN "")
+set(PORTAUDIO_BIN "")
+
 find_package(JNI REQUIRED)
-find_package(FFMPEG REQUIRED COMPONENTS avcodec avformat avutil swresample swscale)
-find_package(PORTAUDIO REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp
@@ -20,8 +24,8 @@ add_library(klarity SHARED
 
 target_include_directories(klarity PRIVATE
         ${JNI_INCLUDE_DIRS}
-        ${FFMPEG_INCLUDE_DIRS}
-        ${PORTAUDIO_INCLUDE_DIRS}
+        ${FFMPEG_INCLUDE}
+        ${PORTAUDIO_INCLUDE}
         include
         include/data
         include/decoder
@@ -32,7 +36,16 @@ target_include_directories(klarity PRIVATE
         include/sampler/stretch
 )
 
+target_link_directories(
+        ${FFMPEG_BIN}
+        ${PORTAUDIO_BIN}
+)
+
 target_link_libraries(klarity PRIVATE
-        ${FFMPEG_LIBRARIES}
+        avcodec
+        avformat
+        avutil
+        swresample
+        swscale
         portaudio
 )
