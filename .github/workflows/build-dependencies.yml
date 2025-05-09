@@ -36,7 +36,7 @@ jobs:
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgJsonGlob: 'core/src/main/vcpkg.json'
+          vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.json'
 
       - name: Configure CMake
         shell: bash
