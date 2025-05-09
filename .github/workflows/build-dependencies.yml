@@ -26,6 +26,7 @@ jobs:
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
+          doNotCache: 'false'
           runVcpkgInstall: 'true'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
@@ -36,12 +37,6 @@ jobs:
           PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
           FFMPEG_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           PORTAUDIO_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
-          
-          echo "FFMPEG_INCLUDE: $FFMPEG_INCLUDE"
-          echo "PORTAUDIO_INCLUDE: $PORTAUDIO_INCLUDE"
-          
-          ls -l "$FFMPEG_INCLUDE"
-          ls -l "$PORTAUDIO_INCLUDE"
           
           cmake -S core/src/main/cpp -B build \
           -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
