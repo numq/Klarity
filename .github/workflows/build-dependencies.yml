@@ -37,7 +37,7 @@ jobs:
 
       - name: Install dependencies via manifest
         run: |
-          ./vcpkg/vcpkg install \
+          ./vcpkg install \
             --triplet=${{ matrix.triplet }} \
             --x-manifest-root=core/src/main/cpp \
             --feature-flags=versions,manifest
