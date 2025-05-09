@@ -4,6 +4,11 @@ project(klarity VERSION 1.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(FFMPEG_INCLUDE "" CACHE PATH "Path to FFmpeg include dir")
+set(PORTAUDIO_INCLUDE "" CACHE PATH "Path to PortAudio include dir")
+set(FFMPEG_BIN "" CACHE PATH "Path to FFmpeg binary dir")
+set(PORTAUDIO_BIN "" CACHE PATH "Path to PortAudio binary dir")
+
 find_package(JNI REQUIRED)
 
 add_library(klarity SHARED
@@ -43,3 +48,8 @@ target_link_libraries(klarity PRIVATE
         swscale
         portaudio
 )
+
+message(STATUS "FFMPEG_INCLUDE: ${FFMPEG_INCLUDE}")
+message(STATUS "PORTAUDIO_INCLUDE: ${PORTAUDIO_INCLUDE}")
+message(STATUS "FFMPEG_BIN: ${FFMPEG_BIN}")
+message(STATUS "PORTAUDIO_BIN: ${PORTAUDIO_BIN}")
