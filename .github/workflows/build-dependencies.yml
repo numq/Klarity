@@ -25,6 +25,12 @@ jobs:
       - name: Clone vcpkg
         run: git clone https://github.com/microsoft/vcpkg.git
 
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm
+
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: ./bootstrap-vcpkg.sh
