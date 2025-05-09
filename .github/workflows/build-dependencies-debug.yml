@@ -29,6 +29,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y nasm
 
+      - name: Install nasm (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install nasm
+
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:

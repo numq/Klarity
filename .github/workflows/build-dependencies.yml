@@ -12,12 +12,12 @@ jobs:
           - os: windows-latest
             triplet: x64-windows
             binary_ext: .dll
-    #          - os: ubuntu-latest
-    #            triplet: x64-linux
-    #            binary_ext: .so
-    #          - os: macos-latest
-    #            triplet: x64-osx
-    #            binary_ext: .dylib
+          - os: ubuntu-latest
+            triplet: x64-linux
+            binary_ext: .so
+          - os: macos-latest
+            triplet: arm64-osx
+            binary_ext: .dylib
 
     steps:
       - name: Checkout repo
@@ -29,11 +29,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y nasm
 
+      - name: Install nasm (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install nasm
+
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           doNotCache: 'false'
-          runVcpkgInstall: 'true'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
       - name: Configure CMake
@@ -51,12 +55,8 @@ jobs:
           -DPORTAUDIO_LIB="$PORTAUDIO_LIB" \
           -DCMAKE_BUILD_TYPE=Release
 
-      - name: Check FFmpeg include path
-        run: |
-          echo "FFMPEG_INCLUDE: $FFMPEG_INCLUDE"
-          ls $FFMPEG_INCLUDE/libavcodec
-
       - name: Build native library
+        shell: bash
         run: cmake --build build --config Release
 
       - name: Prepare resources
