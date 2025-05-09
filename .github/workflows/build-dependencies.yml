@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clone vcpkg
-        run: git clone --depth 1 https://github.com/microsoft/vcpkg.git
+        run: git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
