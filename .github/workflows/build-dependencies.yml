@@ -46,7 +46,7 @@ jobs:
           -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
           -DFFMPEG_BIN="$FFMPEG_BIN" \
           -DPORTAUDIO_BIN="$PORTAUDIO_BIN" \
-          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_BUILD_TYPE=Release
 
       - name: Check FFmpeg include path
         run: |
