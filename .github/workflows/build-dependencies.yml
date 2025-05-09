@@ -36,6 +36,12 @@ jobs:
           FFMPEG_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           PORTAUDIO_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           
+          echo "FFMPEG_INCLUDE: $FFMPEG_INCLUDE"
+          echo "PORTAUDIO_INCLUDE: $PORTAUDIO_INCLUDE"
+          
+          ls -l "$FFMPEG_INCLUDE"
+          ls -l "$PORTAUDIO_INCLUDE"
+          
           cmake -S core/src/main/cpp -B build \
           -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
           -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
