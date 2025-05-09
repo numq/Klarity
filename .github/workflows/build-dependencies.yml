@@ -23,16 +23,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      #      - name: Install dependencies (Linux only)
-      #        if: runner.os == 'Linux'
-      #        run: |
-      #          sudo apt-get update
-      #          sudo apt-get install -y unzip curl pkg-config cmake ninja-build nasm
-      #
-      #      - name: Install dependencies (macOS only)
-      #        if: runner.os == 'macOS'
-      #        run: brew install cmake ninja nasm pkg-config
-
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
@@ -41,8 +31,8 @@ jobs:
       - name: Configure CMake
         shell: bash
         run: |
-          FFMPEG_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include/ffmpeg"
-          PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include/portaudio"
+          FFMPEG_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
+          PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
           FFMPEG_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           PORTAUDIO_BIN="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin"
           
