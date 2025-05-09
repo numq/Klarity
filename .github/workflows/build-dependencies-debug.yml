@@ -24,14 +24,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up vcpkg
-        shell: bash
-        run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          ./bootstrap-vcpkg.sh
+        uses: lukka/run-vcpkg@v11
+        with:
+          doNotCache: 'false'
+          vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
       - name: Configure CMake
-        run: cmake -S core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: cmake core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build native library
         run: cmake --build build --config Debug
@@ -42,8 +41,8 @@ jobs:
           rm -rf core/src/main/resources/bin
           mkdir -p core/src/main/resources/bin
           cp build/*klarity${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
-          for lib in avutil swresample swscale avcodec avformat avfilter avdevice portaudio; do
-            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/bin/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
+          for lib in avutil avcodec avformat swresample swscale portaudio; do
+            cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib/*${lib}*${{ matrix.binary_ext }} core/src/main/resources/bin/ || true
           done
 
       - name: Set up Java
