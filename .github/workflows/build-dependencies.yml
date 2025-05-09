@@ -41,8 +41,8 @@ jobs:
           cmake -S core/src/main/cpp -B build \
           -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
           -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
-          -DFFMPEG_LIB="$FFMPEG_BIN" \
-          -DPORTAUDIO_LIB="$PORTAUDIO_BIN" \
+          -DFFMPEG_LIB="$FFMPEG_LIB" \
+          -DPORTAUDIO_LIB="$PORTAUDIO_LIB" \
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Check FFmpeg include path

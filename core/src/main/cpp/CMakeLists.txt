@@ -44,8 +44,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     set(FFMPEG_INCLUDE "" CACHE PATH "Path to FFmpeg include dir")
     set(PORTAUDIO_INCLUDE "" CACHE PATH "Path to PortAudio include dir")
-    set(FFMPEG_BIN "" CACHE PATH "Path to FFmpeg binary dir")
-    set(PORTAUDIO_BIN "" CACHE PATH "Path to PortAudio binary dir")
+    set(FFMPEG_LIB "" CACHE PATH "Path to FFmpeg library dir")
+    set(PORTAUDIO_LIB "" CACHE PATH "Path to PortAudio library dir")
 
     target_compile_definitions(klarity PRIVATE NDEBUG)
     target_compile_options(klarity PRIVATE -O3)
@@ -65,8 +65,8 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
     )
 
     target_link_directories(klarity PRIVATE
-            ${FFMPEG_BIN}
-            ${PORTAUDIO_BIN}
+            ${FFMPEG_LIB}
+            ${PORTAUDIO_LIB}
     )
 
     target_link_libraries(klarity PRIVATE
