@@ -27,7 +27,7 @@ jobs:
         run: git clone https://github.com/microsoft/vcpkg.git; cd vcpkg; .\bootstrap-vcpkg.bat
 
       - name: Configure CMake
-        run: cmake -S core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=X:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: cmake -S core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build native library
         run: cmake --build build --config Debug
