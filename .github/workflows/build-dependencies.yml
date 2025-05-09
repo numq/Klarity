@@ -49,6 +49,7 @@ jobs:
           PORTAUDIO_LIB="${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
           
           cmake -S core/src/main/cpp -B build \
+          -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake \
           -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
           -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
           -DFFMPEG_LIB="$FFMPEG_LIB" \
