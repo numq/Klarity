@@ -30,7 +30,14 @@ jobs:
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
       - name: Configure CMake
-        run: cmake core/src/main/cpp -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        uses: lukka/run-cmake@v10
+        with:
+          cmakeListsTxtPath: '${{ github.workspace }}/core/src/main/cpp/CMakeLists.txt'
+          configurePresetAdditionalArgs: '[`-DCMAKE_TOOLCHAIN_FILE`, `${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake`]'
+          buildPresetAdditionalArgs: '[`--config`, `Debug`]'
+
+      - name: Configure CMake
+        run: cmake core/src/main/cpp --build
 
       - name: Build native library
         run: cmake --build build --config Debug
