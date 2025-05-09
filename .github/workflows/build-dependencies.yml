@@ -37,10 +37,11 @@ jobs:
 
       - name: Install dependencies via manifest
         run: |
-          ./vcpkg/vcpkg install \
-            --triplet=${{ matrix.triplet }} \
-            --x-manifest-root=core/src/main/cpp \
-            --feature-flags=versions,manifest
+          if [ $RUNNER_OS == 'Windows' ]; then
+            cmd.exe /C vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
+          else
+            ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
+          fi
 
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
