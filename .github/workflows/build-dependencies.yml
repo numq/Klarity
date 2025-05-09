@@ -37,11 +37,10 @@ jobs:
 
       - name: Install dependencies via manifest
         run: |
-          ./vcpkg install \
+          ./vcpkg/vcpkg install \
             --triplet=${{ matrix.triplet }} \
             --x-manifest-root=core/src/main/cpp \
             --feature-flags=versions,manifest
-        working-directory: vcpkg
 
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
