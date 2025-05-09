@@ -5,13 +5,7 @@
   "dependencies": [
     {
       "name": "ffmpeg",
-      "version>=": "7.1.1",
-      "features": [
-        "avcodec",
-        "avformat",
-        "swscale",
-        "swresample"
-      ]
+      "version>=": "7.1.1"
     },
     {
       "name": "portaudio",
