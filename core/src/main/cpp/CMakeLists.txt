@@ -4,12 +4,6 @@ project(klarity VERSION 1.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(FFMPEG_INCLUDE "")
-set(PORTAUDIO_INCLUDE "")
-
-set(FFMPEG_BIN "")
-set(PORTAUDIO_BIN "")
-
 find_package(JNI REQUIRED)
 
 add_library(klarity SHARED
