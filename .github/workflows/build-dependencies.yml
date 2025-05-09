@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
@@ -29,6 +31,9 @@ jobs:
           doNotCache: 'false'
           runVcpkgInstall: 'true'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
+
+      - name: Check vcpkg installation
+        run: ls -la ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}
 
       - name: Configure CMake
         shell: bash
