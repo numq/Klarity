@@ -6,19 +6,19 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      matrix:
-#        include:
-#          - os: windows-latest
-#            triplet: x64-windows
-#            binary_ext: .dll
-#          - os: ubuntu-latest
-#            triplet: x64-linux
-#            binary_ext: .so
-#          - os: macos-latest
-#            triplet: x64-osx
-#            binary_ext: .dylib
+    #    runs-on: ${{ matrix.os }}
+    #    strategy:
+    #      matrix:
+    #        include:
+    #          - os: windows-latest
+    #            triplet: x64-windows
+    #            binary_ext: .dll
+    #          - os: ubuntu-latest
+    #            triplet: x64-linux
+    #            binary_ext: .so
+    #          - os: macos-latest
+    #            triplet: x64-osx
+    #            binary_ext: .dylib
 
     steps:
       - name: Checkout repo
@@ -38,9 +38,9 @@ jobs:
         uses: lukka/run-vcpkg@v11
 
       - name: Configure CMake
-        shell: bash
-        run: cmake -S core/src/main/cpp -B build \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+        run: >
+          cmake -S core/src/main/cpp -B build
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build native library
