@@ -45,13 +45,13 @@ jobs:
           PORTAUDIO_INCLUDE="${{ github.workspace }}/vcpkg/packages/portaudio_${{ matrix.triplet }}/include"
           FFMPEG_BIN="${{ github.workspace }}/vcpkg/packages/ffmpeg_${{ matrix.triplet }}/bin"
           PORTAUDIO_BIN="${{ github.workspace }}/vcpkg/packages/portaudio_${{ matrix.triplet }}/bin"
-          
+
           cmake -S core/src/main/cpp -B build \
-          -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
-          -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
-          -DFFMPEG_BIN="$FFMPEG_BIN" \
-          -DPORTAUDIO_BIN="$PORTAUDIO_BIN" \
-          -DCMAKE_BUILD_TYPE=Release
+            -DFFMPEG_INCLUDE="$FFMPEG_INCLUDE" \
+            -DPORTAUDIO_INCLUDE="$PORTAUDIO_INCLUDE" \
+            -DFFMPEG_BIN="$FFMPEG_BIN" \
+            -DPORTAUDIO_BIN="$PORTAUDIO_BIN" \
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build native library
         run: cmake --build build --config Release
