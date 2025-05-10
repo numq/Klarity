@@ -8,82 +8,28 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: windows-latest
-            triplet: x64-windows
-            artifact_name: windows-x64
           - platform: ubuntu-latest
             triplet: x64-linux
             artifact_name: linux-x64
-          - platform: macos-latest
-            triplet: x64-osx
-            artifact_name: macos-x64
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clone vcpkg
-        run: git clone https://github.com/microsoft/vcpkg.git
+      - name: Set up nasm
+        uses: ilammy/setup-nasm@v1.5.2
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y nasm
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew update
-          brew install nasm
-
-      - name: Bootstrap vcpkg (Unix)
-        if: runner.os != 'Windows'
-        run: ./bootstrap-vcpkg.sh
-        working-directory: vcpkg
-
-      - name: Bootstrap vcpkg (Windows)
-        if: runner.os == 'Windows'
-        run: .\bootstrap-vcpkg.bat
-        working-directory: vcpkg
-
-      - name: Install dependencies via manifest (Windows)
-        if: runner.os == 'Windows'
-        run: vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-
-      - name: Install dependencies via manifest (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
-
-      - name: Create directories
-        shell: bash
-        run: |
-          mkdir -p artifacts/include artifacts/lib artifacts/bin
-
-      - name: Prepare artifacts (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || echo "No includes found"
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.lib artifacts/lib/ || echo "No .lib files found"
-          cp vcpkg/installed/${{ matrix.triplet }}/bin/*.dll artifacts/bin/ || echo "No .dll files found"
-
-      - name: Prepare artifacts (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || echo "No includes found"
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.so* artifacts/lib/ || echo "No .so files found"
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.dylib* artifacts/lib/ || echo "No .dylib files found"
-          cp vcpkg/installed/${{ matrix.triplet }}/bin/* artifacts/bin/ || echo "No bin files found"
-
-      - name: Compress artifacts
-        shell: bash
-        run: |
-          tar -czf ${{ matrix.artifact_name }}.tar.gz -C artifacts .
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.json'
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}.tar.gz
+          path: |
+            vcpkg_installed/${{ matrix.triplet }}
