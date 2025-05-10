@@ -27,6 +27,9 @@ jobs:
         with:
           vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.json'
 
+      - name: Debug vcpkg install location
+        run: find . -type d -name "${{ matrix.triplet }}"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
