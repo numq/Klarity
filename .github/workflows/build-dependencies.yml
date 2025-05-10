@@ -21,8 +21,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-        #      - name: Set up nasm
-        #        uses: ilammy/setup-nasm@v1.5.2
+      - name: Set up nasm
+        uses: ilammy/setup-nasm@v1.5.2
 
       - name: Set up vcpkg
         id: vcpkg
