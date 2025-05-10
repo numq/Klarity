@@ -18,7 +18,7 @@ add_library(klarity SHARED
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     find_package(FFMPEG REQUIRED COMPONENTS libavcodec libavformat libavutil libswresample libswscale)
-    find_package(PORTAUDIO REQUIRED)
+    find_package(PORTAUDIO CONFIG REQUIRED)
 
     target_compile_definitions(klarity PRIVATE DEBUG_MODE)
     target_compile_options(klarity PRIVATE -g)

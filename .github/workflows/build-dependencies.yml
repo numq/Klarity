@@ -30,6 +30,12 @@ jobs:
         with:
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
           runVcpkgInstall: 'true'
+          doNotCache: 'false'
+
+      - name: Debug installed packages
+        run: |
+          ls -la "${{ github.workspace }}/build/vcpkg_installed/${{ matrix.triplet }}/share"
+          ls -la "${{ github.workspace }}/build/vcpkg_installed/${{ matrix.triplet }}/lib"
 
       - name: Set up build essentials
         run: |
