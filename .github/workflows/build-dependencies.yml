@@ -32,7 +32,7 @@ jobs:
       - name: Copy
         run: |
           mkdir -p artifacts/${{ matrix.os }}
-          cp ${{ github.workspace }}/installed/${{ matrix.triplet }} artifacts/${{ matrix.triplet }}
+          cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }} artifacts/${{ matrix.triplet }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
