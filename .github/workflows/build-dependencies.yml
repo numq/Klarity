@@ -32,7 +32,11 @@ jobs:
       - name: Copy
         run: |
           mkdir -p artifacts/${{ matrix.triplet }}
-          cp ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }} artifacts/${{ matrix.triplet }}
+          if [ -d "/home/runner/work/Klarity/Klarity/vcpkg/installed/${{ matrix.triplet }}" ]; then
+            cp -r /home/runner/work/Klarity/Klarity/vcpkg/installed/${{ matrix.triplet }}/* artifacts/${{ matrix.triplet }}
+          else
+            echo "vcpkg installed directory does not exist"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
