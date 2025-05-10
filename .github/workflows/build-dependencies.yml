@@ -32,10 +32,6 @@ jobs:
       - name: Copy
         run: |
           ls -R ${{ github.workspace }}/vcpkg
-          ls -R _
-          ls -R ${{ github.workspace }}/vcpkg/installed
-          ls -R _
-          ls -R "${{ github.workspace }}/core/src/main/cpp"
           
           mkdir -p artifacts/${{ matrix.triplet }}
           if [ -d "${{ github.workspace }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}" ]; then
