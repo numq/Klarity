@@ -10,13 +10,13 @@ jobs:
         include:
           - platform: windows-latest
             triplet: x64-windows
-            artifact_name: klarity-deps-windows-x64
+            artifact_name: windows-x64
           - platform: ubuntu-latest
             triplet: x64-linux
-            artifact_name: klarity-deps-linux-x64
+            artifact_name: linux-x64
           - platform: macos-latest
             triplet: x64-osx
-            artifact_name: klarity-deps-macos-x64
+            artifact_name: macos-x64
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies via manifest (Windows)
         if: runner.os == 'Windows'
-        run: cmd.exe /C vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
+        run: vcpkg\vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
 
       - name: Install dependencies via manifest (Linux/macOS)
         if: runner.os != 'Windows'
@@ -62,23 +62,25 @@ jobs:
 
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
-        shell: cmd
+        shell: bash
         run: |
-          copy vcpkg\installed\${{ matrix.triplet }}\include\* artifacts\include\ /Y
-          copy vcpkg\installed\${{ matrix.triplet }}\lib\*.lib artifacts\lib\ /Y
-          copy vcpkg\installed\${{ matrix.triplet }}\bin\*.dll artifacts\bin\ /Y
-        working-directory: ${{ github.workspace }}
+          cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || echo "No includes found"
+          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.lib artifacts/lib/ || echo "No .lib files found"
+          cp vcpkg/installed/${{ matrix.triplet }}/bin/*.dll artifacts/bin/ || echo "No .dll files found"
 
       - name: Prepare artifacts (Unix)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
-          cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || true
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.so* artifacts/lib/ || true
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.dylib* artifacts/lib/ || true
-          cp vcpkg/installed/${{ matrix.triplet }}/bin/* artifacts/bin/ || true
+          cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || echo "No includes found"
+          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.so* artifacts/lib/ || echo "No .so files found"
+          cp vcpkg/installed/${{ matrix.triplet }}/lib/*.dylib* artifacts/lib/ || echo "No .dylib files found"
+          cp vcpkg/installed/${{ matrix.triplet }}/bin/* artifacts/bin/ || echo "No bin files found"
 
       - name: Compress artifacts
-        run: tar -czf ${{ matrix.artifact_name }}.tar.gz -C artifacts .
+        shell: bash
+        run: |
+          tar -czf ${{ matrix.artifact_name }}.tar.gz -C artifacts .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
