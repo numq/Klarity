@@ -25,7 +25,7 @@ jobs:
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.json'
+          vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.debug.json'
           runVcpkgInstall: 'true'
 
       - name: Upload artifact

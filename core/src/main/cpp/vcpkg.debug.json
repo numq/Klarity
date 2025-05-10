@@ -1,0 +1,17 @@
+{
+  "name": "klarity",
+  "version": "1.1.0",
+  "builtin-baseline": "ce613c41372b23b1f51333815feb3edd87ef8a8b",
+  "dependencies": [
+    {
+      "name": "portaudio",
+      "version>=": "19.7"
+    }
+  ],
+  "overrides": [
+    {
+      "name": "portaudio",
+      "version": "19.7"
+    }
+  ]
+}
