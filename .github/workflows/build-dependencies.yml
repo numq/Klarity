@@ -55,20 +55,21 @@ jobs:
         if: runner.os != 'Windows'
         run: ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
 
+      - name: Create directories
+        run: mkdir -p artifacts/include artifacts/lib artifacts/bin
+
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          mkdir artifacts && mkdir artifacts\include && mkdir artifacts\lib && mkdir artifacts\bin
           copy vcpkg\installed\${{ matrix.triplet }}\include\* artifacts\include\ /Y
           copy vcpkg\installed\${{ matrix.triplet }}\lib\*.lib artifacts\lib\ /Y
           copy vcpkg\installed\${{ matrix.triplet }}\bin\*.dll artifacts\bin\ /Y
+        working-directory: ${{ github.workspace }}
 
       - name: Prepare artifacts (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p artifacts/include artifacts/lib artifacts/bin
-
           cp -r vcpkg/installed/${{ matrix.triplet }}/include/* artifacts/include/ || true
           cp vcpkg/installed/${{ matrix.triplet }}/lib/*.so* artifacts/lib/ || true
           cp vcpkg/installed/${{ matrix.triplet }}/lib/*.dylib* artifacts/lib/ || true
