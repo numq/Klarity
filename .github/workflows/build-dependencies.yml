@@ -44,7 +44,7 @@ jobs:
           cmake -B "${{ github.workspace }}/build" \
             -S "${{ github.workspace }}/core/src/main/cpp" \
             -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkgToolchainFile }}" \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DVCPKG_TARGET_TRIPLET="${{ matrix.triplet }}"
 
       - name: Build
