@@ -4,11 +4,19 @@
   "builtin-baseline": "ce613c41372b23b1f51333815feb3edd87ef8a8b",
   "dependencies": [
     {
+      "name": "ffmpeg",
+      "version>=": "7.1.1"
+    },
+    {
       "name": "portaudio",
       "version>=": "19.7"
     }
   ],
   "overrides": [
+    {
+      "name": "ffmpeg",
+      "version": "7.1.1"
+    },
     {
       "name": "portaudio",
       "version": "19.7"
