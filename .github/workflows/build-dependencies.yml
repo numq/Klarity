@@ -32,10 +32,12 @@ jobs:
       - name: Copy
         run: |
           mkdir -p artifacts/${{ matrix.triplet }}
-          if [ -d "${{ env.VCPKG_INSTALLED_DIR }}/${{ env.VCPKG_DEFAULT_TRIPLET }}" ]; then
-            cp -r ${{ env.VCPKG_INSTALLED_DIR }}/${{ env.VCPKG_DEFAULT_TRIPLET }}/* artifacts/${{ matrix.triplet }}
+          if [ -d "${{ github.workspace }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}" ]; then
+            cp -r ${{ github.workspace }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}/* artifacts/${{ matrix.triplet }}
           else
-            echo "${{ env.VCPKG_INSTALLED_DIR }}/${{ env.VCPKG_DEFAULT_TRIPLET }}"
+            echo "${{ github.workspace }}"
+            echo "${{ github.workspace }}/installed/${{ env.VCPKG_DEFAULT_TRIPLET }}"
+            echo "${{ github.workspace }}/core/src/main/cpp"
             echo "vcpkg installed directory does not exist"
           fi
 
