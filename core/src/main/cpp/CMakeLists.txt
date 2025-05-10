@@ -17,7 +17,7 @@ add_library(klarity SHARED
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    find_package(FFMPEG REQUIRED COMPONENTS avcodec avformat avutil swscale swresample)
+    find_package(FFMPEG REQUIRED COMPONENTS libavcodec libavformat libavutil libswresample libswscale)
     find_package(PORTAUDIO REQUIRED)
 
     target_compile_definitions(klarity PRIVATE DEBUG_MODE)
@@ -35,6 +35,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
             include/sampler/dsp
             include/sampler/portaudio
             include/sampler/stretch
+    )
+
+    target_link_directories(klarity PRIVATE
+            ${FFMPEG_LIBRARY_DIRS}
+            ${PORTAUDIO_LIBRARY_DIRS}
     )
 
     target_link_libraries(klarity PRIVATE
