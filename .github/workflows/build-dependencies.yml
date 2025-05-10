@@ -31,7 +31,9 @@ jobs:
 
       - name: Copy
         run: |
-          ls -R ${{ github.workspace }}/installed
+          ls -R ${{ github.workspace }}/vcpkg
+          ls -R _
+          ls -R ${{ github.workspace }}/vcpkg/installed
           ls -R _
           ls -R "${{ github.workspace }}/core/src/main/cpp"
           
