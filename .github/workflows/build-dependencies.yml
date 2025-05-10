@@ -32,7 +32,7 @@ jobs:
       - name: Copy
         run: |
           mkdir -p artifacts/${{ matrix.os }}
-          cp ${VCPKG_ROOT}/installed/${TRIPLET}/lib/*${lib}*${{ matrix.binary_ext }} artifacts/${{ matrix.os }}/lib
+          cp ${{ env.VCPKG_ROOT }}/installed/${{ env.TRIPLET }}/lib/*${lib}*${{ matrix.binary_ext }} artifacts/${{ matrix.os }}/lib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
