@@ -8,9 +8,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: ubuntu-latest
+          - os: ubuntu-latest
             triplet: x64-linux
-            artifact_name: linux-x64
+            binary_ext: .so
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
@@ -25,11 +25,16 @@ jobs:
           vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.debug.json'
           runVcpkgInstall: 'true'
 
-      - name: Set up CMake
-        uses: lukka/get-cmake@latest
+        #      - name: Set up CMake
+        #        uses: lukka/get-cmake@latest
+
+      - name: Copy
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}
+          cp ${VCPKG_ROOT}/installed/${TRIPLET}/lib/*${lib}*${{ matrix.binary_ext }} artifacts/${{ matrix.os }}/lib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${VCPKG_ROOT}\installed\${TRIPLET}\
+          name: ${{ matrix.os }}
+          path: artifacts/${{ matrix.os }}
