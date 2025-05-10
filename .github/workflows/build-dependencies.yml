@@ -33,4 +33,4 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            ${{ VCPKG_ROOT }}/installed/${{ matrix.triplet }}
+            ${{ env.VCPKG_ROOT }}/installed/${{ matrix.triplet }}
