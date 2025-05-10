@@ -56,7 +56,9 @@ jobs:
         run: ./vcpkg/vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --feature-flags=versions,manifest
 
       - name: Create directories
-        run: mkdir -p artifacts/include artifacts/lib artifacts/bin
+        shell: bash
+        run: |
+          mkdir -p artifacts/include artifacts/lib artifacts/bin
 
       - name: Prepare artifacts (Windows)
         if: runner.os == 'Windows'
