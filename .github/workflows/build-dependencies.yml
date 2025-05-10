@@ -26,13 +26,11 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgJsonGlob: 'core/src/main/cpp/vcpkg.json'
-
-      - name: Debug vcpkg install location
-        run: find . -type d -name "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
+          runVcpkgInstall: 'true'
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            ${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}
+            ${{ VCPKG_ROOT }}/installed/${{ matrix.triplet }}
