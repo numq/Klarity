@@ -5,13 +5,14 @@ on:
 
 jobs:
   build:
+    runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: .so
-    runs-on: ${{ matrix.platform }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
