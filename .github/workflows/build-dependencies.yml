@@ -31,7 +31,7 @@ jobs:
 
       - name: Install vcpkg packages
         run: |
-          ${{ runner.temp }}/vcpkg/vcpkg install --triplet x64-linux --x-install-root ${{ runner.temp }}/vcpkg_installed
+          ${{ runner.temp }}/vcpkg/vcpkg install --triplet ${{ matrix.triplet }}
         env:
           VCPKG_ROOT: ${{ runner.temp }}/vcpkg
 
