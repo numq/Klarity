@@ -11,66 +11,52 @@ jobs:
         include:
           - os: ubuntu-latest
             triplet: x64-linux
-            binary_ext: .so
-
-    defaults:
-      run:
-        shell: bash
+            binary_ext: so
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up nasm
-        uses: ilammy/setup-nasm@v1.5.2
-
-      - name: Set up vcpkg
-        id: vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
-          runVcpkgInstall: 'true'
-          doNotCache: 'false'
-
-      - name: Debug installed packages
-        run: |
-          ls -la "${{ github.workspace }}/build/vcpkg_installed"
-
-      - name: Set up build essentials
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential
+          sudo apt-get install -y cmake g++ unzip curl tar pkg-config
 
-      - name: Set up CMake
-        uses: lukka/get-cmake@latest
-
-      - name: Configure CMake
+      - name: Set up vcpkg
         run: |
-          cmake -B "${{ github.workspace }}/build" \
-            -S ${{ github.workspace }}/core/src/main/cpp \
-            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
-            -DCMAKE_BUILD_TYPE=Debug
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+        working-directory: ${{ runner.temp }}
 
-      - name: Build
+      - name: Install vcpkg packages
         run: |
-          cmake --build "${{ github.workspace }}/build" \
-            --config Debug \
-            --parallel $(nproc)
+          ${{ runner.temp }}/vcpkg/vcpkg install --triplet x64-linux --x-install-root ${{ runner.temp }}/vcpkg_installed
+        env:
+          VCPKG_ROOT: ${{ runner.temp }}/vcpkg
 
-      - name: Find binaries to upload
-        id: find-binaries
+      - name: Configure project
         run: |
-          echo "binaries=$(find "${{ github.workspace }}/build" \
-            -type f \
-            \( -name "*${{ matrix.binary_ext }}" \
-               -o -name '*.a' \
-               -o -name '*.bin' \
-               -o -perm -u=x \
-            \))" >> $GITHUB_OUTPUT
+          cmake -B build -S . \
+            -DFFMPEG_INCLUDE="${{ runner.temp }}/vcpkg_installed/include" \
+            -DPORTAUDIO_INCLUDE="${{ runner.temp }}/vcpkg_installed/include" \
+            -DFFMPEG_LIB="${{ runner.temp }}/vcpkg_installed/lib" \
+            -DPORTAUDIO_LIB="${{ runner.temp }}/vcpkg_installed/lib" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-      - name: Upload binaries as artifact
-        if: steps.find-binaries.outputs.binaries != ''
+      - name: Build project
+        run: cmake --build build --config Release --parallel
+
+      - name: Copy binaries
+        run: |
+          mkdir -p output/bin
+          cp -r build/* output/bin/
+          cp -r ${{ runner.temp }}/vcpkg_installed/lib/*${{ matrix.binary_ext }}* output/bin/
+        shell: bash
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.os }}
-          path: ${{ steps.find-binaries.outputs.binaries }}
+          name: klarity-linux-bin
+          path: output/bin
