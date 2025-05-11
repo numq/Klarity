@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(JNI REQUIRED)
+find_package(FFMPEG REQUIRED)
+find_package(PORTAUDIO CONFIG REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp
@@ -16,70 +18,26 @@ add_library(klarity SHARED
         src/sampler/com_github_numq_klarity_core_sampler_NativeSampler.cpp
 )
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    find_package(FFMPEG REQUIRED COMPONENTS libavcodec libavformat libavutil libswresample libswscale)
-    find_package(PORTAUDIO CONFIG REQUIRED)
+target_include_directories(klarity PRIVATE
+        ${JNI_INCLUDE_DIRS}
+        ${FFMPEG_INCLUDE_DIRS}
+        ${PORTAUDIO_INCLUDE_DIRS}
+        include
+        include/data
+        include/decoder
+        include/decoder/ffmpeg
+        include/sampler
+        include/sampler/dsp
+        include/sampler/portaudio
+        include/sampler/stretch
+)
 
-    target_compile_definitions(klarity PRIVATE DEBUG_MODE)
-    target_compile_options(klarity PRIVATE -g)
+target_link_directories(klarity PRIVATE
+        ${FFMPEG_LIBRARY_DIRS}
+        ${PORTAUDIO_LIBRARY_DIRS}
+)
 
-    target_include_directories(klarity PRIVATE
-            ${JNI_INCLUDE_DIRS}
-            ${FFMPEG_INCLUDE_DIRS}
-            ${PORTAUDIO_INCLUDE_DIRS}
-            include
-            include/data
-            include/decoder
-            include/decoder/ffmpeg
-            include/sampler
-            include/sampler/dsp
-            include/sampler/portaudio
-            include/sampler/stretch
-    )
-
-    target_link_directories(klarity PRIVATE
-            ${FFMPEG_LIBRARY_DIRS}
-            ${PORTAUDIO_LIBRARY_DIRS}
-    )
-
-    target_link_libraries(klarity PRIVATE
-            ${FFMPEG_LIBRARIES}
-            portaudio
-    )
-elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(FFMPEG_INCLUDE "" CACHE PATH "Path to FFmpeg include dir")
-    set(PORTAUDIO_INCLUDE "" CACHE PATH "Path to PortAudio include dir")
-    set(FFMPEG_LIB "" CACHE PATH "Path to FFmpeg library dir")
-    set(PORTAUDIO_LIB "" CACHE PATH "Path to PortAudio library dir")
-
-    target_compile_definitions(klarity PRIVATE NDEBUG)
-    target_compile_options(klarity PRIVATE -O3)
-
-    target_include_directories(klarity PRIVATE
-            ${JNI_INCLUDE_DIRS}
-            ${FFMPEG_INCLUDE}
-            ${PORTAUDIO_INCLUDE}
-            include
-            include/data
-            include/decoder
-            include/decoder/ffmpeg
-            include/sampler
-            include/sampler/dsp
-            include/sampler/portaudio
-            include/sampler/stretch
-    )
-
-    target_link_directories(klarity PRIVATE
-            ${FFMPEG_LIB}
-            ${PORTAUDIO_LIB}
-    )
-
-    target_link_libraries(klarity PRIVATE
-            avcodec
-            avformat
-            avutil
-            swresample
-            swscale
-            portaudio
-    )
-endif ()
+target_link_libraries(klarity PRIVATE
+        ${FFMPEG_LIBRARIES}
+        portaudio
+)

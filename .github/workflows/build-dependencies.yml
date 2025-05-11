@@ -39,7 +39,7 @@ jobs:
 
       - name: Configure project
         run: |
-          cmake -B build -S core/src/main/cpp -DFFMPEG_INCLUDE="${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/include" -DPORTAUDIO_INCLUDE="${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/include" -DFFMPEG_LIB="${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib" -DPORTAUDIO_LIB="${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build project
         run: cmake --build build --config Debug --parallel
