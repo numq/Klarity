@@ -32,8 +32,10 @@ jobs:
       - name: Install vcpkg packages
         run: |
           ${{ runner.temp }}/vcpkg/vcpkg install --triplet ${{ matrix.triplet }}
+        working-directory: ${{ github.workspace }}/core/src/main/cpp
         env:
           VCPKG_ROOT: ${{ runner.temp }}/vcpkg
+
 
       - name: Configure project
         run: |
