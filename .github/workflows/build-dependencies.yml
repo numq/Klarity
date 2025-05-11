@@ -67,9 +67,9 @@ jobs:
       - name: Copy JARs
         run: |
           mkdir -p artifacts/${{ matrix.os }}
-          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/core.jar
-          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/compose.jar
-          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/example.jar
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/
+          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
