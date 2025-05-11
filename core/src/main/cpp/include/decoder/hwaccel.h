@@ -2,6 +2,7 @@
 #define KLARITY_DECODER_HWACCEL_H
 
 #include <map>
+#include <memory>
 #include <iostream>
 #include <vector>
 #include <shared_mutex>
