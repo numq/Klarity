@@ -27,16 +27,10 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
           ./bootstrap-vcpkg.sh
-        working-directory: ${{ runner.temp }}
-
-      - name: Install vcpkg packages
-        run: vcpkg install --triplet ${{ matrix.triplet }}
-        working-directory: ${{ github.workspace }}/core/src/main/cpp
-
 
       - name: Configure project
         run: |
-          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build project
         run: cmake --build build --config Release --parallel
@@ -45,8 +39,8 @@ jobs:
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
-          cp -r ${{ github.workspace }}/build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp -r build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
