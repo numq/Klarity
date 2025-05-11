@@ -34,7 +34,7 @@ jobs:
 
       - name: Debug installed packages
         run: |
-          ls -la "${{ github.workspace }}/build/vcpkg_installed/${{ matrix.triplet }}"
+          ls -la "${{ github.workspace }}/build/vcpkg_installed"
 
       - name: Set up build essentials
         run: |
