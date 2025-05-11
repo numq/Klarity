@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ unzip curl tar pkg-config
+          sudo apt-get install -y cmake g++ unzip curl tar pkg-config nasm
 
       - name: Set up vcpkg
         run: |
