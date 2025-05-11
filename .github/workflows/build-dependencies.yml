@@ -42,16 +42,37 @@ jobs:
           cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build project
-        run: cmake --build build --config Debug --parallel
+        run: cmake --build build --config Release --parallel
 
       - name: Copy binaries
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp -r ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* output/bin/
+          cp ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp -r ${{ github.workspace }}/build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build JARs
+        run: |
+          ./gradlew :core:shadowJar
+          ./gradlew :compose:shadowJar
+          ./gradlew :example:shadowJar
+
+      - name: Clean up resources
+        run: |
+          rm -rf core/src/main/resources/bin
+
+      - name: Copy JARs
+        run: |
+          mkdir -p artifacts/${{ matrix.os }}
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/core.jar
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/compose.jar
+          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/example.jar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: klarity-linux-bin
-          path: output/bin
+          name: klarity-${{ matrix.os }}
+          path: artifacts/${{ matrix.os }}
