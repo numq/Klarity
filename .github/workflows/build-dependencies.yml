@@ -42,8 +42,8 @@ jobs:
       - name: Copy binaries
         run: |
           mkdir -p core/src/main/resources/bin
-          cp core/src/main/cpp/build/vcpkg_installed/${{ matrix.triplet }}/bin/*${{ matrix.binary_ext }}* core/src/main/resources/bin
-          cp -r core/src/main/cpp/build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin
+          cp ${{ github.workspace }}/core/src/main/cpp/build/*${{ matrix.binary_ext }}* core/src/main/resources/bin
+          cp -r ${{ github.workspace }}/core/src/main/cpp/build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
