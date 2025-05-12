@@ -23,7 +23,7 @@ dependencies {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_15}"
+    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_16}"
 }
 
 tasks.test {
