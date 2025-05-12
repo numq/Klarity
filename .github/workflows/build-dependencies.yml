@@ -30,20 +30,20 @@ jobs:
 
       - name: Configure project
         run: |
-          cmake -B build -S core/src/main/cpp \
+          cmake -B core/src/main/cpp/build -S core/src/main/cpp \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
           -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
 
       - name: Build project
-        run: cmake --build build --config Release --parallel
+        run: cmake --build core/src/main/cpp/build --config Release --parallel
 
       - name: Copy binaries
         run: |
-          mkdir -p core/src/main/resources/bin/
-          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
-          cp -r build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          mkdir -p core/src/main/resources/bin
+          cp core/src/main/cpp/build/vcpkg_installed/${{ matrix.triplet }}/bin/*${{ matrix.binary_ext }}* core/src/main/resources/bin
+          cp -r core/src/main/cpp/build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -61,9 +61,9 @@ jobs:
       - name: Copy JARs
         run: |
           mkdir -p artifacts/${{ matrix.os }}
-          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/
-          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/
-          cp example/build/libs/*.jar artifacts/${{ matrix.os }}/
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}
+          cp example/build/libs/*.jar artifacts/${{ matrix.os }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
