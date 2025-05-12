@@ -27,10 +27,21 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
           ./bootstrap-vcpkg.sh
+          ./vcpkg install --triplet ${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --x-install-root=installed
 
       - name: Configure project
         run: |
-          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_C_FLAGS="-fPIC" -DVCPKG_CXX_FLAGS="-fPIC"
+          VCPKG_ROOT=$(pwd)/vcpkg
+          VCPKG_INSTALLED=$VCPKG_ROOT/installed/${{ matrix.triplet }}
+          
+          cmake -B build -S core/src/main/cpp \
+                      -DCMAKE_BUILD_TYPE=Release \
+                      -DFFMPEG_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
+                      -DFFMPEG_LIBRARY_DIRS=$VCPKG_INSTALLED/lib \
+                      -DFFMPEG_LIBRARIES="avcodec;avformat;avutil;avfilter;avdevice;swresample;swscale" \
+                      -DPORTAUDIO_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
+                      -DPORTAUDIO_LIBRARY_DIRS=$VCPKG_INSTALLED/lib
+      #          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build project
         run: cmake --build build --config Release --parallel
@@ -39,7 +50,7 @@ jobs:
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp vcpkg/installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
           cp -r build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
 
       - name: Set up Gradle
