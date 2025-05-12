@@ -27,12 +27,12 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
           ./bootstrap-vcpkg.sh
-          ./vcpkg install --triplet ${{ matrix.triplet }} --x-manifest-root=core/src/main/cpp --x-install-root=installed
+          ./vcpkg install --triplet ${{ matrix.triplet }} --x-manifest-root=${{ github.workspace }}/core/src/main/cpp --x-install-root=installed
 
       - name: Configure project
         run: |
           VCPKG_ROOT=$(pwd)/vcpkg
-          VCPKG_INSTALLED=$VCPKG_ROOT/installed/${{ matrix.triplet }}
+          VCPKG_INSTALLED=${{ github.workspace }}/core/src/main/cpp/installed/${{ matrix.triplet }}
           
           cmake -B build -S core/src/main/cpp \
                       -DCMAKE_BUILD_TYPE=Release \
@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp vcpkg/installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp ${{ github.workspace }}/core/src/main/cpp/installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
           cp -r build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
 
       - name: Set up Gradle
