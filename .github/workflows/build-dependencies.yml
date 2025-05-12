@@ -27,20 +27,24 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git
           cd vcpkg
           ./bootstrap-vcpkg.sh
-          ./vcpkg install --triplet ${{ matrix.triplet }} --x-manifest-root=${{ github.workspace }}/core/src/main/cpp --x-install-root=installed
+          ./vcpkg install --triplet ${{ matrix.triplet }} --x-manifest-root=${{ github.workspace }}/core/src/main/cpp --x-install-root=${{ github.workspace }}/installed/${{ matrix.triplet }}
+
+      - name: Verify installation
+        run: |
+          ls -la $GITHUB_WORKSPACE/installed/${{ matrix.triplet }}/include
+          ls -la $GITHUB_WORKSPACE/installed/${{ matrix.triplet }}/lib
 
       - name: Configure project
         run: |
-          VCPKG_ROOT=$(pwd)/vcpkg
-          VCPKG_INSTALLED=${{ github.workspace }}/core/src/main/cpp/installed/${{ matrix.triplet }}
+          VCPKG_INSTALLED=${{ github.workspace }}/installed/${{ matrix.triplet }}
           
           cmake -B build -S core/src/main/cpp \
-                      -DCMAKE_BUILD_TYPE=Release \
-                      -DFFMPEG_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
-                      -DFFMPEG_LIBRARY_DIRS=$VCPKG_INSTALLED/lib \
-                      -DFFMPEG_LIBRARIES="avcodec;avformat;avutil;avfilter;avdevice;swresample;swscale" \
-                      -DPORTAUDIO_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
-                      -DPORTAUDIO_LIBRARY_DIRS=$VCPKG_INSTALLED/lib
+          -DCMAKE_BUILD_TYPE=Release \
+          -DFFMPEG_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
+          -DFFMPEG_LIBRARY_DIRS=$VCPKG_INSTALLED/lib \
+          -DFFMPEG_LIBRARIES="avcodec;avformat;avutil;avfilter;avdevice;swresample;swscale" \
+          -DPORTAUDIO_INCLUDE_DIRS=$VCPKG_INSTALLED/include \
+          -DPORTAUDIO_LIBRARY_DIRS=$VCPKG_INSTALLED/lib
       #          cmake -B build -S core/src/main/cpp -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build project
@@ -50,7 +54,7 @@ jobs:
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp ${{ github.workspace }}/core/src/main/cpp/installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp ${{ github.workspace }}/installed/${{ matrix.triplet }}/lib/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
           cp -r build/${{ matrix.os }}/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
 
       - name: Set up Gradle
