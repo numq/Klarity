@@ -39,7 +39,7 @@ jobs:
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
       - name: Build project
-        run: cmake --build build --config Release --parallel -fPIC
+        run: cmake --build build --config Release --parallel
 
       - name: Copy binaries
         run: |
