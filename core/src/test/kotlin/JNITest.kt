@@ -10,8 +10,6 @@ abstract class JNITest {
             swscale = "$pathToBinaries\\swscale-8.dll",
             avcodec = "$pathToBinaries\\avcodec-61.dll",
             avformat = "$pathToBinaries\\avformat-61.dll",
-            avfilter = "$pathToBinaries\\avfilter-10.dll",
-            avdevice = "$pathToBinaries\\avdevice-61.dll",
             portaudio = "$pathToBinaries\\portaudio.dll",
             klarity = "$pathToBinaries\\klarity.dll",
         ).getOrThrow()

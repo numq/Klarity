@@ -165,8 +165,6 @@ interface KlarityPlayer {
          * @param swscale The path to the `swscale-8` binary.
          * @param avcodec The path to the `avcodec-61` binary.
          * @param avformat The path to the `avformat-61` binary.
-         * @param avfilter The path to the `avfilter-10` binary.
-         * @param avdevice The path to the `avdevice-61` binary.
          * @param portaudio The path to the `portaudio` binary.
          * @param klarity The path to the `klarity` binary.
          *
@@ -178,8 +176,6 @@ interface KlarityPlayer {
             swresample: String,
             avcodec: String,
             avformat: String,
-            avfilter: String,
-            avdevice: String,
             portaudio: String,
             klarity: String,
         ) = runCatching {
@@ -188,8 +184,6 @@ interface KlarityPlayer {
             System.load(swscale)
             System.load(avcodec)
             System.load(avformat)
-            System.load(avfilter)
-            System.load(avdevice)
             System.load(portaudio)
             System.load(klarity)
         }.onSuccess {
@@ -281,10 +275,8 @@ interface KlarityPlayer {
                     swscale = paths[2],
                     avcodec = paths[3],
                     avformat = paths[4],
-                    avfilter = paths[5],
-                    avdevice = paths[6],
-                    portaudio = paths[7],
-                    klarity = paths[8],
+                    portaudio = paths[5],
+                    klarity = paths[6],
                 )
             }
         }

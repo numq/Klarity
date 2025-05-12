@@ -55,7 +55,7 @@ class NativeDecoderTest : JNITest() {
             decodeVideoStream = true
         )
 
-        val audioFrame = decoder.decodeAudio(nativeBuffer.getBuffer(), bufferSize)
+        val audioFrame = decoder.decodeAudio()
         val videoFrame = decoder.decodeVideo(nativeBuffer.getBuffer(), bufferSize)
 
         assertTrue(audioFrame.isSuccess || videoFrame.isSuccess)

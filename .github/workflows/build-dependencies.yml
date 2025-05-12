@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ unzip curl tar pkg-config nasm
+          sudo apt-get install -y nasm
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
@@ -43,13 +43,14 @@ jobs:
         run: |
           mkdir -p core/src/main/resources/bin
           cp core/src/main/cpp/build/*${{ matrix.binary_ext }}* core/src/main/resources/bin
+          cp core/src/main/cpp/build/*${{ matrix.binary_ext }}* core/src/test/resources/bin
           cp -r core/src/main/cpp/build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin
 
       - name: Set up JDK 16
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 16.0.2+7
+          java-version: 17.0.15+6
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

@@ -33,13 +33,15 @@ internal class DataPool(poolCapacity: Int, bufferCapacity: Int) : Pool<Data> {
     }
 
     override suspend fun acquire() = runCatching {
+        check(!isClosed.get()) { "Pool is closed" }
+
         availableItems.receive()
     }
 
     override suspend fun release(item: Data) = runCatching {
-        if (!isClosed.get()) {
-            availableItems.send(item)
-        }
+        check(!isClosed.get()) { "Pool is closed" }
+
+        availableItems.send(item)
     }
 
     override suspend fun reset() = runCatching {

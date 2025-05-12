@@ -1,7 +1,6 @@
 package sampler
 
 import JNITest
-import com.github.numq.klarity.core.data.NativeData
 import com.github.numq.klarity.core.sampler.NativeSampler
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -34,20 +33,16 @@ class NativeSamplerTest : JNITest() {
 
     @Test
     fun `should start write and stop playback`() = runTest {
-        val bufferSize = 8192
-        val nativeBuffer = NativeData.allocate(bufferSize)
-
         val sampler = NativeSampler(sampleRate = 48000, channels = 2)
 
         val startResult = sampler.start()
-        val writeResult = sampler.write(nativeBuffer.getBuffer(), bufferSize)
+        val writeResult = sampler.write(ByteArray(1024))
         val stopResult = sampler.stop()
 
         assert(startResult.isSuccess)
         assert(writeResult.isSuccess)
         assert(stopResult.isSuccess)
 
-        nativeBuffer.close()
         sampler.close()
     }
 
