@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
+          sudo apt-get update \
           sudo apt-get install -y cmake g++ unzip curl tar pkg-config nasm
 
       - name: Set up vcpkg
@@ -51,9 +51,9 @@ jobs:
 
       - name: Build JARs
         run: |
-          ./gradlew :core:shadowJar
-          ./gradlew :compose:shadowJar
-          ./gradlew :example:shadowJar
+          ./gradlew :core:shadowJar \
+          ./gradlew :compose:shadowJar \
+          ./gradlew :example:shadowJar \
 
       - name: Clean up resources
         run: |
@@ -61,9 +61,9 @@ jobs:
 
       - name: Copy JARs
         run: |
-          mkdir -p artifacts/${{ matrix.os }}
-          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/
-          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/
+          mkdir -p artifacts/${{ matrix.os }} \
+          cp core/build/libs/*.jar artifacts/${{ matrix.os }}/ \
+          cp compose/build/libs/*.jar artifacts/${{ matrix.os }}/ \
           cp example/build/libs/*.jar artifacts/${{ matrix.os }}/
 
       - name: Upload artifact
