@@ -215,83 +215,67 @@ interface KlarityPlayer {
             }
 
             val libraryNames = listOf(
-                "avutil",
-                "swresample",
-                "swscale",
-                "avcodec",
-                "avformat",
-                "avfilter",
-                "avdevice",
-                "portaudio",
-                "klarity"
+                "avutil", "swresample", "swscale", "avcodec", "avformat", "portaudio", "klarity"
             )
 
             val tempDir = Files.createTempDirectory("binaries").toFile().apply { deleteOnExit() }
 
-            libraryNames.map { libraryName ->
-                val resourcePath = "/bin/"
+            val paths = libraryNames.map { libraryName ->
+                val resourceDir = "/bin/"
+                val resourceUrl = KlarityPlayer::class.java.getResource(resourceDir)
+                    ?: error("Resource directory not found: $resourceDir")
 
-                val resources = KlarityPlayer::class.java.classLoader.getResources(resourcePath)
-
-                var resourceName: String? = null
-
-                while (resources.hasMoreElements()) {
-                    if (resourceName != null) {
-                        break
+                val matchingFile = when (resourceUrl.protocol) {
+                    "file" -> {
+                        File(resourceUrl.toURI()).listFiles()?.firstOrNull { file ->
+                                file.name.contains(libraryName) && file.name.endsWith(extension)
+                            }?.name
                     }
 
-                    val url = resources.nextElement()
-                    if (url.protocol == "jar") {
-                        val jarConnection = url.openConnection() as JarURLConnection
-
-                        val jarFile = jarConnection.jarFile
-
-                        jarFile.entries().iterator().forEach { entry ->
-                            if (entry.name.startsWith(resourcePath.removePrefix("/"))) {
-                                val fileName = entry.name.substringAfterLast('/')
-                                if (fileName.startsWith(libraryName) && fileName.endsWith(extension)) {
-                                    resourceName = fileName
-
-                                    return@forEach
-                                }
+                    "jar" -> {
+                        (resourceUrl.openConnection() as JarURLConnection).jarFile.entries().iterator().asSequence()
+                            .filter { !it.isDirectory }.map { it.name.substringAfterLast('/') }
+                            .firstOrNull { fileName ->
+                                fileName.contains(libraryName) && fileName.endsWith(extension)
                             }
-                        }
                     }
-                }
 
-                val tempFile = resourceName?.let { name ->
-                    File(tempDir, name)
-                } ?: error("Library not found in resources: $libraryName with extension $extension")
+                    else -> error("Unsupported resource protocol: ${resourceUrl.protocol}")
+                } ?: error("No matching library found for $libraryName (extension: $extension)")
 
-                KlarityPlayer::class.java.getResourceAsStream("$resourcePath$resourceName")?.use { input ->
+                val tempFile = File(tempDir, matchingFile).apply { deleteOnExit() }
+
+                KlarityPlayer::class.java.getResourceAsStream("$resourceDir$matchingFile")?.use { input ->
                     Files.copy(input, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                } ?: error("Failed to copy library: $resourceName")
+                } ?: error("Failed to copy library: $matchingFile")
 
                 tempFile.absolutePath
-            }.let { paths ->
-                load(
-                    avutil = paths[0],
-                    swresample = paths[1],
-                    swscale = paths[2],
-                    avcodec = paths[3],
-                    avformat = paths[4],
-                    portaudio = paths[5],
-                    klarity = paths[6],
-                )
             }
+
+            load(
+                avutil = paths[0],
+                swresample = paths[1],
+                swscale = paths[2],
+                avcodec = paths[3],
+                avformat = paths[4],
+                portaudio = paths[5],
+                klarity = paths[6]
+            )
         }
 
         /**
          * Creates a new instance of the KlarityPlayer.
          *
+         * @param initialSettings Initial settings of the media player.
+         *
          * @return A Result containing either a new KlarityPlayer instance or an error if creation fails.
          */
-        fun create(): Result<KlarityPlayer> = runCatching {
+        fun create(initialSettings: PlayerSettings? = null): Result<KlarityPlayer> = runCatching {
             check(isLoaded) { "Native binaries were not loaded" }
 
             PlayerControllerFactory().create(
                 parameters = PlayerControllerFactory.Parameters(
-                    initialSettings = null,
+                    initialSettings = initialSettings,
                     audioDecoderFactory = AudioDecoderFactory(),
                     videoDecoderFactory = VideoDecoderFactory(),
                     poolFactory = PoolFactory(),
