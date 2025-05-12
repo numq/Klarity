@@ -35,7 +35,7 @@ jobs:
           cmake -B build -S core/src/main/cpp \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 
       - name: Build project
