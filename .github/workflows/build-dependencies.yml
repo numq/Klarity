@@ -12,8 +12,6 @@ jobs:
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: so
-    env:
-      VCPKG_LIBRARY_LINKAGE: dynamic
 
     steps:
       - name: Checkout repository
@@ -36,9 +34,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          -DCMAKE_C_FLAGS="-fPIC" \
-          -DCMAKE_CXX_FLAGS="-fPIC"
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
 
       - name: Build project
         run: cmake --build build --config Release --parallel
