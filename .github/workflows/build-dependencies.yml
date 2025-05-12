@@ -36,7 +36,9 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          -DCMAKE_C_FLAGS="-fPIC" \
+          -DCMAKE_CXX_FLAGS="-fPIC"
 
       - name: Build project
         run: cmake --build build --config Release --parallel
