@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p output/bin
           cp -r build/* output/bin/
-          cp ${{ github.workspace }}/build/vcpkg_installed/${{ matrix.triplet }}/bin/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
+          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*${{ matrix.binary_ext }}* core/src/main/resources/bin/
           cp -r build/*klarity*${{ matrix.binary_ext }}* core/src/main/resources/bin/
 
       - name: Set up Gradle
