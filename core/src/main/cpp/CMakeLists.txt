@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(JNI REQUIRED)
 find_package(FFMPEG REQUIRED)
-find_package(PORTAUDIO REQUIRED)
+find_package(portaudio REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp

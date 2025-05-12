@@ -10,8 +10,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            triplet: x64-linux
+            triplet: x64-linux-dynamic
             binary_ext: so
+    env:
+      VCPKG_LIBRARY_LINKAGE: dynamic
 
     steps:
       - name: Checkout repository
