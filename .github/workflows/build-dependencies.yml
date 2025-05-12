@@ -31,8 +31,8 @@ jobs:
 
       - name: Verify installation
         run: |
-          ls -la $GITHUB_WORKSPACE/installed/${{ matrix.triplet }}/include
-          ls -la $GITHUB_WORKSPACE/installed/${{ matrix.triplet }}/lib
+          ls -la ${{ github.workspace }}/installed/${{ matrix.triplet }}/include
+          ls -la ${{ github.workspace }}/installed/${{ matrix.triplet }}/lib
 
       - name: Configure project
         run: |
