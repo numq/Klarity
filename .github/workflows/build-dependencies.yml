@@ -42,6 +42,25 @@ jobs:
           doNotCache: 'false'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
+      - name: Configure project (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cmake -B core/src/main/cpp/build -S core/src/main/cpp \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+        shell: bash
+
+      - name: Configure project (macOS)
+        if: matrix.os == 'macos-latest' || matrix.os == 'macos-latest-arm64'
+        run: |
+          cmake -B core/src/main/cpp/build -S core/src/main/cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+        shell: bash
+
       - name: Configure project (Linux)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-latest-arm64'
         run: |
@@ -50,15 +69,6 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
           -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
-        shell: bash
-
-      - name: Configure project (Non-Linux)
-        if: matrix.os != 'ubuntu-latest' && matrix.os != 'ubuntu-latest-arm64'
-        run: |
-          cmake -B core/src/main/cpp/build -S core/src/main/cpp \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
         shell: bash
 
       - name: Build project
