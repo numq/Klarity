@@ -132,7 +132,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build JARs
-        run: ./gradlew :core:jar -x test
+        run: ./gradlew :core:jar -x test --no-daemon
 
       - name: Clean up resources
         run: |
@@ -164,7 +164,7 @@ jobs:
 
       - name: Build JAR
         run: |
-          ./gradlew :compose:jar -x test
+          ./gradlew :compose:jar -x test --no-daemon
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
