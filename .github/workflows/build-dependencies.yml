@@ -13,13 +13,13 @@ jobs:
             triplet: x64-windows
             binary_ext: dll
 
-#          - os: macos-latest-arm64
-#            triplet: arm64-osx
-#            binary_ext: dylib
-#
-#          - os: macos-latest
-#            triplet: x64-osx
-#            binary_ext: dylib
+          #          - os: macos-latest-arm64
+          #            triplet: arm64-osx
+          #            binary_ext: dylib
+          #
+          #          - os: macos-latest
+          #            triplet: x64-osx
+          #            binary_ext: dylib
 
           - os: ubuntu-latest-arm64
             triplet: arm64-linux
@@ -42,13 +42,23 @@ jobs:
           doNotCache: 'false'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
-      - name: Configure project
+      - name: Configure project (Linux)
+        if: matrix.triplet == 'arm64-linux' || matrix.triplet == 'x64-linux'
         run: |
           cmake -B "core/src/main/cpp/build-${{ matrix.triplet }}" -S core/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            $([ "${{ matrix.triplet }}" == *"linux"* ] && echo "-DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,-Bsymbolic\"")
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
+        shell: bash
+
+      - name: Configure project (Windows)
+        if: matrix.triplet == 'x64-windows'
+        run: |
+          cmake -B "core/src/main/cpp/build-${{ matrix.triplet }}" -S core/src/main/cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
         shell: bash
 
       - name: Build project
