@@ -20,14 +20,14 @@ jobs:
           #          - os: macos-latest
           #            triplet: x64-osx
           #            binary_ext: dylib
-
-          - os: ubuntu-latest-arm64
-            triplet: arm64-linux
-            binary_ext: so
-
-          - os: ubuntu-latest
-            triplet: x64-linux
-            binary_ext: so
+#
+#          - os: ubuntu-latest-arm64
+#            triplet: arm64-linux
+#            binary_ext: so
+#
+#          - os: ubuntu-latest
+#            triplet: x64-linux
+#            binary_ext: so
 
     steps:
       - name: Checkout repository
@@ -52,8 +52,8 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
         shell: bash
 
-      - name: Configure project (Windows)
-        if: matrix.triplet == 'x64-windows'
+      - name: Configure project (Non-Linux)
+        if: matrix.triplet != 'arm64-linux' && matrix.triplet != 'x64-linux'
         run: |
           cmake -B "core/src/main/cpp/build-${{ matrix.triplet }}" -S core/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
