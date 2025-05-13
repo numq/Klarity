@@ -63,9 +63,9 @@ jobs:
 
       - name: Build JARs
         run: |
-          ./gradlew :core:assemble
-          ./gradlew :compose:assemble
-          ./gradlew :example:assemble
+          ./gradlew :core:build -x test
+          ./gradlew :compose:build -x test
+          ./gradlew :example:build -x test
 
       - name: Clean up resources
         run: |
