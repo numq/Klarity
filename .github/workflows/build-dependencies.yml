@@ -13,13 +13,13 @@ jobs:
             triplet: x64-windows
             binary_ext: dll
 
-          - os: macos-latest-arm64
-            triplet: arm64-osx
-            binary_ext: dylib
-
-          - os: macos-latest
-            triplet: x64-osx
-            binary_ext: dylib
+#          - os: macos-latest-arm64
+#            triplet: arm64-osx
+#            binary_ext: dylib
+#
+#          - os: macos-latest
+#            triplet: x64-osx
+#            binary_ext: dylib
 
           - os: ubuntu-latest-arm64
             triplet: arm64-linux
@@ -48,7 +48,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
+            $([ "${{ matrix.triplet }}" == *"linux"* ] && echo "-DCMAKE_SHARED_LINKER_FLAGS=\"-Wl,-Bsymbolic\"")
         shell: bash
 
       - name: Build project
