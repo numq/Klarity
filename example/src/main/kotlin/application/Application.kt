@@ -6,7 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,69 +29,56 @@ import java.awt.FileDialog
 import java.io.File
 import kotlin.system.exitProcess
 
-const val APP_NAME = "Klarity"
+private const val APP_NAME = "Klarity"
 
-fun main() {
-    val pathToBinaries = Thread.currentThread().contextClassLoader.getResource("bin")?.file
+private val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))
 
-    checkNotNull(pathToBinaries) { "Binaries not found" }
+fun main() = singleWindowApplication(state = windowState, undecorated = true) {
+    val isSystemInDarkTheme = isSystemInDarkTheme()
 
-    KlarityPlayer.load(
-        avutil = "$pathToBinaries\\avutil-59.dll",
-        swresample = "$pathToBinaries\\swresample-5.dll",
-        swscale = "$pathToBinaries\\swscale-8.dll",
-        avcodec = "$pathToBinaries\\avcodec-61.dll",
-        avformat = "$pathToBinaries\\avformat-61.dll",
-        avfilter = "$pathToBinaries\\avfilter-10.dll",
-        avdevice = "$pathToBinaries\\avdevice-61.dll",
-        portaudio = "$pathToBinaries\\portaudio.dll",
-        klarity = "$pathToBinaries\\klarity.dll"
-    ).getOrThrow()
+    val (isDarkTheme, setIsDarkTheme) = remember(isSystemInDarkTheme) {
+        mutableStateOf(isSystemInDarkTheme)
+    }
 
-    val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))
-
-    singleWindowApplication(state = windowState, undecorated = true) {
-        val iconSvg = remember {
-            File("media/logo.svg").inputStream().use {
-                loadSvgPainter(it, Density(1f))
-            }
+    val iconSvg = remember {
+        File("media/logo.svg").inputStream().use {
+            loadSvgPainter(it, Density(1f))
         }
+    }
 
-        SideEffect {
-            window.iconImage = iconSvg.toAwtImage(Density(1f), LayoutDirection.Ltr)
+    DisposableEffect(Unit) {
+        KlarityPlayer.load().getOrThrow()
 
-            window.minimumSize = Dimension(700, 700)
+        window.iconImage = iconSvg.toAwtImage(Density(1f), LayoutDirection.Ltr)
+
+        window.minimumSize = Dimension(700, 700)
+
+        onDispose {
         }
+    }
 
-        val isSystemInDarkTheme = isSystemInDarkTheme()
-
-        val (isDarkTheme, setIsDarkTheme) = remember(isSystemInDarkTheme) {
-            mutableStateOf(isSystemInDarkTheme)
-        }
-
-        KlarityTheme(isDarkTheme = isDarkTheme) {
-            Column(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                DecorationBox(
-                    window = window,
-                    isDarkTheme = isDarkTheme,
-                    changeTheme = setIsDarkTheme,
-                    close = { exitProcess(0) }) {
-                    Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
-                        Image(iconSvg, "icon")
-                    }
-                    Text(APP_NAME, color = MaterialTheme.colors.primary)
+    KlarityTheme(isDarkTheme = isDarkTheme) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            DecorationBox(
+                window = window,
+                isDarkTheme = isDarkTheme,
+                changeTheme = setIsDarkTheme,
+                close = { exitProcess(0) }) {
+                Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
+                    Image(iconSvg, "icon")
                 }
-                Navigation(openFileChooser = {
-                    FileDialog(window, "Upload media", FileDialog.LOAD).apply {
-                        isMultipleMode = true
-                        isVisible = true
-                    }.files.toList()
-                })
+                Text(APP_NAME, color = MaterialTheme.colors.primary)
             }
+            Navigation(openFileChooser = {
+                FileDialog(window, "Upload media", FileDialog.LOAD).apply {
+                    isMultipleMode = true
+                    isVisible = true
+                }.files.toList()
+            })
         }
     }
 }
