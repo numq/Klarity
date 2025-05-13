@@ -42,33 +42,13 @@ jobs:
           doNotCache: 'false'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
 
-      - name: Configure project (Windows)
-        if: matrix.triplet == 'x64-windows'
+      - name: Configure project
         run: |
-          cmake -B core/src/main/cpp/build-${{ matrix.triplet }} -S core/src/main/cpp \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
-        shell: bash
-
-      - name: Configure project (macOS)
-        if: matrix.triplet == 'arm64-osx' || matrix.triplet == 'x64-osx'
-        run: |
-          cmake -B core/src/main/cpp/build-${{ matrix.triplet }} -S core/src/main/cpp \
+          cmake -B "core/src/main/cpp/build-${{ matrix.triplet }}" -S core/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-        shell: bash
-
-      - name: Configure project (Linux)
-        if: matrix.triplet == 'arm64-linux' || matrix.triplet == 'x64-linux'
-        run: |
-          cmake -B core/src/main/cpp/build-${{ matrix.triplet }} -S core/src/main/cpp \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic"
         shell: bash
 
       - name: Build project
@@ -79,6 +59,9 @@ jobs:
         with:
           name: bin-${{ matrix.triplet }}
           path: core/src/main/cpp/build-${{ matrix.triplet }}/*.${{ matrix.binary_ext }}
+
+      - name: Clean build directories
+        run: rm -rf core/src/main/cpp/build-*
 
   build-core:
     needs: compile
