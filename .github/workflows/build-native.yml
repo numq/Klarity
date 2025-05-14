@@ -13,10 +13,6 @@ jobs:
             triplet: x64-windows
             binary_ext: dll
 
-          - os: macos-13
-            triplet: x64-osx
-            binary_ext: dylib
-
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: so
