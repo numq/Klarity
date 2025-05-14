@@ -48,4 +48,4 @@ jobs:
         with:
           name: ${{ matrix.os }}
           path: |
-            ${{ github.workspace }}/vcpkg_installed/${{ matrix.triplet }}
+            ${{ github.workspace }}/vcpkg/vcpkg_installed/${{ matrix.triplet }}
