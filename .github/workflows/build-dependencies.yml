@@ -54,4 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}
+          path: |
+            ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/bin/*
+            ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/lib/*
+            ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/include/*
