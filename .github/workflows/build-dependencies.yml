@@ -48,4 +48,4 @@ jobs:
         with:
           name: ${{ matrix.os }}
           path: |
-            ${{ github.workspace }}/vcpkg_installed/core/src/main/cpp/${{ matrix.triplet }}
+            ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}
