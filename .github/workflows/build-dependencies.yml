@@ -9,21 +9,21 @@ jobs:
     strategy:
       matrix:
         include:
-#          - os: windows-latest
-#            triplet: x64-windows
-#            binary_ext: dll
-#
-#          - os: macos-latest-arm64
-#            triplet: arm64-osx
-#            binary_ext: dylib
-#
-#          - os: macos-latest
-#            triplet: x64-osx
-#            binary_ext: dylib
-#
-#          - os: ubuntu-latest-arm64
-#            triplet: arm64-linux
-#            binary_ext: so
+          #          - os: windows-latest
+          #            triplet: x64-windows
+          #            binary_ext: dll
+          #
+          #          - os: macos-latest-arm64
+          #            triplet: arm64-osx
+          #            binary_ext: dylib
+          #
+          #          - os: macos-latest
+          #            triplet: x64-osx
+          #            binary_ext: dylib
+          #
+          #          - os: ubuntu-latest-arm64
+          #            triplet: arm64-linux
+          #            binary_ext: so
 
           - os: ubuntu-latest
             triplet: x64-linux
@@ -42,10 +42,11 @@ jobs:
           doNotCache: 'false'
           vcpkgJsonGlob: '**/core/src/main/cpp/vcpkg.json'
           runVcpkgInstall: 'true'
+          runVcpkgFormatString: '[`install`, `--x-install-root`, `${{ github.workspace }}/core/src/main/cpp`'
 
       - name: Upload installed
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}
           path: |
-            ${{ github.workspace }}/vcpkg/vcpkg_installed/${{ matrix.triplet }}
+            ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}
