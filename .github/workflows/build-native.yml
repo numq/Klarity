@@ -22,8 +22,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up FFmpeg
-        uses: FedericoCarboni/setup-ffmpeg@v1
-        id: setup-ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: "7.1.1"
 
       - name: Build PortAudio
         run: |
@@ -37,8 +38,8 @@ jobs:
       - name: Build klarity
         run: |
           cmake -S core/src/main/cpp -B build \
-            -DFFMPEG_INCLUDE_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/include" \
-            -DFFMPEG_LIBRARY_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/lib" \
+            -DFFMPEG_INCLUDE_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-path }}/include" \
+            -DFFMPEG_LIBRARY_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-path }}/lib" \
             -DPORTAUDIO_INCLUDE_DIRS="${{ github.workspace }}/portaudio/include" \
             -DPORTAUDIO_LIBRARY_DIRS="${{ github.workspace }}/portaudio/build"
           cmake --build build --config Release
