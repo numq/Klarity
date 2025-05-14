@@ -4,9 +4,15 @@ project(klarity VERSION 1.1.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(FFMPEG_INCLUDE_DIRS "")
+set(PORTAUDIO_INCLUDE_DIRS "")
+
+set(FFMPEG_LIBRARY_DIRS "")
+set(PORTAUDIO_LIBRARY_DIRS "")
+
+set(FFMPEG_LIBRARIES "")
+
 find_package(JNI REQUIRED)
-find_package(FFMPEG REQUIRED)
-find_package(portaudio REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp
