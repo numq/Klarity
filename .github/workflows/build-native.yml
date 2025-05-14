@@ -12,17 +12,14 @@ jobs:
           - os: windows-latest
             triplet: x64-windows
             binary_ext: dll
-            shell: powershell
 
           - os: macos-latest
             triplet: x64-osx
             binary_ext: dylib
-            shell: bash
 
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: so
-            shell: bash
 
     steps:
       - name: Checkout repository
@@ -39,7 +36,7 @@ jobs:
           git checkout v19.7.0
           cmake -B build -DPA_BUILD_SHARED=OFF -DPA_BUILD_STATIC=ON
           cmake --build build --config Release
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Build klarity
         run: |
@@ -49,7 +46,7 @@ jobs:
             -DPORTAUDIO_INCLUDE_DIRS="${{ github.workspace }}/portaudio/include" \
             -DPORTAUDIO_LIBRARY_DIRS="${{ github.workspace }}/portaudio/build"
           cmake --build build --config Release
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Find built shared library
         id: find-lib
@@ -58,7 +55,7 @@ jobs:
           if [ -f libklarity.so ]; then echo "LIB_NAME=libklarity.so" >> $GITHUB_ENV; fi
           if [ -f klarity.dll ]; then echo "LIB_NAME=klarity.dll" >> $GITHUB_ENV; fi
           if [ -f libklarity.dylib ]; then echo "LIB_NAME=libklarity.dylib" >> $GITHUB_ENV; fi
-        shell: ${{ matrix.shell }}
+        shell: bash
 
       - name: Upload shared library
         uses: actions/upload-artifact@v4
