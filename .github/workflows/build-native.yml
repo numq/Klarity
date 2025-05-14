@@ -36,18 +36,18 @@ jobs:
 
       - name: Build klarity
         run: |
-          cmake -B build \
+          cmake -B core/src/main/cpp/build \
             -DFFMPEG_INCLUDE_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/include" \
             -DFFMPEG_LIBRARY_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/lib" \
             -DPORTAUDIO_INCLUDE_DIRS="${{ github.workspace }}/portaudio/include" \
             -DPORTAUDIO_LIBRARY_DIRS="${{ github.workspace }}/portaudio/build"
-          cmake --build build --config Release
+          cmake --build core/src/main/cpp/build --config Release
         shell: bash
 
       - name: Find built shared library
         id: find-lib
         run: |
-          cd build
+          cd core/src/main/cpp/build
           if [ -f libklarity.so ]; then echo "LIB_NAME=libklarity.so" >> $GITHUB_ENV; fi
           if [ -f klarity.dll ]; then echo "LIB_NAME=klarity.dll" >> $GITHUB_ENV; fi
           if [ -f libklarity.dylib ]; then echo "LIB_NAME=libklarity.dylib" >> $GITHUB_ENV; fi
