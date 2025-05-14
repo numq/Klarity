@@ -5,6 +5,7 @@ on:
 
 jobs:
   compile:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
@@ -22,8 +23,6 @@ jobs:
             triplet: x64-linux
             binary_ext: so
             shell: bash
-
-    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
