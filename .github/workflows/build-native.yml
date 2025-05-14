@@ -12,10 +12,12 @@ jobs:
           - os: windows-latest
             triplet: x64-windows
             binary_ext: dll
+            shell: powershell
 
           - os: ubuntu-latest
             triplet: x64-linux
             binary_ext: so
+            shell: bash
 
     steps:
       - name: Checkout repository
@@ -32,26 +34,26 @@ jobs:
           git checkout v19.7.0
           cmake -B build -DPA_BUILD_SHARED=OFF -DPA_BUILD_STATIC=ON
           cmake --build build --config Release
-        shell: bash
+        shell: ${{ matrix.shell }}
 
       - name: Build klarity
         run: |
-          cmake -B core/src/main/cpp/build \
+          cmake -S core/src/main/cpp -B build \
             -DFFMPEG_INCLUDE_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/include" \
             -DFFMPEG_LIBRARY_DIRS="${{ steps.setup-ffmpeg.outputs.ffmpeg-root }}/lib" \
             -DPORTAUDIO_INCLUDE_DIRS="${{ github.workspace }}/portaudio/include" \
             -DPORTAUDIO_LIBRARY_DIRS="${{ github.workspace }}/portaudio/build"
-          cmake --build core/src/main/cpp/build --config Release
-        shell: bash
+          cmake --build build --config Release
+        shell: ${{ matrix.shell }}
 
       - name: Find built shared library
         id: find-lib
         run: |
-          cd core/src/main/cpp/build
+          cd build
           if [ -f libklarity.so ]; then echo "LIB_NAME=libklarity.so" >> $GITHUB_ENV; fi
           if [ -f klarity.dll ]; then echo "LIB_NAME=klarity.dll" >> $GITHUB_ENV; fi
           if [ -f libklarity.dylib ]; then echo "LIB_NAME=libklarity.dylib" >> $GITHUB_ENV; fi
-        shell: bash
+        shell: ${{ matrix.shell }}
 
       - name: Upload shared library
         uses: actions/upload-artifact@v4
