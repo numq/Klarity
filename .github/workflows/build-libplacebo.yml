@@ -9,9 +9,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            triplet: x64-windows
-            binary_ext: dll
+          - os: [ windows-latest ]
+    #          - os: [windows-latest, ubuntu-latest, macos-latest]
 
     steps:
       - name: Checkout code
@@ -20,45 +19,29 @@ jobs:
           repository: haasn/libplacebo
           path: libplacebo
 
-      - name: Install build tools
-        shell: bash
-        run: |
-          case "$RUNNER_OS" in
-          "Linux")
-           sudo apt-get update -qq
-           sudo apt-get install -y \
-             build-essential meson ninja-build \
-             libshaderc-dev vulkan-validationlayers-dev \
-             liblcms2-dev libdovi-dev
-           ;;
-          "macOS")
-           brew update
-           brew install meson ninja shaderc vulkan-headers lcms2 libdovi
-           ;;
-          "Windows")
-           choco install -y meson ninja python
-           pip install meson
-           # Install Vulkan SDK silently
-           curl -LO https://sdk.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
-           ./vulkan-sdk.exe /S
-           ;;
-          esac
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Meson
+        run: pip install meson ninja
 
       - name: Configure static build
         shell: bash
         working-directory: ./libplacebo
         run: |
           meson setup build \
-            --buildtype=release \
-            --default-library=static \
-            --prefix=/tmp/libplacebo-static \
-            -Dshaderc=disabled \      
-            -Dvulkan=disabled \       
-            -Dlcms=disabled \         
-            -Ddovi=disabled \         
-            -Dglslang=disabled \      
-            -Dopengl=disabled \       
-            -Dd3d11=disabled          
+          --buildtype=release \
+          --default-library=static \
+          --prefix=/tmp/libplacebo-static \
+          -Dshaderc=disabled \
+          -Dvulkan=disabled \
+          -Dlcms=disabled \
+          -Ddovi=disabled \
+          -Dglslang=disabled \
+          -Dopengl=disabled \
+          -Dd3d11=disabled
 
       - name: Compile and install
         shell: bash
