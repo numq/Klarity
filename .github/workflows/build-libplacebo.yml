@@ -24,6 +24,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Prepare Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        with:
+          vulkan-query-version: 1.4.304.1
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
+
       - name: Set up Meson
         run: pip install meson ninja jinja2
 
