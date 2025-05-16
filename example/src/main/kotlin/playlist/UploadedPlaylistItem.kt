@@ -19,10 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.RendererComponent
-import com.github.numq.klarity.compose.scale.ImageScale
-import com.github.numq.klarity.core.media.Media
+import io.github.numq.klarity.media.Media
+import io.github.numq.klarity.renderer.compose.Foreground
+import io.github.numq.klarity.renderer.compose.ImageScale
+import io.github.numq.klarity.renderer.compose.RendererComponent
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

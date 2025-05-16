@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.github.numq.klarity.core.player.KlarityPlayer
+import io.github.numq.klarity.player.KlarityPlayer
 import notification.Notification
 import java.io.File
 
@@ -16,18 +16,14 @@ fun PlaylistScreen(
     upload: (List<String>) -> List<File>,
     notify: (Notification) -> Unit,
 ) {
-    val player = remember { KlarityPlayer.create() }
+    val player = remember { KlarityPlayer.create().getOrThrow() }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        player.onSuccess { player ->
-            PlaylistScreenSuccess(
-                player = player,
-                openFileChooser = openFileChooser,
-                upload = upload,
-                notify = notify
-            )
-        }.onFailure { throwable ->
-            PlaylistScreenFailure(throwable)
-        }
+        PlaylistScreenSuccess(
+            player = player,
+            openFileChooser = openFileChooser,
+            upload = upload,
+            notify = notify
+        )
     }
 }

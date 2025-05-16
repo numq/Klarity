@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.github.numq"
-version = "1.1.0"
+version = "1.0.0"
 
 repositories {
     google()
@@ -18,12 +18,13 @@ repositories {
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.10")
-    implementation(project(":core"))
-    implementation(project(":compose"))
+    implementation(project(":library"))
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "${JavaVersion.VERSION_17}"
+    kotlinOptions {
+        jvmTarget = "${JavaVersion.VERSION_17}"
+    }
 }
 
 tasks.test {
@@ -39,7 +40,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Klarity"
-            packageVersion = "1.1.0"
+            packageVersion = "1.0.0"
         }
     }
 }

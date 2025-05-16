@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.github.numq.klarity.core.queue.RepeatMode
-import com.github.numq.klarity.core.state.PlayerState
+import io.github.numq.klarity.queue.RepeatMode
+import io.github.numq.klarity.state.PlayerState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.time.Duration

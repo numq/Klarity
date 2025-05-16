@@ -8,12 +8,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import com.github.numq.klarity.compose.renderer.Foreground
-import com.github.numq.klarity.compose.renderer.RendererComponent
-import com.github.numq.klarity.compose.renderer.SkiaRenderer
-import com.github.numq.klarity.compose.scale.ImageScale
 import controls.HoveredTimestamp
 import extension.formatTimestamp
+import io.github.numq.klarity.renderer.SkiaRenderer
+import io.github.numq.klarity.renderer.compose.Foreground
+import io.github.numq.klarity.renderer.compose.ImageScale
+import io.github.numq.klarity.renderer.compose.RendererComponent
 
 @Composable
 fun TimelinePreview(

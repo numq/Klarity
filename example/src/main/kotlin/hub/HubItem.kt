@@ -1,7 +1,7 @@
 package hub
 
-import com.github.numq.klarity.compose.renderer.SkiaRenderer
-import com.github.numq.klarity.core.player.KlarityPlayer
+import io.github.numq.klarity.player.KlarityPlayer
+import io.github.numq.klarity.renderer.SkiaRenderer
 import java.util.*
 
 sealed class HubItem private constructor(open val id: Long) {

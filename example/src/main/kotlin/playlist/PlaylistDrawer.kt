@@ -23,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.github.numq.klarity.core.queue.SelectedItem
+import io.github.numq.klarity.queue.SelectedItem
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)

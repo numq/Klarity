@@ -17,10 +17,10 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
-import com.github.numq.klarity.compose.renderer.SkiaRenderer
-import com.github.numq.klarity.core.player.KlarityPlayer
-import com.github.numq.klarity.core.probe.ProbeManager
-import com.github.numq.klarity.core.snapshot.SnapshotManager
+import io.github.numq.klarity.player.KlarityPlayer
+import io.github.numq.klarity.probe.ProbeManager
+import io.github.numq.klarity.renderer.SkiaRenderer
+import io.github.numq.klarity.snapshot.SnapshotManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
@@ -30,7 +30,6 @@ import notification.Notification
 import remote.RemoteUploadingDialog
 import slider.StepSlider
 import java.io.File
-
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable

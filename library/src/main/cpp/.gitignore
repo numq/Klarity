@@ -1,0 +1,32 @@
+# Compiled Object media, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+*.dll
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake build directories
+cmake-build-debug/
+cmake-build-release/
+
+# CLion project media
+.idea/
+
+# Compiled output
+bin/
+lib/
+
+# Ignore any local user-specific media
+.vscode/
+*.suo
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.xcodeproj/
+
+vcpkg_installed/

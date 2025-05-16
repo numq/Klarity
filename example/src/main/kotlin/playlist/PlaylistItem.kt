@@ -1,7 +1,7 @@
 package playlist
 
-import com.github.numq.klarity.compose.renderer.SkiaRenderer
-import com.github.numq.klarity.core.media.Media
+import io.github.numq.klarity.media.Media
+import io.github.numq.klarity.renderer.SkiaRenderer
 import java.util.*
 
 sealed class PlaylistItem private constructor(open val id: Long) {
