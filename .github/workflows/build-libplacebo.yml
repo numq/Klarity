@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
 
       - name: Set up Meson
-        run: pip install meson ninja
+        run: pip install meson ninja jinja2
 
       - name: Configure static build
         shell: bash
