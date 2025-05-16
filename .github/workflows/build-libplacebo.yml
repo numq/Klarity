@@ -19,56 +19,30 @@ jobs:
           repository: haasn/libplacebo
           path: libplacebo
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Prepare Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.1
-        with:
-          vulkan-query-version: 1.4.304.1
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
-          vulkan-use-cache: true
-
-      - name: Set up Meson
-        run: pip install meson ninja jinja2
-
-      - name: Configure static build
-        shell: bash
-        working-directory: ./libplacebo
+      - name: Set up dependencies
         run: |
-          meson setup build \
-          --buildtype=release \
-          --default-library=static \
-          --prefix=/tmp/libplacebo-static \
-          -Dshaderc=disabled \
-          -Dvulkan=disabled \
-          -Dlcms=disabled \
-          -Ddovi=disabled \
+          pip install meson ninja
+          vcpkg install glfw3
+          vcpkg install opengl
+
+      - name: Set up build
+        run: |
+          meson setup build
+
+      - name: Configure build
+        run: |
+          meson configure build \
+          -Dd3d11=disabled \
+          -Ddemos=false \
           -Dglslang=disabled \
-          -Dopengl=disabled \
-          -Dd3d11=disabled
-
-      - name: Compile and install
-        shell: bash
-        working-directory: ./libplacebo
-        run: |
-          meson compile -C build
-          meson install -C build
-
-      - name: Package library
-        shell: bash
-        run: |
-          cd /tmp/libplacebo-static
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            7z a libplacebo-static-${{ runner.os }}.zip ./*
-          else
-            tar czvf libplacebo-static-${{ runner.os }}.tar.gz ./*
-          fi
+          -Dlcms=disabled \
+          -Dopengl=enabled \
+          -Dshaderc=disabled \
+          -Dunwind=disabled \
+          -Dvulkan=disabled
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libplacebo-static-${{ runner.os }}
-          path: /tmp/libplacebo-static/libplacebo-static-${{ runner.os }}.*
+          name: ${{ runner.os }}
+          path: build
