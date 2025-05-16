@@ -20,15 +20,18 @@ jobs:
           path: libplacebo
 
       - name: Set up dependencies
+        shell: bash
         run: |
           pip install meson ninja
-          vcpkg install glfw3
-          vcpkg install opengl
+          git clone https://github.com/Microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install glfw3 opengl
 
       - name: Configure and build
         shell: bash
+        working-directory: ./libplacebo
         run: |
-          meson setup build \
+          meson setup builddir \
           --buildtype=release \
           --default-library=static \
           -Dd3d11=disabled \
@@ -40,11 +43,11 @@ jobs:
           -Dunwind=disabled \
           -Dvulkan=disabled
           
-          meson compile -C build
+          meson compile -C builddir
 
       - name: Package artifacts
         shell: bash
-        working-directory: ./libplacebo/build
+        working-directory: ./libplacebo/builddir
         run: |
           mkdir -p /tmp/libplacebo-artifacts
           find . -name '*.a' -o -name '*.lib' -exec cp {} /tmp/libplacebo-artifacts \;
