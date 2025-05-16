@@ -26,6 +26,7 @@ jobs:
           vcpkg install opengl
 
       - name: Configure and build
+        shell: bash
         run: |
           meson setup build \
           --buildtype=release \
