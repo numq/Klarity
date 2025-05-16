@@ -25,13 +25,11 @@ jobs:
           vcpkg install glfw3
           vcpkg install opengl
 
-      - name: Set up build
+      - name: Configure and build
         run: |
-          meson setup build
-
-      - name: Configure build
-        run: |
-          meson configure build \
+          meson setup build \
+          --buildtype=release \
+          --default-library=static \
           -Dd3d11=disabled \
           -Ddemos=false \
           -Dglslang=disabled \
@@ -40,9 +38,19 @@ jobs:
           -Dshaderc=disabled \
           -Dunwind=disabled \
           -Dvulkan=disabled
+          
+          meson compile -C build
+
+      - name: Package artifacts
+        shell: bash
+        working-directory: ./libplacebo/build
+        run: |
+          mkdir -p /tmp/libplacebo-artifacts
+          find . -name '*.a' -o -name '*.lib' -exec cp {} /tmp/libplacebo-artifacts \;
+          cp -r ../src/include /tmp/libplacebo-artifacts/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}
-          path: build
+          name: libplacebo-windows
+          path: /tmp/libplacebo-artifacts/*
