@@ -10,16 +10,10 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         external fun create(sampleRate: Int, channels: Int): Long
 
         @JvmStatic
-        external fun setPlaybackSpeed(handle: Long, factor: Float)
-
-        @JvmStatic
-        external fun setVolume(handle: Long, value: Float)
-
-        @JvmStatic
         external fun start(handle: Long): Long
 
         @JvmStatic
-        external fun write(handle: Long, bytes: ByteArray)
+        external fun write(handle: Long, bytes: ByteArray, volume: Float, playbackSpeedFactor: Float)
 
         @JvmStatic
         external fun stop(handle: Long)
@@ -28,7 +22,7 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         external fun flush(handle: Long)
 
         @JvmStatic
-        external fun drain(handle: Long)
+        external fun drain(handle: Long, volume: Float, playbackSpeedFactor: Float)
 
         @JvmStatic
         external fun delete(handle: Long)
@@ -58,28 +52,25 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         require(nativeHandle.get() != -1L) { "Could not instantiate native sampler" }
     }
 
-    fun setPlaybackSpeed(factor: Float) = runCatching {
-        ensureOpen()
-
-        Native.setPlaybackSpeed(handle = nativeHandle.get(), factor = factor)
-    }
-
-    fun setVolume(value: Float) = runCatching {
-        ensureOpen()
-
-        Native.setVolume(handle = nativeHandle.get(), value = value)
-    }
-
     fun start() = runCatching {
         ensureOpen()
 
         Native.start(handle = nativeHandle.get())
     }
 
-    fun write(bytes: ByteArray) = runCatching {
+    fun write(bytes: ByteArray, volume: Float, playbackSpeedFactor: Float) = runCatching {
         ensureOpen()
 
-        Native.write(handle = nativeHandle.get(), bytes = bytes)
+        require(volume in 0.0..1.0) { "Volume must be between 0.0 and 1.0" }
+
+        require(playbackSpeedFactor in 0.5..2.0) { "Playback speed factor must be between 0.5 and 2.0" }
+
+        Native.write(
+            handle = nativeHandle.get(),
+            bytes = bytes,
+            volume = volume,
+            playbackSpeedFactor = playbackSpeedFactor
+        )
     }
 
     fun stop() = runCatching {
@@ -94,10 +85,14 @@ internal class NativeSampler(sampleRate: Int, channels: Int) : Closeable {
         Native.flush(handle = nativeHandle.get())
     }
 
-    fun drain() = runCatching {
+    fun drain(volume: Float, playbackSpeedFactor: Float) = runCatching {
         ensureOpen()
 
-        Native.drain(handle = nativeHandle.get())
+        require(volume in 0.0..1.0) { "Volume must be between 0.0 and 1.0" }
+
+        require(playbackSpeedFactor in 0.5..2.0) { "Playback speed factor must be between 0.5 and 2.0" }
+
+        Native.drain(handle = nativeHandle.get(), volume = volume, playbackSpeedFactor = playbackSpeedFactor)
     }
 
     override fun close() = cleanable.clean()

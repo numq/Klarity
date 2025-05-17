@@ -28,10 +28,6 @@ private:
 
     std::vector<float> samples;
 
-    float playbackSpeedFactor = 1.0f;
-
-    float volume = 1.0f;
-
 public:
     explicit Sampler(uint32_t sampleRate, uint32_t channels);
 
@@ -39,19 +35,15 @@ public:
 
     Sampler &operator=(const Sampler &) = delete;
 
-    void setPlaybackSpeed(float factor);
-
-    void setVolume(float value);
-
     int start();
 
-    void write(const uint8_t *buffer, int size);
+    void write(const uint8_t *buffer, int size, float volume, float playbackSpeedFactor);
 
     void stop();
 
     void flush();
 
-    void drain();
+    void drain(float volume, float playbackSpeedFactor);
 };
 
 #endif //KLARITY_SAMPLER_H

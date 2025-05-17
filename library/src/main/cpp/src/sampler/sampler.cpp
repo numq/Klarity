@@ -42,26 +42,6 @@ Sampler::Sampler(uint32_t sampleRate, uint32_t channels) {
     stream = std::unique_ptr<PaStream, PaStreamDeleter>(rawStream);
 }
 
-void Sampler::setPlaybackSpeed(float factor) {
-    std::shared_lock<std::shared_mutex> lock(mutex);
-
-    if (factor < 0.5 || factor > 2) {
-        throw SamplerException("Playback speed factor out of range (0.5, 2)");
-    }
-
-    playbackSpeedFactor = factor;
-}
-
-void Sampler::setVolume(float value) {
-    std::shared_lock<std::shared_mutex> lock(mutex);
-
-    if (value < 0 || value > 1) {
-        throw SamplerException("Volume out of range (0, 1)");
-    }
-
-    volume = value;
-}
-
 int Sampler::start() {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
@@ -90,7 +70,7 @@ int Sampler::start() {
     return static_cast<int>(totalLatency * 1'000'000);
 }
 
-void Sampler::write(const uint8_t *buffer, const int size) {
+void Sampler::write(const uint8_t *buffer, const int size, const float volume, const float playbackSpeedFactor) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream || Pa_IsStreamActive(stream.get()) <= 0) {
@@ -186,7 +166,7 @@ void Sampler::flush() {
     samples.shrink_to_fit();
 }
 
-void Sampler::drain() {
+void Sampler::drain(const float volume, const float playbackSpeedFactor) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!stretch || !stream) {
@@ -203,7 +183,7 @@ void Sampler::drain() {
         }
     }
 
-    int outputSamples = stretch->outputLatency();
+    auto outputSamples = static_cast<int>(static_cast<float>(stretch->outputLatency()) / playbackSpeedFactor);
 
     if (outputSamples > 0) {
         std::vector<std::vector<float>> outputBuffers(channels, std::vector<float>(outputSamples, 0.0f));

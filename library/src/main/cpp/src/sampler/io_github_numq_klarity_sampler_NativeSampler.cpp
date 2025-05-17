@@ -16,32 +16,6 @@ JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024N
     }, -1);
 }
 
-JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_setPlaybackSpeed(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong samplerHandle,
-        jfloat factor
-) {
-    return handleException(env, [&] {
-        auto sampler = getSamplerPointer(samplerHandle);
-
-        sampler->setPlaybackSpeed(static_cast<float>(factor));
-    });
-}
-
-JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_setVolume(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong samplerHandle,
-        jfloat value
-) {
-    return handleException(env, [&] {
-        auto sampler = getSamplerPointer(samplerHandle);
-
-        sampler->setVolume(static_cast<float>(value));
-    });
-}
-
 JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_start(
         JNIEnv *env,
         jclass thisClass,
@@ -58,7 +32,9 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Na
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle,
-        jbyteArray bytes
+        jbyteArray bytes,
+        jfloat volume,
+        jfloat playbackSpeedFactor
 ) {
     return handleException(env, [&] {
         auto sampler = getSamplerPointer(samplerHandle);
@@ -69,7 +45,7 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Na
 
         env->GetByteArrayRegion(bytes, 0, size, reinterpret_cast<jbyte *>(buffer.data()));
 
-        sampler->write(buffer.data(), static_cast<int>(buffer.size()));
+        sampler->write(buffer.data(), static_cast<int>(buffer.size()), volume, playbackSpeedFactor);
     });
 }
 
@@ -100,12 +76,14 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Na
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_drain(
         JNIEnv *env,
         jclass thisClass,
-        jlong samplerHandle
+        jlong samplerHandle,
+        jfloat volume,
+        jfloat playbackSpeedFactor
 ) {
     return handleException(env, [&] {
         auto sampler = getSamplerPointer(samplerHandle);
 
-        sampler->drain();
+        sampler->drain(volume, playbackSpeedFactor);
     });
 }
 

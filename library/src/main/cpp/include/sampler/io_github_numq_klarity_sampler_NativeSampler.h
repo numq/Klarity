@@ -18,20 +18,6 @@ JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024N
         jint channels
 );
 
-JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_setPlaybackSpeed(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong samplerHandle,
-        jfloat factor
-);
-
-JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_setVolume(
-        JNIEnv *env,
-        jclass thisClass,
-        jlong samplerHandle,
-        jfloat value
-);
-
 JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_start(
         JNIEnv *env,
         jclass thisClass,
@@ -42,7 +28,9 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Na
         JNIEnv *env,
         jclass thisClass,
         jlong samplerHandle,
-        jbyteArray bytes
+        jbyteArray bytes,
+        jfloat volume,
+        jfloat playbackSpeedFactor
 );
 
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_stop(
@@ -60,7 +48,9 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Na
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_drain(
         JNIEnv *env,
         jclass thisClass,
-        jlong samplerHandle
+        jlong samplerHandle,
+        jfloat volume,
+        jfloat playbackSpeedFactor
 );
 
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_sampler_NativeSampler_00024Native_delete(

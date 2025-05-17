@@ -13,7 +13,6 @@ import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pipeline.Pipeline
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
-import io.github.numq.klarity.sampler.Sampler
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.InternalPlayerState
@@ -72,24 +71,6 @@ internal class DefaultPlayerController(
     )
 
     override val settings = MutableStateFlow(initialSettings ?: defaultSettings)
-
-    private suspend fun Sampler.applySettings(settings: PlayerSettings) {
-        setVolume(value = settings.volume).getOrThrow()
-
-        setMuted(state = settings.isMuted).getOrThrow()
-
-        setPlaybackSpeed(factor = settings.playbackSpeedFactor).getOrThrow()
-    }
-
-    private suspend fun applySettings(pipeline: Pipeline, settings: PlayerSettings) = runCatching {
-        when (pipeline) {
-            is Pipeline.Audio -> pipeline.sampler.applySettings(settings)
-
-            is Pipeline.Video -> Unit
-
-            is Pipeline.AudioVideo -> pipeline.sampler.applySettings(settings)
-        }
-    }
 
     /**
      * State
@@ -392,8 +373,6 @@ internal class DefaultPlayerController(
                 }
             }
 
-            applySettings(pipeline, settings.value).getOrThrow()
-
             val bufferLoop = bufferLoopFactory.create(
                 parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
             ).onFailure {
@@ -405,7 +384,8 @@ internal class DefaultPlayerController(
             val playbackLoop = playbackLoopFactory.create(
                 parameters = PlaybackLoopFactory.Parameters(
                     pipeline = pipeline,
-                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor.toDouble() },
+                    getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
+                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
                     getRenderer = { renderer })
             ).onFailure {
                 bufferLoop.close().getOrThrow()
@@ -632,10 +612,6 @@ internal class DefaultPlayerController(
 
     override suspend fun changeSettings(newSettings: PlayerSettings) = commandMutex.withLock {
         runCatching {
-            (internalState as? InternalPlayerState.Ready)?.run {
-                applySettings(pipeline, newSettings).getOrThrow()
-            }
-
             settings.emit(newSettings)
         }
     }

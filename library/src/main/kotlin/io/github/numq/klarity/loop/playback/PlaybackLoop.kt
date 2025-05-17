@@ -20,11 +20,13 @@ interface PlaybackLoop {
     companion object {
         internal fun create(
             pipeline: Pipeline,
-            getPlaybackSpeedFactor: () -> Double,
+            getVolume: () -> Float,
+            getPlaybackSpeedFactor: () -> Float,
             getRenderer: () -> Renderer?
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,
+                getVolume = getVolume,
                 getPlaybackSpeedFactor = getPlaybackSpeedFactor,
                 getRenderer = getRenderer
             )

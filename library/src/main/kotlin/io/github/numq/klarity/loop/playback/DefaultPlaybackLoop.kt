@@ -15,7 +15,8 @@ import kotlin.time.Duration
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
-    private val getPlaybackSpeedFactor: () -> Double,
+    private val getVolume: () -> Float,
+    private val getPlaybackSpeedFactor: () -> Float,
     private val getRenderer: () -> Renderer?
 ) : PlaybackLoop {
     private val mutex = Mutex()
@@ -46,13 +47,17 @@ internal class DefaultPlaybackLoop(
 
                     audioClock.set(frameTime)
 
-                    sampler.write(frame).getOrThrow()
+                    sampler.write(
+                        frame = frame,
+                        volume = getVolume(),
+                        playbackSpeedFactor = getPlaybackSpeedFactor()
+                    ).getOrThrow()
                 }
 
                 is Frame.EndOfStream -> {
                     currentCoroutineContext().ensureActive()
 
-                    sampler.drain().getOrThrow()
+                    sampler.drain(volume = getVolume(), playbackSpeedFactor = getPlaybackSpeedFactor()).getOrThrow()
 
                     audioClock.set(Duration.INFINITE)
 
@@ -102,7 +107,7 @@ internal class DefaultPlaybackLoop(
                             if (masterClockTime.isFinite()) {
                                 val deltaTime = frameTime - masterClockTime
 
-                                delay(deltaTime / playbackSpeedFactor)
+                                delay(deltaTime / playbackSpeedFactor.toDouble())
                             }
                         }
 
@@ -121,7 +126,7 @@ internal class DefaultPlaybackLoop(
                         val videoClockTime = videoClock.get()
 
                         if (videoClockTime.isFinite()) {
-                            delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor())
+                            delay((mediaDuration - videoClockTime) / getPlaybackSpeedFactor().toDouble())
                         }
 
                         videoClock.set(Duration.INFINITE)
