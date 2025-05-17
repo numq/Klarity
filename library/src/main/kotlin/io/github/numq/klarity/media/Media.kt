@@ -44,4 +44,6 @@ sealed interface Media {
         override val audioFormat: AudioFormat,
         override val videoFormat: VideoFormat,
     ) : Media
+
+    fun isContinuous() = duration.isPositive() && (audioFormat != null || (videoFormat?.frameRate ?: 0.0) > 0.0)
 }

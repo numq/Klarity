@@ -281,12 +281,14 @@ Decoder::Decoder(
                     throw DecoderException("Could not copy parameters to audio codec context");
                 }
 
-                audioCodecContext->thread_count = 0;
-
                 if (audioDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
                     audioCodecContext->thread_type = FF_THREAD_FRAME;
+
+                    audioCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
                 } else if (audioDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
                     audioCodecContext->thread_type = FF_THREAD_SLICE;
+
+                    audioCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
                 }
 
                 if (avcodec_open2(audioCodecContext.get(), audioDecoder, nullptr) < 0) {
@@ -357,13 +359,26 @@ Decoder::Decoder(
                     }
                 }
 
-                if (format.durationMicros > 0) {
-                    videoCodecContext->thread_count = 0;
+                if (videoStream->avg_frame_rate.num != 0 && videoStream->avg_frame_rate.den != 0) {
+                    format.frameRate = av_q2d(videoStream->avg_frame_rate);
+                }
 
-                    if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
-                        videoCodecContext->thread_type = FF_THREAD_FRAME;
-                    } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
-                        videoCodecContext->thread_type = FF_THREAD_SLICE;
+                const auto frameInterval = 1'000'000.0 / format.frameRate;
+
+                if (format.frameRate > 0) {
+                    if (static_cast<double>(format.durationMicros) > frameInterval) {
+                        if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+                            videoCodecContext->thread_type = FF_THREAD_FRAME;
+
+                            videoCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                        } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+                            videoCodecContext->thread_type = FF_THREAD_SLICE;
+
+                            videoCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                        }
+                    } else {
+                        format.frameRate = 0.0;
+                        format.durationMicros = 0;
                     }
                 }
 
@@ -374,10 +389,6 @@ Decoder::Decoder(
                 format.width = videoCodecContext->width;
 
                 format.height = videoCodecContext->height;
-
-                if (videoStream->avg_frame_rate.num != 0 && videoStream->avg_frame_rate.den != 0) {
-                    format.frameRate = av_q2d(videoStream->avg_frame_rate);
-                }
 
                 int videoBufferCapacity = av_image_get_buffer_size(
                         targetPixelFormat,

@@ -214,6 +214,10 @@ internal class DefaultPlayerController(
     ) = commandMutex.withLock {
         check(internalState is InternalPlayerState.Ready) { "Unable to execute playback command" }
 
+        if (!media.isContinuous()) {
+            return@withLock
+        }
+
         updateState(updateStatus(status = InternalPlayerState.Ready.Status.TRANSITION))
 
         when (val currentInternalState = internalState) {
