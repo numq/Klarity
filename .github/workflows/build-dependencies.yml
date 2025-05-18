@@ -46,6 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           ./vcpkg/vcpkg install \
+          --triplet=${{ matrix.triplet }}
           --x-manifest-root=${{ github.workspace }}/library/src/main/cpp \
           --x-install-root=${{ github.workspace }}/library/src/main/cpp/vcpkg_installed
 
