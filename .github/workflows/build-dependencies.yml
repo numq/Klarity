@@ -9,20 +9,20 @@ jobs:
     strategy:
       matrix:
         include:
-#          - os: windows-latest
-#            triplet: x64-windows-static
+          - os: windows-latest
+            triplet: x64-windows-static
 
-          - os: macos-latest-arm64
-            triplet: arm64-osx
+#          - os: macos-latest-arm64
+#            triplet: arm64-osx
 
-#          - os: macos-13
-#            triplet: x64-osx
+          - os: macos-13
+            triplet: x64-osx
 
-          - os: ubuntu-latest-arm64
-            triplet: arm64-linux
+#          - os: ubuntu-latest-arm64
+#            triplet: arm64-linux
 
-#          - os: ubuntu-latest
-#            triplet: x64-linux
+          - os: ubuntu-latest
+            triplet: x64-linux
 
     steps:
       - name: Checkout repository
