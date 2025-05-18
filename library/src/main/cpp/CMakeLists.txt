@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(JNI REQUIRED)
 find_package(FFMPEG REQUIRED)
-find_package(portaudio REQUIRED)
+find_package(portaudio CONFIG REQUIRED)
 
 add_library(klarity SHARED
         src/common.cpp
@@ -32,10 +32,11 @@ target_include_directories(klarity PRIVATE
 
 target_link_directories(klarity PRIVATE
         ${FFMPEG_LIBRARY_DIRS}
-        ${PORTAUDIO_LIBRARY_DIRS}
 )
 
-target_link_options(klarity PRIVATE "/FORCE:MULTIPLE")
+if (WIN32)
+    target_link_options(klarity PRIVATE "/FORCE:MULTIPLE")
+endif()
 
 target_link_libraries(klarity PRIVATE
         ${FFMPEG_LIBRARIES}
