@@ -104,4 +104,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}\library\src\main\cpp\build\**
+          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\**
