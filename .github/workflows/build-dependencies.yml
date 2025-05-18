@@ -39,6 +39,7 @@ jobs:
           ./vcpkg/bootstrap-vcpkg.sh
 
       - name: Install dependencies
+        shell: bash
         run: |
           ./vcpkg/vcpkg install \
           --x-manifest-root=${{ github.workspace }}/library/src/main/cpp \
