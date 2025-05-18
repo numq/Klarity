@@ -51,7 +51,7 @@ jobs:
 
       - name: List installed files
         run: |
-          find ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/${{ matrix.triplet }} -type f
+          find ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/ -type f
 
       - name: Upload dependencies
         uses: actions/upload-artifact@v4
