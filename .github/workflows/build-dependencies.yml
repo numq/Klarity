@@ -9,25 +9,20 @@ jobs:
     strategy:
       matrix:
         include:
-          #          - os: windows-latest
-          #            triplet: x64-windows
-          #            binary_ext: dll
-          #
-          #          - os: macos-latest-arm64
-          #            triplet: arm64-osx
-          #            binary_ext: dylib
+          - os: windows-latest
+            triplet: x64-windows-static
 
-          - os: macos-latest
+          - os: macos-latest-arm64
+            triplet: arm64-osx
+
+          - os: macos-13
             triplet: x64-osx
-            binary_ext: dylib
 
-    #          - os: ubuntu-latest-arm64
-    #            triplet: arm64-linux
-    #            binary_ext: so
-    #
-    #          - os: ubuntu-latest
-    #            triplet: x64-linux
-    #            binary_ext: so
+          - os: ubuntu-latest-arm64
+            triplet: arm64-linux
+
+          - os: ubuntu-latest
+            triplet: x64-linux
 
     steps:
       - name: Checkout repository
@@ -46,13 +41,8 @@ jobs:
       - name: Install dependencies
         run: |
           ./vcpkg/vcpkg install \
-          --triplet=${{ matrix.triplet }}
           --x-manifest-root=${{ github.workspace }}/library/src/main/cpp \
           --x-install-root=${{ github.workspace }}/library/src/main/cpp/vcpkg_installed
-
-      - name: List installed files
-        run: |
-          find ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/ -type f
 
       - name: Upload dependencies
         uses: actions/upload-artifact@v4
