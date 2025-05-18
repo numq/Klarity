@@ -57,7 +57,7 @@ jobs:
       - name: Configure project (Linux)
         if: matrix.triplet == 'arm64-linux' || matrix.triplet == 'x64-linux'
         run: |
-          cmake -B library\src\main\cpp\build -S library\src\main\cpp \
+          cmake -B "library\src\main\cpp\build" -S "library\src\main\cpp" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
@@ -67,7 +67,7 @@ jobs:
         if: matrix.triplet != 'arm64-linux' && matrix.triplet != 'x64-linux'
         shell: bash
         run: |
-          cmake -B library\src\main\cpp\build -S library\src\main\cpp \
+          cmake -B "library\src\main\cpp\build" -S "library\src\main\cpp" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}\scripts\buildsystems\vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
