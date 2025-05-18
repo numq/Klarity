@@ -45,14 +45,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          ./vcpkg/vcpkg install --x-manifest-root=${{ github.workspace }}/core/src/main/cpp 
+          ./vcpkg/vcpkg install --x-manifest-root=${{ github.workspace }}/library/src/main/cpp 
 
       - name: List installed files
         run: |
-          find ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }} -type f
+          find ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/${{ matrix.triplet }} -type f
 
       - name: Upload dependencies
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}/core/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/
+          path: ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/
