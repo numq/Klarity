@@ -1,16 +1,11 @@
-name: Build libplacebo
+name: Build libplacebo (Windows)
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: [ windows-latest ]
-    #          - os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -23,7 +18,7 @@ jobs:
       - name: Set up dependencies
         shell: bash
         run: |
-          pip install meson ninja
+          pip install meson ninja glad2
           git clone https://github.com/Microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
           ./vcpkg/vcpkg install glfw3 opengl
@@ -33,29 +28,38 @@ jobs:
         working-directory: ./libplacebo
         run: |
           meson setup builddir \
-          --buildtype=release \
-          --default-library=static \
-          -Dd3d11=disabled \
-          -Ddemos=false \
-          -Dglslang=disabled \
-          -Dlcms=disabled \
-          -Dopengl=enabled \
-          -Dshaderc=disabled \
-          -Dunwind=disabled \
-          -Dvulkan=disabled
+            --buildtype=release \
+            --default-library=static \
+            --prefix="$RUNNER_TEMP/libplacebo-install" \
+            -Dd3d11=disabled \
+            -Ddemos=false \
+            -Dglslang=disabled \
+            -Dlcms=disabled \
+            -Dopengl=enabled \
+            -Dshaderc=disabled \
+            -Dunwind=disabled \
+            -Dvulkan=disabled
           
           meson compile -C builddir
+          meson install -C builddir
 
       - name: Package artifacts
         shell: bash
-        working-directory: ./libplacebo/builddir
         run: |
-          mkdir -p /tmp/libplacebo-artifacts
-          find . -name '*.a' -o -name '*.lib' -exec cp {} /tmp/libplacebo-artifacts \;
-          cp -r ../src/include /tmp/libplacebo-artifacts/
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          
+          if [[ -d "$RUNNER_TEMP/libplacebo-install" ]]; then
+            cp -r "$RUNNER_TEMP/libplacebo-install"/* "$GITHUB_WORKSPACE/artifacts/"
+          fi
+          
+          if [[ -d "libplacebo/builddir" ]]; then
+            find libplacebo/builddir -name '*.a' -o -name '*.lib' -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
+            cp -r libplacebo/src/include "$GITHUB_WORKSPACE/artifacts/"
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: libplacebo-windows
-          path: /tmp/libplacebo-artifacts/*
+          path: "$GITHUB_WORKSPACE/artifacts"
+          if-no-files-found: error
