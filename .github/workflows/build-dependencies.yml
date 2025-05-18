@@ -54,26 +54,45 @@ jobs:
       #            --x-manifest-root=${{ github.workspace }}\library\src\main\cpp ^
       #            --x-install-root=${{ github.workspace }}\library\src\main\cpp\vcpkg_installed
 
-      - name: Configure project (Linux)
-        if: matrix.triplet == 'arm64-linux' || matrix.triplet == 'x64-linux'
+      - name: Configure project (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: cmd
         run: |
-          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          cmake -B library\src\main\cpp\build -S library\src\main\cpp ^
+          -DCMAKE_BUILD_TYPE=Release ^
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
-      - name: Configure project (Non-Linux)
-        if: matrix.triplet != 'arm64-linux' && matrix.triplet != 'x64-linux'
+      - name: Configure project (macOS)
+        if: matrix.os == 'macos-13'
         shell: bash
         run: |
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
-      - name: Build project
-        run: cmake --build library\src\main\cpp\build --config Release --parallel
+      - name: Configure project (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+
+      - name: Build project (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          cmake --build library\src\main\cpp\build --config Release --parallel
+
+      - name: Build project (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          cmake --build library/src/main/cpp/build --config Release --parallel
 
       #      - name: Upload dependencies
       #        uses: actions/upload-artifact@v4
