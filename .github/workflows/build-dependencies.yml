@@ -59,7 +59,7 @@ jobs:
         run: |
           cmake -B "library\src\main\cpp\build" -S "library\src\main\cpp" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
@@ -69,7 +69,7 @@ jobs:
         run: |
           cmake -B "library\src\main\cpp\build" -S "library\src\main\cpp" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}\scripts\buildsystems\vcpkg.cmake \
+            -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}\scripts\buildsystems\vcpkg.cmake" \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Build project
