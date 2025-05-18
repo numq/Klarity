@@ -12,17 +12,17 @@ jobs:
           - os: windows-latest
             triplet: x64-windows-static
 
-          - os: macos-latest-arm64
-            triplet: arm64-osx
-
-          - os: macos-13
-            triplet: x64-osx
-
-          - os: ubuntu-latest-arm64
-            triplet: arm64-linux
-
-          - os: ubuntu-latest
-            triplet: x64-linux
+#          - os: macos-latest-arm64
+#            triplet: arm64-osx
+#
+#          - os: macos-13
+#            triplet: x64-osx
+#
+#          - os: ubuntu-latest-arm64
+#            triplet: arm64-linux
+#
+#          - os: ubuntu-latest
+#            triplet: x64-linux
 
     steps:
       - name: Checkout repository
@@ -58,4 +58,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}/library/src/main/cpp/vcpkg_installed/${{ matrix.triplet }}/
+          path: ${{ github.workspace }}\library\src\main\cpp\vcpkg_installed\${{ matrix.triplet }}\**
