@@ -75,9 +75,9 @@ jobs:
 
       - name: Copy binaries (Windows)
         if: matrix.os == 'windows-latest'
-        shell: cmd
+        shell: bash
         run: |
-          cp library\src\main\cpp\build\Release\klarity.dll library/src/main/resources/bin/
+          cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/
 
       - name: Copy binaries (macOS)
         if: matrix.os == 'macos-13'
@@ -91,6 +91,12 @@ jobs:
         run: |
           cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/
 
+      - name: Make binaries executable (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          chmod +x library/src/main/resources/bin/* || true
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -100,12 +106,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Make Gradle wrapper executable (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          chmod +x gradlew
+
       - name: Make JARs
         run: ./gradlew :library:jar -x test --no-daemon
 
       - name: Clean up resources
-        run: |
-          rm -rf library/src/main/resources/bin
+        shell: bash
+        run: rm -rf library/src/main/resources/bin
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
