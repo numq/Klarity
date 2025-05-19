@@ -73,63 +73,23 @@ jobs:
         run: |
           cmake --build library/src/main/cpp/build --config Release --parallel
 
-      #      - name: Upload artifact (Windows)
-      #        if: runner.os == 'Windows'
-      #        uses: actions/upload-artifact@v4
-      #        with:
-      #          name: ${{ matrix.triplet }}
-      #          path: ${{ github.workspace }}\library\src\main\cpp\build\Release\klarity.dll
-      #
-      #      - name: Upload artifact (macOS)
-      #        if: matrix.os == 'macos-13'
-      #        uses: actions/upload-artifact@v4
-      #        with:
-      #          name: ${{ matrix.triplet }}
-      #          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.dylib
-      #
-      #      - name: Upload artifact (Linux)
-      #        if: matrix.os == 'ubuntu-latest'
-      #        uses: actions/upload-artifact@v4
-      #        with:
-      #          name: ${{ matrix.triplet }}
-      #          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.so
-
-      - name: Copy native binary to resources
-        run: |
-          mkdir -p library/src/main/resources/bin
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/
-          elif [[ "${{ matrix.os }}" == "macos-13" ]]; then
-            cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/
-          else
-            cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/
-          fi
-
-      - name: Make binaries executable
-        if: matrix.triplet != 'x64-windows'
-        run: chmod +x library/src/main/resources/bin/* || true
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 17.0.15+6
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
-      - name: Build JARs
-        run: ./gradlew :library:jar -x test --no-daemon
-
-      - name: Clean up resources
-        run: |
-          rm -rf library/src/main/resources/bin
-
-      - name: Upload artifact
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.triplet }}
-          path: ${{ github.workspace }}/library/build/libs/klarity-${{ matrix.suffix }}.jar
+          path: ${{ github.workspace }}\library\src\main\cpp\build\Release\klarity.dll
+
+      - name: Upload artifact (macOS)
+        if: matrix.os == 'macos-13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.triplet }}
+          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.dylib
+
+      - name: Upload artifact (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.triplet }}
+          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.so
