@@ -28,9 +28,11 @@ import io.github.numq.klarity.renderer.compose.Foreground
 import io.github.numq.klarity.renderer.compose.ImageScale
 import io.github.numq.klarity.renderer.compose.RendererComponent
 import io.github.numq.klarity.state.PlayerState
-import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import notification.Notification
 
 @Composable
@@ -51,66 +53,44 @@ fun UploadedHubItem(
 
     val hoverInteractionSource = remember { MutableInteractionSource() }
 
-    var previewJob by remember { mutableStateOf<Job?>(null) }
+    var snapshotIndex by remember { mutableIntStateOf(0) }
 
-    var snapshotIndex by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        hoverInteractionSource.interactions.collectLatest { interaction ->
+            when (interaction) {
+                is HoverInteraction.Enter -> if (state is PlayerState.Ready.Stopped) {
+                    while (isActive) {
+                        snapshotIndex = (snapshotIndex + 1) % hubItem.snapshots.size
 
-    LaunchedEffect(state) {
-        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
-
-        when (val currentState = state) {
-            is PlayerState.Ready -> {
-                hubItem.renderer?.let { renderer ->
-                    renderer.withCache { cache ->
-                        if (cache.size > 1) {
-                            previewJob?.cancel()
-
-                            previewJob = launch(Dispatchers.Default) {
-                                hoverInteractionSource.interactions.collectLatest { interaction ->
-                                    when (interaction) {
-                                        is HoverInteraction.Enter -> {
-                                            while (isActive) {
-                                                snapshotIndex = (snapshotIndex + 1) % cache.size
-
-                                                delay(500L)
-                                            }
-                                        }
-
-                                        is HoverInteraction.Exit -> {
-                                            snapshotIndex = 0
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        delay(500L)
                     }
                 }
 
-                when (currentState) {
-                    is PlayerState.Ready.Paused, is PlayerState.Ready.Stopped, is PlayerState.Ready.Completed -> {
-                        if (currentState is PlayerState.Ready.Completed) {
-                            hubItem.player.stop().getOrThrow()
-                        }
-                    }
-
-                    else -> Unit
+                is HoverInteraction.Exit -> {
+                    snapshotIndex = 0
                 }
-            }
-
-            else -> {
-                previewJob?.cancel()
-
-                previewJob = null
             }
         }
     }
 
+    LaunchedEffect(state) {
+        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
+
+        when (state) {
+            is PlayerState.Ready.Playing -> {
+                snapshotIndex = 0
+            }
+
+            is PlayerState.Ready.Completed -> hubItem.player.stop().getOrThrow()
+
+            else -> Unit
+        }
+    }
+
     LaunchedEffect(snapshotIndex) {
-        hubItem.renderer?.let { renderer ->
-            renderer.withCache { cache ->
-                cache.getOrNull(snapshotIndex)?.let { cachedFrame ->
-                    renderer.render(cachedFrame).getOrThrow()
-                }
+        if (state !is PlayerState.Ready.Playing) {
+            hubItem.snapshots.getOrNull(snapshotIndex)?.let { frame ->
+                hubItem.renderer?.render(frame)?.getOrThrow()
             }
         }
     }
@@ -127,45 +107,41 @@ fun UploadedHubItem(
                 modifier = Modifier.fillMaxSize().aspectRatio(1f).hoverable(
                     interactionSource = hoverInteractionSource, enabled = state !is PlayerState.Ready.Playing
                 ).pointerInput(maxWidth, maxHeight, state) {
-                    detectTapGestures(
-                        onTap = {
-                            coroutineScope.launch {
-                                with(hubItem.player) {
-                                    when (state) {
-                                        is PlayerState.Empty -> play().getOrThrow()
+                    detectTapGestures(onTap = {
+                        coroutineScope.launch {
+                            with(hubItem.player) {
+                                when (state) {
+                                    is PlayerState.Empty -> play().getOrThrow()
 
-                                        is PlayerState.Ready.Playing -> stop().getOrThrow()
+                                    is PlayerState.Ready.Playing -> stop().getOrThrow()
 
-                                        is PlayerState.Ready.Stopped -> play().getOrThrow()
+                                    is PlayerState.Ready.Stopped -> play().getOrThrow()
 
-                                        is PlayerState.Ready.Completed -> {
-                                            stop().getOrThrow()
-                                            play().getOrThrow()
-                                        }
-
-                                        else -> Unit
+                                    is PlayerState.Ready.Completed -> {
+                                        stop().getOrThrow()
+                                        play().getOrThrow()
                                     }
+
+                                    else -> Unit
                                 }
-                            }
-                        },
-                        onPress = {
-                            awaitRelease()
-                            hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
-                        },
-                        onLongPress = { (x, y) ->
-                            if (state is PlayerState.Ready.Playing) {
-                                val playbackSpeedFactor =
-                                    if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) 0.5f else 2f
-                                coroutineScope.launch {
-                                    hubItem.player.changeSettings(
-                                        settings = settings.copy(playbackSpeedFactor = playbackSpeedFactor)
-                                    ).getOrThrow()
-                                }
-                            } else {
-                                delete()
                             }
                         }
-                    )
+                    }, onPress = {
+                        awaitRelease()
+                        hubItem.player.changeSettings(settings.copy(playbackSpeedFactor = 1f)).getOrThrow()
+                    }, onLongPress = { (x, y) ->
+                        if (state is PlayerState.Ready.Playing) {
+                            val playbackSpeedFactor =
+                                if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) 0.5f else 2f
+                            coroutineScope.launch {
+                                hubItem.player.changeSettings(
+                                    settings = settings.copy(playbackSpeedFactor = playbackSpeedFactor)
+                                ).getOrThrow()
+                            }
+                        } else {
+                            delete()
+                        }
+                    })
                 }, contentAlignment = Alignment.Center
             ) {
                 when (state) {
@@ -175,10 +151,8 @@ fun UploadedHubItem(
 
                             else -> hubItem.renderer?.let {
                                 RendererComponent(
-                                    modifier = Modifier.fillMaxSize(),
-                                    foreground = Foreground(
-                                        renderer = it,
-                                        imageScale = ImageScale.Crop
+                                    modifier = Modifier.fillMaxSize(), foreground = Foreground(
+                                        renderer = it, imageScale = ImageScale.Crop
                                     )
                                 )
                             } ?: Icon(Icons.Default.BrokenImage, null)
@@ -190,13 +164,9 @@ fun UploadedHubItem(
                                 contentAlignment = Alignment.BottomStart
                             ) {
                                 Text(
-                                    "$playbackTimestamp",
-                                    modifier = Modifier.padding(8.dp),
-                                    style = TextStyle(
+                                    "$playbackTimestamp", modifier = Modifier.padding(8.dp), style = TextStyle(
                                         drawStyle = Stroke(
-                                            miter = 2f,
-                                            width = 1f,
-                                            join = StrokeJoin.Round
+                                            miter = 2f, width = 1f, join = StrokeJoin.Round
                                         )
                                     )
                                 )
@@ -204,8 +174,7 @@ fun UploadedHubItem(
 
                             if (settings.playbackSpeedFactor != 1f) {
                                 Box(
-                                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                                    contentAlignment = Alignment.Center
+                                    modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         "Playing on ${
@@ -215,8 +184,7 @@ fun UploadedHubItem(
                                                 color = Color.Black.copy(alpha = .5f),
                                                 cornerRadius = CornerRadius(16f, 16f)
                                             )
-                                        }.padding(8.dp),
-                                        color = Color.White
+                                        }.padding(8.dp), color = Color.White
                                     )
                                 }
                             }

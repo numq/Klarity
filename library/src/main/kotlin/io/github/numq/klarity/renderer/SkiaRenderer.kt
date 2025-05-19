@@ -2,57 +2,112 @@ package io.github.numq.klarity.renderer
 
 import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.frame.Frame
-import kotlinx.coroutines.flow.StateFlow
-import org.jetbrains.skia.Surface
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.jetbrains.skia.*
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.nanoseconds
 
-/**
- * A renderer implementation using Skia for drawing video frames.
- */
-interface SkiaRenderer : Renderer {
-    /**
-     * A state flow that emits the current generation ID of the rendered surface.
-     * Changes when the surface is updated or cleared.
-     */
-    val generationId: StateFlow<Int>
-
-    /**
-     * Indicates whether the renderer currently draws nothing (e.g. after a flush or before rendering).
-     *
-     * @return true if no frame is currently rendered, false otherwise.
-     */
-    fun drawsNothing(): Boolean
-
-    /**
-     * Draws directly to the Skia surface using the provided callback.
-     *
-     * @param callback A function that receives the surface for custom drawing.
-     */
-    fun draw(callback: (Surface) -> Unit)
-
-    /**
-     * Provides access to cached frames, returning the result of the given callback.
-     *
-     * @param callback Suspend function that receives a list of cached frames and returns a result.
-     * @return The result returned by the callback.
-     */
-    suspend fun <T> withCache(callback: suspend (List<Frame.Content.Video>) -> T): T
-
-    /**
-     * Flushes the Skia surface, finalizing any pending draw operations, resets the generation ID.
-     *
-     * @return A [Result] indicating success or failure of the operation.
-     */
-    suspend fun flush(): Result<Unit>
-
+internal class SkiaRenderer(
+    override val format: VideoFormat
+) : Renderer {
     companion object {
-        /**
-         * Factory method to create a [SkiaRenderer] for a given video format.
-         *
-         * @param format The target video format.
-         * @return A [Result] containing either a new [SkiaRenderer] instance or an error if creation fails.
-         */
-        fun create(format: VideoFormat): Result<SkiaRenderer> = runCatching {
-            DefaultSkiaRenderer(format = format)
+        const val DRAWS_NOTHING_ID = 0
+    }
+
+    private val isClosed = AtomicBoolean(false)
+
+    private val renderMutex = Mutex()
+
+    private val imageInfo = ImageInfo(
+        width = format.width,
+        height = format.height,
+        colorType = ColorType.BGRA_8888,
+        alphaType = ColorAlphaType.UNPREMUL
+    )
+
+    private val pixmap = Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes)
+
+    private val surface = Surface.makeRaster(imageInfo)
+
+    private val minByteSize by lazy { imageInfo.computeMinByteSize() }
+
+    private fun isRenderable(frame: Frame.Content.Video) =
+        !isClosed.get() && !surface.isClosed && !pixmap.isClosed && !frame.data.isClosed && frame.data.size >= minByteSize
+
+    private fun isFlushable() = !isClosed.get() && !surface.isClosed && !pixmap.isClosed
+
+    private val _generationId = MutableStateFlow(DRAWS_NOTHING_ID)
+
+    override val generationId = _generationId.asStateFlow()
+
+    override fun drawsNothing() = _generationId.value == DRAWS_NOTHING_ID
+
+    override fun draw(callback: (Surface) -> Unit) {
+        if (isClosed.get() || surface.isClosed || pixmap.isClosed) {
+            return
+        }
+
+        callback(surface)
+    }
+
+    override suspend fun render(frame: Frame.Content.Video) = renderMutex.withLock {
+        runCatching {
+            if (!isRenderable(frame)) {
+                return@runCatching
+            }
+
+            frame.onRenderStart?.invoke()
+
+            val startTime = System.nanoTime().nanoseconds
+
+            pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
+
+            surface.writePixels(pixmap, 0, 0)
+
+            val renderTime = System.nanoTime().nanoseconds - startTime
+
+            frame.onRenderComplete?.invoke(renderTime)
+        }.onFailure {
+            _generationId.value = DRAWS_NOTHING_ID
+        }.onSuccess {
+            if (!surface.isClosed) {
+                _generationId.value = surface.generationId
+            }
+        }
+    }
+
+    override suspend fun flush() = renderMutex.withLock {
+        runCatching {
+            if (isFlushable()) {
+                return@runCatching
+            }
+
+            pixmap.reset()
+
+            surface.flush()
+        }.onSuccess {
+            _generationId.value = DRAWS_NOTHING_ID
+        }
+    }
+
+    override suspend fun close() = renderMutex.withLock {
+        runCatching {
+            if (!isClosed.compareAndSet(false, true)) {
+                return@runCatching
+            }
+
+            if (!surface.isClosed) {
+                surface.close()
+            }
+
+            if (!pixmap.isClosed) {
+                pixmap.close()
+            }
+        }.onSuccess {
+            _generationId.value = DRAWS_NOTHING_ID
         }
     }
 }

@@ -1,5 +1,5 @@
 package io.github.numq.klarity.renderer.compose
 
-import io.github.numq.klarity.renderer.SkiaRenderer
+import io.github.numq.klarity.renderer.Renderer
 
-data class Foreground(val renderer: SkiaRenderer, val imageScale: ImageScale = ImageScale.Fit)
+data class Foreground(val renderer: Renderer, val imageScale: ImageScale = ImageScale.Fit)

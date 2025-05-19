@@ -13,7 +13,7 @@ import kotlin.time.Duration
  */
 interface PreviewManager {
     /**
-     * Video format of the media used
+     * Video format of the media used.
      */
     val format: VideoFormat
 

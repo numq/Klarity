@@ -31,21 +31,18 @@ import io.github.numq.klarity.preview.PreviewManager
 import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.queue.MediaQueue
 import io.github.numq.klarity.queue.SelectedItem
-import io.github.numq.klarity.renderer.SkiaRenderer
+import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.renderer.compose.Background
 import io.github.numq.klarity.renderer.compose.Foreground
 import io.github.numq.klarity.renderer.compose.RendererComponent
 import io.github.numq.klarity.snapshot.SnapshotManager
 import io.github.numq.klarity.state.PlayerState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import notification.Notification
 import remote.RemoteUploadingDialog
 import java.io.File
@@ -105,21 +102,15 @@ fun PlaylistScreenSuccess(
                 queue.add(pendingItem)
 
                 ProbeManager.probe(pendingItem.location).mapCatching { media ->
-                    val renderer = media.videoFormat?.let(SkiaRenderer::create)?.mapCatching { renderer ->
-                        SnapshotManager.snapshot(location = media.location, renderer = renderer).getOrThrow()
+                    val renderer = media.videoFormat?.let(Renderer::create)?.getOrThrow()
 
-                        renderer
-                    }?.mapCatching { renderer ->
-                        renderer.withCache { cache ->
-                            cache.firstOrNull()?.let { cachedFrame ->
-                                renderer.render(cachedFrame).getOrThrow()
-                            }
-                        }
+                    val preview = SnapshotManager.snapshot(location = media.location).getOrThrow()
 
-                        renderer
-                    }?.getOrThrow()
+                    if (preview != null) {
+                        renderer?.render(preview)
+                    }
 
-                    val uploadedItem = PlaylistItem.Uploaded(media = media, renderer = renderer)
+                    val uploadedItem = PlaylistItem.Uploaded(media = media, renderer = renderer, preview = preview)
 
                     queue.replace(pendingItem, uploadedItem)
                 }.onFailure(::handleException).onFailure {
@@ -138,7 +129,7 @@ fun PlaylistScreenSuccess(
                 player.close().getOrThrow()
 
                 items.filterIsInstance<PlaylistItem.Uploaded>().forEach { item ->
-                    item.renderer?.close()?.getOrThrow()
+                    item.close()
                 }
             }
         }
@@ -227,7 +218,9 @@ fun PlaylistScreenSuccess(
                 is PlaylistItem.Uploaded -> {
                     queue.delete(playlistItem)
 
-                    playlistItem.renderer?.close()?.getOrThrow()
+                    withContext(Dispatchers.IO) {
+                        playlistItem.close()
+                    }
                 }
             }
         }
@@ -303,9 +296,13 @@ fun PlaylistScreenSuccess(
                             }
 
                             val playerRenderer = remember(format) {
-                                format?.let(SkiaRenderer::create)?.mapCatching { renderer ->
+                                format?.let(Renderer::create)?.mapCatching { renderer ->
                                     runBlocking {
-                                        SnapshotManager.snapshot(currentState.media.location, renderer).getOrThrow()
+                                        SnapshotManager.snapshot(
+                                            location = currentState.media.location
+                                        ).getOrThrow()?.let { frame ->
+                                            renderer.render(frame).getOrThrow()
+                                        }
                                     }
 
                                     renderer
@@ -317,7 +314,7 @@ fun PlaylistScreenSuccess(
                             }
 
                             val previewRenderer = remember(format) {
-                                previewManager?.format?.let(SkiaRenderer::create)?.getOrNull()
+                                previewManager?.format?.let(Renderer::create)?.getOrNull()
                                     ?.also(previewManager::attachRenderer)
                             }
 
@@ -335,11 +332,9 @@ fun PlaylistScreenSuccess(
 
                             LaunchedEffect(state) {
                                 if (state is PlayerState.Ready.Stopped) {
-                                    playerRenderer?.let { renderer ->
-                                        renderer.withCache { cache ->
-                                            cache.firstOrNull()?.let { cachedFrame ->
-                                                renderer.render(cachedFrame).getOrThrow()
-                                            }
+                                    ((selectedItem as? SelectedItem.Present)?.item as? PlaylistItem.Uploaded)?.run {
+                                        preview?.let { frame ->
+                                            playerRenderer?.render(frame)?.getOrThrow()
                                         }
                                     }
                                 }

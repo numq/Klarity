@@ -6,7 +6,6 @@
 #include <optional>
 #include <shared_mutex>
 #include <string>
-#include <thread>
 #include "deleter.h"
 #include "exception.h"
 #include "format.h"
@@ -22,6 +21,8 @@ extern "C" {
 class Decoder {
 private:
     std::shared_mutex mutex;
+
+    const int THREAD_COUNT = 2;
 
     const AVSampleFormat targetSampleFormat = AV_SAMPLE_FMT_FLT;
 
@@ -62,8 +63,6 @@ private:
     std::unique_ptr<AVFrame, AVFrameDeleter> hwVideoFrame;
 
     std::vector<uint8_t> audioBuffer;
-
-    std::map<int64_t, int64_t> keyframeCache;
 
 public:
     static AVPixelFormat _getHardwareAccelerationFormat(

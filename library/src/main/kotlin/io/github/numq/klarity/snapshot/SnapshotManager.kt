@@ -3,8 +3,6 @@ package io.github.numq.klarity.snapshot
 import io.github.numq.klarity.decoder.VideoDecoderFactory
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
-import io.github.numq.klarity.pool.PoolFactory
-import io.github.numq.klarity.renderer.Renderer
 import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
@@ -12,8 +10,6 @@ import kotlin.time.Duration
  * Provides frame capture functionality for video media at specified timestamps.
  */
 object SnapshotManager {
-    private const val POOL_CAPACITY = 1
-
     /**
      * Captures multiple video frames at specified timestamps.
      *
@@ -21,57 +17,50 @@ object SnapshotManager {
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
      * @param timestamps A function that provides a media duration that can be used to construct desired timestamps
-     * @return [Result] Indicating success or containing failure information
+     * @return [Result] Containing a list of [Frame.Content.Video] that should be closed, otherwise failure information
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshots(
         location: String,
-        renderer: Renderer,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestamps: (duration: Duration) -> (List<Duration>) = { listOf(Duration.ZERO) },
-    ) = VideoDecoderFactory().create(
+    ): Result<List<Frame.Content.Video>> = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(
-            location = location,
-            hardwareAccelerationCandidates = hardwareAccelerationCandidates
+            location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     ).mapCatching { decoder ->
-        val validTimestamps = timestamps(decoder.media.duration).distinct().filter {
-            it in Duration.ZERO..decoder.media.duration
-        }
+        val frames = mutableListOf<Frame.Content.Video>()
 
-        if (validTimestamps.isNotEmpty()) {
-            PoolFactory().create(
-                parameters = PoolFactory.Parameters(
-                    poolCapacity = POOL_CAPACITY,
-                    createData = {
-                        Data.makeUninitialized(decoder.media.videoFormat.bufferCapacity)
-                    }
-                )
-            ).mapCatching { pool ->
-                try {
-                    validTimestamps.forEach { timestamp ->
-                        if (timestamp.isPositive()) {
-                            decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
-                        }
+        try {
+            timestamps(decoder.media.duration).filter {
+                it in Duration.ZERO..decoder.media.duration
+            }.forEach { timestamp ->
+                decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
 
-                        val data = pool.acquire().getOrThrow()
+                var frame: Frame.Content.Video? = null
 
-                        try {
-                            (decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video)?.let { frame ->
-                                renderer.save(frame).getOrThrow()
-                            }
-                        } finally {
-                            pool.release(item = data).getOrThrow()
+                Data.makeUninitialized(decoder.media.videoFormat.bufferCapacity).let { data ->
+                    try {
+                        frame = (decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video)
+                    } finally {
+                        if (frame == null) {
+                            data.close()
                         }
                     }
-                } finally {
-                    decoder.close().getOrThrow()
-
-                    pool.close().getOrThrow()
                 }
+
+                frame?.let(frames::add)
             }
+        } catch (t: Throwable) {
+            frames.forEach(Frame.Content.Video::close)
+
+            throw t
+        } finally {
+            decoder.close()
         }
+
+        frames
     }.recoverCatching { t ->
         throw SnapshotManagerException(t)
     }
@@ -83,21 +72,19 @@ object SnapshotManager {
      * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
      * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
      * @param timestamp A function that provides a media duration that can be used to construct desired timestamp
-     * @return [Result] Indicating success or containing failure information
+     * @return [Result] Containing a [Frame.Content.Video] that should be closed or null, otherwise failure information
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshot(
         location: String,
-        renderer: Renderer,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
-    ) = snapshots(
+    ): Result<Frame.Content.Video?> = snapshots(
         location = location,
-        renderer = renderer,
         keyframesOnly = keyframesOnly,
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,
         timestamps = { duration ->
             listOf(timestamp(duration))
-        })
+        }).mapCatching { snapshots -> snapshots.firstOrNull() }
 }

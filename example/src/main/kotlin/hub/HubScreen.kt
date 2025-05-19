@@ -19,7 +19,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.unit.dp
 import io.github.numq.klarity.player.KlarityPlayer
 import io.github.numq.klarity.probe.ProbeManager
-import io.github.numq.klarity.renderer.SkiaRenderer
+import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.snapshot.SnapshotManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -56,9 +56,7 @@ fun HubScreen(
                 awaitAll(
                     *hubItems.filterIsInstance<HubItem.Uploaded>().map { hubItem ->
                         async {
-                            hubItem.player.close().getOrThrow()
-
-                            hubItem.renderer?.close()?.getOrThrow()
+                            hubItem.close()
                         }
                     }.toTypedArray()
                 )
@@ -76,20 +74,18 @@ fun HubScreen(
                     player.prepare(location = media.location).getOrThrow()
 
                     val renderer = media.videoFormat?.let { format ->
-                        SkiaRenderer.create(format = format).mapCatching { renderer ->
-                            val maxSnapshots = 10
-
-                            SnapshotManager.snapshots(location = media.location, renderer = renderer, timestamps = {
-                                (0..maxSnapshots).map {
-                                    (media.duration * it) / (maxSnapshots - 1)
-                                }
-                            }).getOrThrow()
-
-                            renderer
-                        }.onSuccess(player::attachRenderer).getOrThrow()
+                        Renderer.create(format = format).onSuccess(player::attachRenderer).getOrThrow()
                     }
 
-                    HubItem.Uploaded(player = player, renderer = renderer)
+                    val maxSnapshots = 10
+
+                    val snapshots = SnapshotManager.snapshots(location = media.location, timestamps = {
+                        (0..maxSnapshots).map {
+                            (media.duration * it) / (maxSnapshots - 1)
+                        }
+                    }).getOrThrow()
+
+                    HubItem.Uploaded(player = player, renderer = renderer, snapshots = snapshots)
                 }.onSuccess { uploadedItem ->
                     hubItems = hubItems.map { if (it.id == pendingItem.id) uploadedItem else it }
                 }.onFailure {
@@ -123,10 +119,8 @@ fun HubScreen(
         } else if (hubItem is HubItem.Uploaded) {
             hubItems = hubItems.filterNot { item -> item is HubItem.Uploaded && item.id == hubItem.id }
 
-            coroutineScope.launch {
-                hubItem.player.close().getOrThrow()
-
-                hubItem.renderer?.close()?.getOrThrow()
+            coroutineScope.launch(Dispatchers.IO) {
+                hubItem.close()
             }
         }
     }
@@ -193,14 +187,10 @@ fun HubScreen(
                     ) {
                         when (hubItem) {
                             is HubItem.Pending -> PendingHubItem(
-                                hubItem = hubItem,
-                                delete = { deleteHubItem(hubItem) }
-                            )
+                                hubItem = hubItem, delete = { deleteHubItem(hubItem) })
 
                             is HubItem.Uploaded -> UploadedHubItem(
-                                hubItem = hubItem,
-                                delete = { deleteHubItem(hubItem) },
-                                notify = notify
+                                hubItem = hubItem, delete = { deleteHubItem(hubItem) }, notify = notify
                             )
                         }
                     }

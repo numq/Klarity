@@ -295,6 +295,15 @@ Decoder::Decoder(
                     throw DecoderException("Could not open audio decoder");
                 }
 
+                format.durationMicros = std::max(
+                        format.durationMicros,
+                        av_rescale_q(
+                                audioStream->duration,
+                                audioStream->time_base,
+                                {1, AV_TIME_BASE}
+                        )
+                );
+
                 format.sampleRate = audioCodecContext->sample_rate;
 
                 format.channels = audioCodecContext->ch_layout.nb_channels;
@@ -370,11 +379,11 @@ Decoder::Decoder(
                         if (videoDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
                             videoCodecContext->thread_type = FF_THREAD_FRAME;
 
-                            videoCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                            videoCodecContext->thread_count = THREAD_COUNT;
                         } else if (videoDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
                             videoCodecContext->thread_type = FF_THREAD_SLICE;
 
-                            videoCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                            videoCodecContext->thread_count = THREAD_COUNT;
                         }
                     } else {
                         format.frameRate = 0.0;
@@ -385,6 +394,15 @@ Decoder::Decoder(
                 if (avcodec_open2(videoCodecContext.get(), videoDecoder, nullptr) < 0) {
                     throw DecoderException("Could not open video decoder");
                 }
+
+                format.durationMicros = std::max(
+                        format.durationMicros,
+                        av_rescale_q(
+                                videoStream->duration,
+                                videoStream->time_base,
+                                {1, AV_TIME_BASE}
+                        )
+                );
 
                 format.width = videoCodecContext->width;
 
@@ -666,58 +684,21 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         return 0;
     }
 
-    int streamIndex = (audioStream ? audioStream : videoStream)->index;
-
-    if (keyframesOnly && !keyframeCache.empty()) {
-        auto it = keyframeCache.lower_bound(timestampMicros);
-
-        if (it != keyframeCache.begin() &&
-            (it == keyframeCache.end() || timestampMicros - std::prev(it)->first < it->first - timestampMicros)) {
-            --it;
-        }
-
-        const auto cachedTimestamp = it->second;
-
-        const auto cachedTarget = av_rescale_q(
-                cachedTimestamp,
-                {1, AV_TIME_BASE},
-                formatContext->streams[streamIndex]->time_base
-        );
-
-        if (av_seek_frame(formatContext.get(), streamIndex, cachedTarget, AVSEEK_FLAG_BACKWARD) >= 0) {
-            return cachedTimestamp;
-        }
-    }
-
-    const auto targetTimestamp = av_rescale_q(
-            timestampMicros,
-            {1, AV_TIME_BASE},
-            formatContext->streams[streamIndex]->time_base
-    );
-
     int seekFlags = AVSEEK_FLAG_BACKWARD;
 
     if (!keyframesOnly) {
         seekFlags |= AVSEEK_FLAG_ANY;
     }
 
-    if (keyframesOnly) {
-        if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
-            throw DecoderException("Error seeking to timestamp: " + std::to_string(timestampMicros));
-        }
-
-        keyframeCache[timestampMicros] = targetTimestamp;
-
-        return timestampMicros;
-    }
+    int streamIndex = (videoStream ? videoStream : audioStream)->index;
 
     int64_t low = 0;
 
     int64_t high = format.durationMicros;
 
-    int64_t best_match = timestampMicros;
+    int64_t bestMatch = timestampMicros;
 
-    const int MAX_SEEK_ATTEMPTS = 5;
+    const int MAX_SEEK_ATTEMPTS = keyframesOnly ? 1 : 5;
 
     int attempts = 0;
 
@@ -740,7 +721,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
         auto frame = av_frame_alloc();
 
-        const int MAX_FRAMES_TO_READ = 10;
+        const int MAX_FRAMES_TO_READ = keyframesOnly ? 1 : 10;
 
         int framesRead = 0;
 
@@ -770,8 +751,8 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
                                     {1, AV_TIME_BASE}
                             );
 
-                            if (abs(actualTimestamp - timestampMicros) < abs(best_match - timestampMicros)) {
-                                best_match = actualTimestamp;
+                            if (abs(actualTimestamp - timestampMicros) < abs(bestMatch - timestampMicros)) {
+                                bestMatch = actualTimestamp;
                             }
 
                             if (actualTimestamp < timestampMicros) {
@@ -796,7 +777,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     }
 
     const auto bestTimestamp = av_rescale_q(
-            best_match,
+            bestMatch,
             {1, AV_TIME_BASE},
             formatContext->streams[streamIndex]->time_base
     );
@@ -833,7 +814,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     audioBuffer.shrink_to_fit();
 
-    return best_match;
+    return bestMatch;
 }
 
 void Decoder::reset() {

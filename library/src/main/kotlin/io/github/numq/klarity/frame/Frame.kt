@@ -1,6 +1,7 @@
 package io.github.numq.klarity.frame
 
 import org.jetbrains.skia.Data
+import java.io.Closeable
 import kotlin.time.Duration
 
 sealed interface Frame {
@@ -8,8 +9,7 @@ sealed interface Frame {
         val timestamp: Duration
 
         data class Audio(
-            val bytes: ByteArray,
-            override val timestamp: Duration
+            val bytes: ByteArray, override val timestamp: Duration
         ) : Content {
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -31,13 +31,19 @@ sealed interface Frame {
         }
 
         data class Video(
-            val data: Data,
+            internal val data: Data,
             override val timestamp: Duration,
             val width: Int,
             val height: Int,
             val onRenderStart: (() -> Unit)? = null,
             val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
-        ) : Content
+        ) : Content, Closeable {
+            override fun close() {
+                if (!data.isClosed) {
+                    data.close()
+                }
+            }
+        }
     }
 
     data object EndOfStream : Frame
