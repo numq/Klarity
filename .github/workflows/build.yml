@@ -75,15 +75,21 @@ jobs:
 
       - name: Copy binaries (Windows)
         if: matrix.os == 'windows-latest'
-        run: cp library\src\main\cpp\build\Release\klarity.dll library/src/main/resources/bin/
+        shell: cmd
+        run: |
+          cp library\src\main\cpp\build\Release\klarity.dll library/src/main/resources/bin/
 
       - name: Copy binaries (macOS)
         if: matrix.os == 'macos-13'
-        run: cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/
+        shell: bash
+        run: |
+          cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/
 
       - name: Copy binaries (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/
+        shell: bash
+        run: |
+          cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
