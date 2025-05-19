@@ -34,7 +34,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          cmake -B library\src\main\cpp\build-${{ matrix.triplet }} -S library\src\main\cpp ^
+          cmake -B library\src\main\cpp\build -S library\src\main\cpp ^
           -DCMAKE_BUILD_TYPE=Release ^
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
@@ -43,7 +43,7 @@ jobs:
         if: matrix.os == 'macos-13'
         shell: bash
         run: |
-          cmake -B library/src/main/cpp/build-${{ matrix.triplet }} -S library/src/main/cpp \
+          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
@@ -52,7 +52,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
-          cmake -B library/src/main/cpp/build-${{ matrix.triplet }} -S library/src/main/cpp \
+          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
@@ -62,31 +62,31 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          cmake --build library\src\main\cpp\build-${{ matrix.triplet }} --config Release --parallel
+          cmake --build library\src\main\cpp\build --config Release --parallel
 
       - name: Build project (non-Windows)
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          cmake --build library/src/main/cpp/build-${{ matrix.triplet }} --config Release --parallel
+          cmake --build library/src/main/cpp/build --config Release --parallel
 
-      - name: Upload klarity.dll (Windows)
+      - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-binary
-          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\Release\klarity.dll
+          name: ${{ matrix.triplet }}
+          path: ${{ github.workspace }}\library\src\main\cpp\build\Release\klarity.dll
 
-      - name: Upload libklarity.dylib (macOS)
+      - name: Upload artifact (macOS)
         if: matrix.os == 'macos-13'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-binary
-          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/libklarity.dylib
+          name: ${{ matrix.triplet }}
+          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.dylib
 
-      - name: Upload libklarity.so (Linux)
+      - name: Upload artifact (Linux)
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-binary
-          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/libklarity.so
+          name: ${{ matrix.triplet }}
+          path: ${{ github.workspace }}/library/src/main/cpp/build/libklarity.so
