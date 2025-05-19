@@ -100,8 +100,16 @@ jobs:
       #          name: ${{ matrix.os }}-dependencies
       #          path: ${{ github.workspace }}\library\src\main\cpp\vcpkg_installed\${{ matrix.triplet }}\**
 
-      - name: Upload dependencies
+      - name: Upload dependencies (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\**
+          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\lib
+
+      - name: Upload dependencies (non-Windows)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-dependencies
+          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/lib
