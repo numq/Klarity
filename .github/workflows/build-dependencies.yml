@@ -122,14 +122,18 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build JARs
-        run: ./gradlew :klarity:jar -x test --no-daemon
+        run: ./gradlew :library:jar -x test --no-daemon
 
       - name: Clean up resources
         run: |
           rm -rf library/src/main/resources/bin
 
+      - name: Rename JAR
+        run: |
+          mv ${{ github.workspace }}/library/build/libs/library.jar ${{ github.workspace }}/library/build/libs/klarity-${{ matrix.os_suffix }}.jar
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.triplet }}
-          path: ${{ github.workspace }}/library/build/libs/core-${{ matrix.suffix }}.jar
+          path: ${{ github.workspace }}/library/build/libs/klarity-${{ matrix.suffix }}.jar
