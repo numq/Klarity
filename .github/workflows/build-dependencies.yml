@@ -30,22 +30,6 @@ jobs:
           git clone https://github.com/Microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
 
-      #      - name: Install dependencies (non-Windows)
-      #        if: runner.os != 'Windows'
-      #        shell: bash
-      #        run: |
-      #          ./vcpkg/vcpkg install \
-      #          --x-manifest-root=${{ github.workspace }}/library/src/main/cpp \
-      #          --x-install-root=${{ github.workspace }}/library/src/main/cpp/vcpkg_installed
-      #
-      #      - name: Install dependencies (Windows)
-      #        if: runner.os == 'Windows'
-      #        shell: cmd
-      #        run: |
-      #          .\vcpkg\vcpkg.exe install ^
-      #            --x-manifest-root=${{ github.workspace }}\library\src\main\cpp ^
-      #            --x-install-root=${{ github.workspace }}\library\src\main\cpp\vcpkg_installed
-
       - name: Configure project (Windows)
         if: matrix.os == 'windows-latest'
         shell: cmd
@@ -86,22 +70,23 @@ jobs:
         run: |
           cmake --build library/src/main/cpp/build-${{ matrix.triplet }} --config Release --parallel
 
-      #      - name: Upload dependencies
-      #        uses: actions/upload-artifact@v4
-      #        with:
-      #          name: ${{ matrix.os }}-dependencies
-      #          path: ${{ github.workspace }}\library\src\main\cpp\vcpkg_installed\${{ matrix.triplet }}\**
-
-      - name: Upload dependencies (Windows)
+      - name: Upload klarity.dll (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\
+          name: ${{ matrix.os }}-binary
+          path: ${{ github.workspace }}\library\src\main\cpp\build-${{ matrix.triplet }}\Release\klarity.dll
 
-      - name: Upload dependencies (non-Windows)
-        if: runner.os != 'Windows'
+      - name: Upload libklarity.dylib (macOS)
+        if: matrix.os == 'macos-13'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-dependencies
-          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/
+          name: ${{ matrix.os }}-binary
+          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/libklarity.dylib
+
+      - name: Upload libklarity.so (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-binary
+          path: ${{ github.workspace }}/library/src/main/cpp/build-${{ matrix.triplet }}/libklarity.so
