@@ -9,12 +9,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            triplet: x64-windows-static
-            suffix: x64-win
-          - os: macos-13
-            triplet: x64-osx
-            suffix: x64-osx
+          #          - os: windows-latest
+          #            triplet: x64-windows-static
+          #            suffix: x64-win
+          #          - os: macos-13
+          #            triplet: x64-osx
+          #            suffix: x64-osx
           - os: ubuntu-latest
             triplet: x64-linux
             suffix: x64-linux
@@ -26,7 +26,7 @@ jobs:
       - name: Download binaries
         uses: actions/download-artifact@v4
         with:
-          path: ${{ matrix.triplet }}
+          name: ${{ matrix.triplet }}
 
       - name: Create resources folder
         run: mkdir -p library/src/main/resources/bin
@@ -52,11 +52,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-
-      - name: Make binaries executable
-        run: chmod +x library/src/main/resources/bin/* || true
+      #      - name: Make Gradle wrapper executable
+      #        run: chmod +x gradlew
+      #
+      #      - name: Make binaries executable
+      #        run: chmod +x library/src/main/resources/bin/* || true
 
       - name: Make JARs
         run: ./gradlew :library:jar -x test --no-daemon
