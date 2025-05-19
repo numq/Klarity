@@ -54,6 +54,7 @@ jobs:
         run: |
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-Bsymbolic" \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
