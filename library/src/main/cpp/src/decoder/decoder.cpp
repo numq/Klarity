@@ -284,11 +284,11 @@ Decoder::Decoder(
                 if (audioDecoder->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
                     audioCodecContext->thread_type = FF_THREAD_FRAME;
 
-                    audioCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                    audioCodecContext->thread_count = 2;
                 } else if (audioDecoder->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
                     audioCodecContext->thread_type = FF_THREAD_SLICE;
 
-                    audioCodecContext->thread_count = static_cast<int>(std::thread::hardware_concurrency());
+                    audioCodecContext->thread_count = 2;
                 }
 
                 if (avcodec_open2(audioCodecContext.get(), audioDecoder, nullptr) < 0) {
