@@ -17,9 +17,9 @@ internal class SkiaRenderer(
         const val DRAWS_NOTHING_ID = 0
     }
 
-    private val isClosed = AtomicBoolean(false)
-
     private val renderMutex = Mutex()
+
+    private val isClosed = AtomicBoolean(false)
 
     private val imageInfo = ImageInfo(
         width = format.width,
