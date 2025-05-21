@@ -10,9 +10,10 @@ interface ImageScale {
     /**
      * Scales the source image dimensions to match the destination image dimensions.
      *
-     * @param srcSize The dimensions of the source image.
-     * @param dstSize The dimensions of the destination image.
-     * @return The scaled dimensions of the source image.
+     * @param srcSize the dimensions of the source image
+     * @param dstSize the dimensions of the destination image
+     *
+     * @return the scaled dimensions of the source image
      */
     fun scale(srcSize: Size, dstSize: Size): Size
 
@@ -20,9 +21,10 @@ interface ImageScale {
         /**
          * Validates that source and destination dimensions are positive.
          *
-         * @param srcSize The dimensions of the source image.
-         * @param dstSize The dimensions of the destination image.
-         * @throws IllegalArgumentException if either source or destination dimensions are not positive.
+         * @param srcSize the dimensions of the source image
+         * @param dstSize the dimensions of the destination image
+         *
+         * @throws IllegalArgumentException if either source or destination dimensions are not positive
          */
         private fun validateDimensions(
             srcSize: Size,
@@ -35,8 +37,9 @@ interface ImageScale {
         /**
          * Scales the source to match the destination dimension (either width or height) while preserving aspect ratio.
          *
-         * @param scaleFactor The factor by which to scale (based on width or height).
-         * @return The scaled dimensions of the source image.
+         * @param scaleFactor the factor by which to scale (based on width or height)
+         *
+         * @return the scaled dimensions of the source image
          */
         private fun scaleByFactor(srcSize: Size, scaleFactor: Float): Size {
             val scaledWidth = srcSize.width * scaleFactor

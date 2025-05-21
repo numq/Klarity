@@ -9,7 +9,7 @@ internal class PlaybackLoopFactory : Factory<PlaybackLoopFactory.Parameters, Pla
         val pipeline: Pipeline,
         val getVolume: () -> Float,
         val getPlaybackSpeedFactor: () -> Float,
-        val getRenderer: () -> Renderer?
+        val getRenderers: suspend () -> List<Renderer>
     )
 
     override fun create(parameters: Parameters): Result<PlaybackLoop> = with(parameters) {
@@ -17,7 +17,7 @@ internal class PlaybackLoopFactory : Factory<PlaybackLoopFactory.Parameters, Pla
             pipeline = pipeline,
             getVolume = getVolume,
             getPlaybackSpeedFactor = getPlaybackSpeedFactor,
-            getRenderer = getRenderer
+            getRenderers = getRenderers
         )
     }
 }

@@ -17,7 +17,7 @@ internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
     private val getVolume: () -> Float,
     private val getPlaybackSpeedFactor: () -> Float,
-    private val getRenderer: () -> Renderer?
+    private val getRenderers: suspend () -> List<Renderer>
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
@@ -35,9 +35,7 @@ internal class DefaultPlaybackLoop(
         onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
-            val frame = buffer.take().getOrThrow()
-
-            when (frame) {
+            when (val frame = buffer.take().getOrThrow()) {
                 is Frame.Content.Audio -> {
                     currentCoroutineContext().ensureActive()
 
@@ -113,7 +111,15 @@ internal class DefaultPlaybackLoop(
 
                         currentCoroutineContext().ensureActive()
 
-                        getRenderer()?.render(frame)?.getOrThrow()
+                        coroutineScope {
+                            getRenderers().map { renderer ->
+                                async {
+                                    renderer.render(frame)
+                                }
+                            }.awaitAll().fold(Result.success(Unit)) { acc, result ->
+                                acc.fold(onSuccess = { result }, onFailure = { acc })
+                            }.getOrThrow()
+                        }
 
                         onTimestamp(frameTime)
 

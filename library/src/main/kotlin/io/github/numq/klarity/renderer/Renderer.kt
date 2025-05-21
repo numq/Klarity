@@ -23,29 +23,30 @@ interface Renderer {
     /**
      * Indicates whether the renderer currently draws nothing (e.g. after a flush or before rendering).
      *
-     * @return true if no frame is currently rendered, false otherwise.
+     * @return `true` if no frame is currently rendered, `false` otherwise
      */
     fun drawsNothing(): Boolean
 
     /**
      * Draws directly to the Skia [Surface] using the provided callback.
      *
-     * @param callback A function that receives the [Surface] for custom drawing.
+     * @param callback a function that receives the [Surface] for custom drawing
      */
     fun draw(callback: (Surface) -> Unit)
 
     /**
      * Requests rendering of the [Frame.Content.Video].
      *
-     * @param frame A [Frame.Content.Video] for rendering.
-     * @return A [Result] indicating success or failure of the operation.
+     * @param frame [Frame.Content.Video] for rendering.
+     *
+     * @return [Result] indicating success or failure of the operation.
      */
     suspend fun render(frame: Frame.Content.Video): Result<Unit>
 
     /**
      * Flushes the Skia [Surface], finalizing any pending draw operations, resets the generation ID.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success or failure of the operation
      */
     suspend fun flush(): Result<Unit>
 
@@ -56,10 +57,11 @@ interface Renderer {
 
     companion object {
         /**
-         * Factory method to create a [SkiaRenderer] for a given video format.
+         * Factory method to create a [Renderer] for a given video format.
          *
-         * @param format The target video format.
-         * @return A [Result] containing either a new [SkiaRenderer] instance or an error if creation fails.
+         * @param format the target video format
+         *
+         * @return [Result] containing either a new renderer instance or an error if creation fails
          */
         fun create(format: VideoFormat): Result<Renderer> = runCatching {
             SkiaRenderer(format = format)

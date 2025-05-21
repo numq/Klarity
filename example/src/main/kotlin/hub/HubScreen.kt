@@ -74,7 +74,9 @@ fun HubScreen(
                     player.prepare(location = media.location).getOrThrow()
 
                     val renderer = media.videoFormat?.let { format ->
-                        Renderer.create(format = format).onSuccess(player::attachRenderer).getOrThrow()
+                        Renderer.create(format = format).onSuccess { renderer ->
+                            player.attachRenderer(renderer).getOrThrow()
+                        }.getOrThrow()
                     }
 
                     val maxSnapshots = 10

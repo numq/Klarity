@@ -48,18 +48,39 @@ internal class DefaultPlayerController(
     private val controllerScope = CoroutineScope(Dispatchers.Default + supervisorJob + CoroutineName("ControllerScope"))
 
     /**
-     * Renderer
+     * Renderable
      */
 
-    @Volatile
-    private var renderer: Renderer? = null
+    private val renderableMutex = Mutex()
 
-    override fun attachRenderer(renderer: Renderer) {
-        this.renderer = renderer
+    private val renderers = mutableSetOf<Renderer>()
+
+    override suspend fun getRenderers() = renderableMutex.withLock {
+        runCatching {
+            renderers.toList()
+        }
     }
 
-    override fun detachRenderer() {
-        renderer = null
+    override suspend fun attachRenderer(renderer: Renderer) = renderableMutex.withLock {
+        runCatching {
+            renderers.add(renderer)
+
+            Unit
+        }
+    }
+
+    override suspend fun detachRenderer(renderer: Renderer) = renderableMutex.withLock {
+        runCatching {
+            renderers.remove(renderer)
+
+            Unit
+        }
+    }
+
+    override suspend fun detachRenderers() = renderableMutex.withLock {
+        runCatching {
+            renderers.clear()
+        }
     }
 
     /**
@@ -386,7 +407,8 @@ internal class DefaultPlayerController(
                     pipeline = pipeline,
                     getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
                     getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
-                    getRenderer = { renderer })
+                    getRenderers = { getRenderers().getOrThrow() }
+                )
             ).onFailure {
                 bufferLoop.close().getOrThrow()
 

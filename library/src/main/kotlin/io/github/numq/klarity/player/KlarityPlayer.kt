@@ -1,5 +1,6 @@
 package io.github.numq.klarity.player
 
+import io.github.numq.klarity.renderable.Renderable
 import io.github.numq.klarity.buffer.BufferFactory
 import io.github.numq.klarity.controller.PlayerControllerFactory
 import io.github.numq.klarity.decoder.AudioDecoderFactory
@@ -9,7 +10,6 @@ import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
-import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
@@ -22,7 +22,7 @@ import kotlin.time.Duration
 /**
  * Interface representing a media player.
  */
-interface KlarityPlayer {
+interface KlarityPlayer : Renderable {
     /**
      * A flow that emits the current settings of the player.
      */
@@ -49,42 +49,30 @@ interface KlarityPlayer {
     val events: SharedFlow<PlayerEvent>
 
     /**
-     * Attaches the renderer to the player.
-     *
-     * @param renderer The new renderer to attach.
-     */
-    fun attachRenderer(renderer: Renderer)
-
-    /**
-     * Detaches the renderer from the player.
-     */
-    fun detachRenderer()
-
-    /**
      * Changes the settings of the player.
      *
-     * @param settings The new settings to apply.
+     * @param settings the new settings to apply
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun changeSettings(settings: PlayerSettings): Result<Unit>
 
     /**
-     * Resets the player's settings to their default values.
+     * Resets the player settings to their default values.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun resetSettings(): Result<Unit>
 
     /**
      * Prepares the player for playback of the specified media.
      *
-     * @param location The location of the media file to prepare.
-     * @property audioBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the audio buffer size in frames.
-     * @property videoBufferSize If the size is less than or equal to zero, it disables audio, otherwise it sets the video buffer size in frames.
-     * @property hardwareAccelerationCandidates Hardware acceleration candidates.
+     * @param location the location of the media file to prepare
+     * @param audioBufferSize if the size is less than or equal to zero, it disables audio, otherwise it sets the audio buffer size in frames
+     * @param videoBufferSize if the size is less than or equal to zero, it disables audio, otherwise it sets the video buffer size in frames
+     * @param hardwareAccelerationCandidates hardware acceleration candidates
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return A [Result] indicating success
      */
     suspend fun prepare(
         location: String,
@@ -96,52 +84,52 @@ interface KlarityPlayer {
     /**
      * Starts playback of the prepared media.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun play(): Result<Unit>
 
     /**
      * Pauses the currently playing media.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun pause(): Result<Unit>
 
     /**
      * Resumes playback of the paused media.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun resume(): Result<Unit>
 
     /**
      * Stops the playback of the media.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun stop(): Result<Unit>
 
     /**
      * Seeks to the specified position in the media.
      *
-     * @param timestamp The seeking timestamp.
-     * @property keyFramesOnly Use less precise but faster keyframe seeking.
+     * @param timestamp The seeking timestamp
+     * @param keyFramesOnly Use less precise but faster keyframe seeking
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean = false): Result<Unit>
 
     /**
      * Releases any resources held by the player.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun release(): Result<Unit>
 
     /**
      * Closes the player.
      *
-     * @return A [Result] indicating success or failure of the operation.
+     * @return [Result] indicating success
      */
     suspend fun close(): Result<Unit>
 
@@ -158,9 +146,9 @@ interface KlarityPlayer {
          *
          * This method must be called before creating an instance.
          *
-         * @param klarity The path to the `klarity` binary.
-         *
-         * @return A [Result] containing either a new [KlarityPlayer] instance or an error if creation fails.
+         * @param klarity The path to the `klarity` binary
+
+         * @return [Result] indicating a success
          */
         fun load(klarity: String) = runCatching {
             System.load(klarity)
@@ -173,7 +161,7 @@ interface KlarityPlayer {
          *
          * This method must be called before creating an instance.
          *
-         * @return A [Result] containing either a new [KlarityPlayer] instance or an error if creation fails.
+         * @return [Result] containing a [KlarityPlayer] instance
          */
         fun load() = runCatching {
             if (isLoaded) {
@@ -223,9 +211,9 @@ interface KlarityPlayer {
         /**
          * Creates a new instance of the KlarityPlayer.
          *
-         * @param initialSettings Initial settings of the media player.
+         * @param initialSettings initial settings of the media player
          *
-         * @return A Result containing either a new KlarityPlayer instance or an error if creation fails.
+         * @return [Result] containing a [KlarityPlayer] instance
          */
         fun create(initialSettings: PlayerSettings? = null): Result<KlarityPlayer> = runCatching {
             check(isLoaded) { "Native binaries were not loaded" }

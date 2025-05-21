@@ -13,11 +13,13 @@ object SnapshotManager {
     /**
      * Captures multiple video frames at specified timestamps.
      *
-     * @param location Media file path or URI
-     * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
-     * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @param timestamps A function that provides a media duration that can be used to construct desired timestamps
-     * @return [Result] Containing a list of [Frame.Content.Video] that should be closed, otherwise failure information
+     * @param location media file path or URI
+     * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
+     * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
+     * @param timestamps a function that provides a media duration that can be used to construct desired timestamps
+     *
+     * @return [Result] containing a list of [Frame.Content.Video]. Each [Frame.Content.Video] must be closed by the caller
+     *
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshots(
@@ -68,11 +70,13 @@ object SnapshotManager {
     /**
      * Captures a single video frame at specified timestamp.
      *
-     * @param location Media file path or URI
-     * @param hardwareAccelerationCandidates Preferred hardware acceleration methods in order of priority
-     * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @param timestamp A function that provides a media duration that can be used to construct desired timestamp
-     * @return [Result] Containing a [Frame.Content.Video] that should be closed or null, otherwise failure information
+     * @param location media file path or URI
+     * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
+     * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
+     * @param timestamp a function that provides a media duration that can be used to construct desired timestamp
+     *
+     * @return [Result] containing a [Frame.Content.Video] or null. [Frame.Content.Video] must be closed by the caller
+     *
      * @throws SnapshotManagerException if frame capture fails
      */
     suspend fun snapshot(

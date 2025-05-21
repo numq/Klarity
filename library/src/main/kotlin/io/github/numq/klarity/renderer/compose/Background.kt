@@ -21,10 +21,10 @@ sealed interface Background {
     /**
      * Represents a solid color background.
      *
-     * @property a Alpha channel value (0-255).
-     * @property r Red channel value (0-255).
-     * @property g Green channel value (0-255).
-     * @property b Blue channel value (0-255).
+     * @property a alpha channel value (0-255)
+     * @property r red channel value (0-255)
+     * @property g green channel value (0-255)
+     * @property b blue channel value (0-255)
      */
     data class Color(val a: Int, val r: Int, val g: Int, val b: Int) : Background {
         override val imageScale: ImageScale = ImageScale.None
@@ -33,8 +33,8 @@ sealed interface Background {
     /**
      * Represents a blurred background.
      *
-     * @property sigma The blur intensity applied to the background.
-     * @property imageScale The video frame scaling method (default is [ImageScale.Crop]).
+     * @property sigma the blur intensity applied to the background
+     * @property imageScale the video frame scaling method (default is [ImageScale.Crop])
      */
     data class Blur(
         val sigma: Float = 8f,

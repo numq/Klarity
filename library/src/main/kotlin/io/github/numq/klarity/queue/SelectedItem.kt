@@ -14,8 +14,8 @@ sealed interface SelectedItem<out Item> {
     /**
      * Represents an item that is currently selected in the queue.
      *
-     * @param item The selected item.
-     * @param updatedAtNanos The time in nanoseconds when the item was last updated or selected.
+     * @param item the selected item
+     * @param updatedAtNanos the time in nanoseconds when the item was last updated or selected
      */
     data class Present<out Item>(val item: Item, val updatedAtNanos: Long) : SelectedItem<Item>
 }

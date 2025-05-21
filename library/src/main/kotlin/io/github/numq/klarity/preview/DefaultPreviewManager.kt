@@ -6,6 +6,8 @@ import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pool.Pool
 import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
@@ -19,15 +21,36 @@ internal class DefaultPreviewManager(
 
     override val format = decoder.media.videoFormat
 
-    @Volatile
-    private var renderer: Renderer? = null
+    private val renderableMutex = Mutex()
 
-    override fun attachRenderer(renderer: Renderer) {
-        this.renderer = renderer
+    private val renderers = mutableSetOf<Renderer>()
+
+    override suspend fun getRenderers() = renderableMutex.withLock {
+        runCatching {
+            renderers.toList()
+        }
     }
 
-    override fun detachRenderer() {
-        renderer = null
+    override suspend fun attachRenderer(renderer: Renderer) = renderableMutex.withLock {
+        runCatching {
+            renderers.add(renderer)
+
+            Unit
+        }
+    }
+
+    override suspend fun detachRenderer(renderer: Renderer) = renderableMutex.withLock {
+        runCatching {
+            renderers.remove(renderer)
+
+            Unit
+        }
+    }
+
+    override suspend fun detachRenderers() = renderableMutex.withLock {
+        runCatching {
+            renderers.clear()
+        }
     }
 
     override suspend fun preview(
@@ -35,7 +58,7 @@ internal class DefaultPreviewManager(
         debounceTime: Duration,
         keyframesOnly: Boolean,
     ) = runCatching {
-        previewJob?.cancel()
+        previewJob?.cancelAndJoin()
         previewJob = coroutineScope.launch {
             delay(debounceTime)
 
@@ -52,7 +75,13 @@ internal class DefaultPreviewManager(
 
             try {
                 (decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video)?.let { frame ->
-                    renderer?.render(frame)?.getOrThrow()
+                    getRenderers().getOrThrow().map { renderer ->
+                        async {
+                            renderer.render(frame)
+                        }
+                    }.awaitAll().fold(Result.success(Unit)) { acc, result ->
+                        acc.fold(onSuccess = { result }, onFailure = { acc })
+                    }.getOrThrow()
                 }
             } finally {
                 pool.release(item = data).getOrThrow()

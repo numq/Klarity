@@ -306,7 +306,11 @@ fun PlaylistScreenSuccess(
                                     }
 
                                     renderer
-                                }?.getOrThrow()?.also(player::attachRenderer)
+                                }?.onSuccess { renderer ->
+                                    runBlocking {
+                                        player.attachRenderer(renderer).getOrThrow()
+                                    }
+                                }?.getOrThrow()
                             }
 
                             val previewManager = remember(currentState.media.location) {
@@ -314,8 +318,11 @@ fun PlaylistScreenSuccess(
                             }
 
                             val previewRenderer = remember(format) {
-                                previewManager?.format?.let(Renderer::create)?.getOrNull()
-                                    ?.also(previewManager::attachRenderer)
+                                previewManager?.format?.let(Renderer::create)?.onSuccess { renderer ->
+                                    runBlocking {
+                                        previewManager.attachRenderer(renderer).getOrThrow()
+                                    }
+                                }?.getOrNull()
                             }
 
                             var hoveredTimestamp by remember {

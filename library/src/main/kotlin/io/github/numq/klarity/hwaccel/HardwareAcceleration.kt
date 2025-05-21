@@ -44,7 +44,7 @@ sealed class HardwareAcceleration private constructor(internal val native: Nativ
         /**
          * Retrieves a list of available hardware acceleration methods for video decoding.
          *
-         * @return A [Result] containing a list of supported [HardwareAcceleration] types.
+         * @return [Result] containing a list of supported [HardwareAcceleration] types
          */
         fun availableHardwareAcceleration() = runCatching {
             NativeDecoder.getAvailableHardwareAcceleration().map { nativeHardwareAcceleration ->

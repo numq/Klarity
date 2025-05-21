@@ -22,13 +22,13 @@ interface PlaybackLoop {
             pipeline: Pipeline,
             getVolume: () -> Float,
             getPlaybackSpeedFactor: () -> Float,
-            getRenderer: () -> Renderer?
+            getRenderers: suspend () -> List<Renderer>
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,
                 getVolume = getVolume,
                 getPlaybackSpeedFactor = getPlaybackSpeedFactor,
-                getRenderer = getRenderer
+                getRenderers = getRenderers
             )
         }
     }

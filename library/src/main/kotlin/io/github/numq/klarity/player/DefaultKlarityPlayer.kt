@@ -21,9 +21,13 @@ internal class DefaultKlarityPlayer(
 
     override val events = playerController.events
 
-    override fun attachRenderer(renderer: Renderer) = playerController.attachRenderer(renderer)
+    override suspend fun getRenderers() = playerController.getRenderers()
 
-    override fun detachRenderer() = playerController.detachRenderer()
+    override suspend fun attachRenderer(renderer: Renderer) = playerController.attachRenderer(renderer)
+
+    override suspend fun detachRenderer(renderer: Renderer) = playerController.detachRenderer(renderer)
+
+    override suspend fun detachRenderers() = playerController.detachRenderers()
 
     override suspend fun changeSettings(
         settings: PlayerSettings,

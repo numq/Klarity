@@ -7,7 +7,7 @@ sealed interface PlayerEvent {
     /**
      * Represents an error event containing the exception that occurred.
      *
-     * @property exception The exception that caused the error.
+     * @property exception the exception that caused the error
      */
     data class Error(val exception: Exception) : PlayerEvent
 

@@ -1,44 +1,31 @@
 package io.github.numq.klarity.preview
 
+import io.github.numq.klarity.renderable.Renderable
 import io.github.numq.klarity.decoder.VideoDecoderFactory
 import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.pool.PoolFactory
-import io.github.numq.klarity.renderer.Renderer
 import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
 /**
  * Provides real-time frame capture functionality for video media at specified timestamps, displays the captured frames through an attached renderer.
  */
-interface PreviewManager {
+interface PreviewManager : Renderable {
     /**
      * Video format of the media used.
      */
     val format: VideoFormat
 
     /**
-     * Attaches a renderer to display preview frames. Only one renderer may be attached at a time.
-     * Any previously attached renderer will be automatically detached.
-     *
-     * @param renderer The renderer implementation that will receive video frames
-     */
-    fun attachRenderer(renderer: Renderer)
-
-    /**
-     * Detaches the current renderer if one is attached. After detachment, preview frames
-     * will not be displayed until a new renderer is attached.
-     */
-    fun detachRenderer()
-
-    /**
      * Seeks to the specified timestamp and renders the corresponding frame if a renderer is attached.
      * If no renderer is attached, the operation will complete successfully but no rendering will occur.
      *
-     * @param timestamp Desired timestamp
-     * @param debounceTime Minimum delay between consecutive requests
-     * @param keyframesOnly If true, seeks only to keyframes (faster but less precise)
-     * @return [Result] Indicating success or containing failure information
+     * @param timestamp desired timestamp
+     * @param debounceTime minimum delay between consecutive requests
+     * @param keyframesOnly if true, seeks only to keyframes (faster but less precise)
+     *
+     * @return [Result] indicating success
      */
     suspend fun preview(
         timestamp: Duration,
@@ -50,19 +37,20 @@ interface PreviewManager {
      * Releases all resources and stops any ongoing preview operations.
      * The instance should not be used after closing.
      *
-     * @return [Result] Indicating success or containing failure information
+     * @return [Result] indicating success
      */
     suspend fun close(): Result<Unit>
 
     companion object {
-        private const val POOL_CAPACITY = 1
+        private const val POOL_CAPACITY = 2
 
         /**
-         * Creates a new PreviewManager instance for the specified media file.
+         * Creates a new [PreviewManager] instance for the specified media file.
          *
-         * @param location Path or URI to media source
-         * @param hardwareAccelerationCandidates Preferred acceleration methods in order
-         * @return [Result] Containing new PreviewManager or failure information
+         * @param location path or URI to media source
+         * @param hardwareAccelerationCandidates preferred acceleration methods in order
+         *
+         * @return [Result] containing [PreviewManager] instance
          */
         fun create(
             location: String,
