@@ -10,25 +10,7 @@ class NativeSamplerTest : JNITest() {
 
     @Test
     fun `should create and close sampler`() = runTest {
-        val sampler = NativeSampler(sampleRate = 44100, channels = 2)
-        sampler.close()
-
-        assertThrows<IllegalStateException> {
-            sampler.setVolume(1.0f).getOrThrow()
-        }
-    }
-
-    @Test
-    fun `should allow setting playback speed and volume`() = runTest {
-        val sampler = NativeSampler(sampleRate = 48000, channels = 2)
-
-        val speedResult = sampler.setPlaybackSpeed(1.25f)
-        val volumeResult = sampler.setVolume(0.75f)
-
-        assert(speedResult.isSuccess)
-        assert(volumeResult.isSuccess)
-
-        sampler.close()
+        NativeSampler(sampleRate = 44100, channels = 2).close()
     }
 
     @Test
@@ -36,7 +18,7 @@ class NativeSamplerTest : JNITest() {
         val sampler = NativeSampler(sampleRate = 48000, channels = 2)
 
         val startResult = sampler.start()
-        val writeResult = sampler.write(ByteArray(1024))
+        val writeResult = sampler.write(ByteArray(1024), 1f, 1f)
         val stopResult = sampler.stop()
 
         assert(startResult.isSuccess)
@@ -51,7 +33,7 @@ class NativeSamplerTest : JNITest() {
         val sampler = NativeSampler(sampleRate = 44100, channels = 2)
 
         val flushResult = sampler.flush()
-        val drainResult = sampler.drain()
+        val drainResult = sampler.drain(1f, 1f)
 
         assert(flushResult.isSuccess)
         assert(drainResult.isSuccess)
