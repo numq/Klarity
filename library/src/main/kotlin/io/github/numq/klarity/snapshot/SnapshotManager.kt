@@ -7,31 +7,33 @@ import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
 /**
- * Provides frame capture functionality for video media at specified timestamps.
+ * Provides video snapshot capture functionality for video media at specified timestamps.
  */
 object SnapshotManager {
     /**
-     * Captures multiple video frames at specified timestamps.
+     * Captures multiple video snapshots at specified timestamps.
      *
      * @param location media file path or URI
      * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
      * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
      * @param timestamps a function that provides a media duration that can be used to construct desired timestamps
      *
-     * @return [Result] containing a list of [Frame.Content.Video]. Each [Frame.Content.Video] must be closed by the caller
+     * @return [Result] containing a list of [Snapshot]. Each [Snapshot] must be closed by the caller
      *
-     * @throws SnapshotManagerException if frame capture fails
+     * @throws SnapshotManagerException if snapshot capture fails
      */
     suspend fun snapshots(
         location: String,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestamps: (duration: Duration) -> (List<Duration>) = { listOf(Duration.ZERO) },
-    ): Result<List<Frame.Content.Video>> = VideoDecoderFactory().create(
+    ): Result<List<Snapshot>> = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(
             location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     ).mapCatching { decoder ->
+        val format = decoder.media.videoFormat
+
         val frames = mutableListOf<Frame.Content.Video>()
 
         try {
@@ -42,7 +44,7 @@ object SnapshotManager {
 
                 var frame: Frame.Content.Video? = null
 
-                Data.makeUninitialized(decoder.media.videoFormat.bufferCapacity).let { data ->
+                Data.makeUninitialized(format.bufferCapacity).let { data ->
                     try {
                         frame = (decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video)
                     } finally {
@@ -62,29 +64,31 @@ object SnapshotManager {
             decoder.close()
         }
 
-        frames
+        frames.map { frame ->
+            Snapshot(format = format, frame = frame)
+        }
     }.recoverCatching { t ->
         throw SnapshotManagerException(t)
     }
 
     /**
-     * Captures a single video frame at specified timestamp.
+     * Captures a single video snapshot at specified timestamp.
      *
      * @param location media file path or URI
      * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
      * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
      * @param timestamp a function that provides a media duration that can be used to construct desired timestamp
      *
-     * @return [Result] containing a [Frame.Content.Video] or null. [Frame.Content.Video] must be closed by the caller
+     * @return [Result] containing a [Snapshot] or null. [Snapshot] must be closed by the caller
      *
-     * @throws SnapshotManagerException if frame capture fails
+     * @throws SnapshotManagerException if snapshot capture fails
      */
     suspend fun snapshot(
         location: String,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
         keyframesOnly: Boolean = true,
         timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
-    ): Result<Frame.Content.Video?> = snapshots(
+    ): Result<Snapshot?> = snapshots(
         location = location,
         keyframesOnly = keyframesOnly,
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,

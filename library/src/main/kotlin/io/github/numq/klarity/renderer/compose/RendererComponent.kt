@@ -72,20 +72,22 @@ fun RendererComponent(
             if (drawsNothing) {
                 placeholder()
             } else {
-                Canvas(modifier = modifier.fillMaxSize()) {
-                    foreground.renderer.draw { surface ->
-                        drawBackground(
-                            background = background,
-                            backgroundSize = backgroundSize,
-                            backgroundOffset = backgroundOffset,
-                            surface = surface,
-                        )
+                key(generationId) {
+                    Canvas(modifier = modifier.fillMaxSize()) {
+                        foreground.renderer.draw { surface ->
+                            drawBackground(
+                                background = background,
+                                backgroundSize = backgroundSize,
+                                backgroundOffset = backgroundOffset,
+                                surface = surface,
+                            )
 
-                        drawForeground(
-                            foregroundSize = foregroundSize,
-                            foregroundOffset = foregroundOffset,
-                            surface = surface,
-                        )
+                            drawForeground(
+                                foregroundSize = foregroundSize,
+                                foregroundOffset = foregroundOffset,
+                                surface = surface,
+                            )
+                        }
                     }
                 }
             }
