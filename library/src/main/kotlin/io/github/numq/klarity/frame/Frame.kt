@@ -1,7 +1,6 @@
 package io.github.numq.klarity.frame
 
 import org.jetbrains.skia.Data
-import java.io.Closeable
 import kotlin.time.Duration
 
 sealed interface Frame {
@@ -37,8 +36,8 @@ sealed interface Frame {
             val height: Int,
             val onRenderStart: (() -> Unit)? = null,
             val onRenderComplete: ((renderTime: Duration) -> Unit)? = null
-        ) : Content, Closeable {
-            override fun close() {
+        ) : Content {
+            internal fun close() {
                 if (!data.isClosed) {
                     data.close()
                 }

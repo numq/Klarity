@@ -87,9 +87,7 @@ internal class DefaultPlayerController(
      * Settings
      */
 
-    private val defaultSettings = PlayerSettings(
-        playbackSpeedFactor = 1f, isMuted = false, volume = 1f
-    )
+    private val defaultSettings = PlayerSettings.DEFAULT
 
     override val settings = MutableStateFlow(initialSettings ?: defaultSettings)
 
