@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
@@ -34,12 +35,14 @@ internal class DefaultPlaybackLoop(
         sampler: Sampler,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
+        val latency = sampler.getLatency().getOrThrow().microseconds
+
         while (currentCoroutineContext().isActive) {
             when (val frame = buffer.take().getOrThrow()) {
                 is Frame.Content.Audio -> {
                     currentCoroutineContext().ensureActive()
 
-                    val frameTime = frame.timestamp
+                    val frameTime = frame.timestamp - latency
 
                     onTimestamp(frameTime)
 
