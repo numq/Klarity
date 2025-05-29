@@ -1,11 +1,10 @@
 package io.github.numq.klarity.loop.playback
 
 import io.github.numq.klarity.pipeline.Pipeline
-import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
 
-interface PlaybackLoop {
+internal interface PlaybackLoop {
     suspend fun start(
         coroutineScope: CoroutineScope,
         onException: suspend (PlaybackLoopException) -> Unit,
@@ -18,17 +17,15 @@ interface PlaybackLoop {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun create(
+        fun create(
             pipeline: Pipeline,
             getVolume: () -> Float,
-            getPlaybackSpeedFactor: () -> Float,
-            getRenderers: suspend () -> List<Renderer>
+            getPlaybackSpeedFactor: () -> Float
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,
                 getVolume = getVolume,
-                getPlaybackSpeedFactor = getPlaybackSpeedFactor,
-                getRenderers = getRenderers
+                getPlaybackSpeedFactor = getPlaybackSpeedFactor
             )
         }
     }

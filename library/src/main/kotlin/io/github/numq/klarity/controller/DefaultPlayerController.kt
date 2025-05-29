@@ -13,6 +13,7 @@ import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pipeline.Pipeline
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
+import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.InternalPlayerState
@@ -20,6 +21,7 @@ import io.github.numq.klarity.state.PlayerState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
@@ -33,7 +35,8 @@ internal class DefaultPlayerController(
     private val bufferFactory: BufferFactory,
     private val bufferLoopFactory: BufferLoopFactory,
     private val playbackLoopFactory: PlaybackLoopFactory,
-    private val samplerFactory: SamplerFactory
+    private val samplerFactory: SamplerFactory,
+    private val rendererFactory: RendererFactory
 ) : PlayerController {
     /**
      * Coroutines
@@ -48,40 +51,10 @@ internal class DefaultPlayerController(
     private val controllerScope = CoroutineScope(Dispatchers.Default + supervisorJob + CoroutineName("ControllerScope"))
 
     /**
-     * Renderable
+     * Renderer
      */
 
-    private val renderableMutex = Mutex()
-
-    private val renderers = mutableSetOf<Renderer>()
-
-    override suspend fun getRenderers() = renderableMutex.withLock {
-        runCatching {
-            renderers.toList()
-        }
-    }
-
-    override suspend fun attachRenderer(renderer: Renderer) = renderableMutex.withLock {
-        runCatching {
-            renderers.add(renderer)
-
-            Unit
-        }
-    }
-
-    override suspend fun detachRenderer(renderer: Renderer) = renderableMutex.withLock {
-        runCatching {
-            renderers.remove(renderer)
-
-            Unit
-        }
-    }
-
-    override suspend fun detachRenderers() = renderableMutex.withLock {
-        runCatching {
-            renderers.clear()
-        }
-    }
+    override val renderer = MutableStateFlow<Renderer?>(null)
 
     /**
      * Settings
@@ -303,8 +276,20 @@ internal class DefaultPlayerController(
                         throw it
                     }.getOrThrow()
 
+                    val renderer = rendererFactory.create(
+                        parameters = RendererFactory.Parameters(format = videoFormat)
+                    ).onFailure {
+                        buffer.close().getOrThrow()
+
+                        decoder.close().getOrThrow()
+
+                        pool.close().getOrThrow()
+
+                        throw it
+                    }.getOrThrow()
+
                     Pipeline.Video(
-                        media = media, decoder = decoder, pool = pool, buffer = buffer
+                        media = media, decoder = decoder, pool = pool, buffer = buffer, renderer = renderer
                     )
                 }
 
@@ -380,6 +365,24 @@ internal class DefaultPlayerController(
                         throw it
                     }.getOrThrow()
 
+                    val renderer = rendererFactory.create(
+                        parameters = RendererFactory.Parameters(format = videoFormat)
+                    ).onFailure {
+                        sampler.close().getOrThrow()
+
+                        videoBuffer.clear().getOrThrow()
+
+                        audioBuffer.clear().getOrThrow()
+
+                        videoDecoder.close().getOrThrow()
+
+                        audioDecoder.close().getOrThrow()
+
+                        videoPool.close().getOrThrow()
+
+                        throw it
+                    }.getOrThrow()
+
                     Pipeline.AudioVideo(
                         media = media,
                         audioDecoder = audioDecoder,
@@ -387,7 +390,8 @@ internal class DefaultPlayerController(
                         videoPool = videoPool,
                         audioBuffer = audioBuffer,
                         videoBuffer = videoBuffer,
-                        sampler = sampler
+                        sampler = sampler,
+                        renderer = renderer
                     )
                 }
             }
@@ -404,8 +408,7 @@ internal class DefaultPlayerController(
                 parameters = PlaybackLoopFactory.Parameters(
                     pipeline = pipeline,
                     getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
-                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
-                    getRenderers = { getRenderers().getOrThrow() }
+                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor }
                 )
             ).onFailure {
                 bufferLoop.close().getOrThrow()
@@ -414,6 +417,18 @@ internal class DefaultPlayerController(
 
                 throw it
             }.getOrThrow()
+
+            when (pipeline) {
+                is Pipeline.Audio -> Unit
+
+                is Pipeline.Video -> renderer.update { pipeline.renderer }
+
+                is Pipeline.AudioVideo -> renderer.update { pipeline.renderer }
+            }
+
+            media.videoFormat?.let { format ->
+                renderer.emit(Renderer.create(format = format).getOrThrow())
+            }
 
             updateState(
                 InternalPlayerState.Ready(
@@ -621,6 +636,10 @@ internal class DefaultPlayerController(
 
         pipeline.close().getOrThrow()
 
+        renderer.value?.close()?.getOrThrow()
+
+        renderer.emit(null)
+
         bufferTimestamp.emit(Duration.ZERO)
 
         playbackTimestamp.emit(Duration.ZERO)
@@ -738,6 +757,10 @@ internal class DefaultPlayerController(
                     bufferLoop.close().getOrThrow()
 
                     pipeline.close().getOrThrow()
+
+                    renderer.value?.close()?.getOrThrow()
+
+                    Unit
                 }
             }
         }

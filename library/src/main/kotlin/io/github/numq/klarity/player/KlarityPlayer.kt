@@ -1,6 +1,5 @@
 package io.github.numq.klarity.player
 
-import io.github.numq.klarity.renderable.Renderable
 import io.github.numq.klarity.buffer.BufferFactory
 import io.github.numq.klarity.controller.PlayerControllerFactory
 import io.github.numq.klarity.decoder.AudioDecoderFactory
@@ -10,6 +9,8 @@ import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
+import io.github.numq.klarity.renderer.Renderer
+import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
@@ -22,7 +23,12 @@ import kotlin.time.Duration
 /**
  * Interface representing a media player.
  */
-interface KlarityPlayer : Renderable {
+interface KlarityPlayer {
+    /**
+     * A flow that emits the renderer of the player or null.
+     */
+    val renderer: StateFlow<Renderer?>
+
     /**
      * A flow that emits the current settings of the player.
      */
@@ -134,12 +140,12 @@ interface KlarityPlayer : Renderable {
     suspend fun close(): Result<Unit>
 
     companion object {
+        @Volatile
+        private var isLoaded = false
+
         const val MIN_AUDIO_BUFFER_SIZE = 4
 
         const val MIN_VIDEO_BUFFER_SIZE = 2
-
-        @Volatile
-        private var isLoaded = false
 
         /**
          * Loads the native libraries.
@@ -192,8 +198,7 @@ interface KlarityPlayer : Renderable {
             when (resource.protocol) {
                 "file" -> {
                     File(resource.toURI()).listFiles()?.firstOrNull { it.name == libraryName }
-                        ?.copyTo(tempFile, overwrite = true)
-                        ?: error("Library $libraryName not found in $resourceDir")
+                        ?.copyTo(tempFile, overwrite = true) ?: error("Library $libraryName not found in $resourceDir")
                 }
 
                 "jar" -> {
@@ -227,7 +232,8 @@ interface KlarityPlayer : Renderable {
                     bufferFactory = BufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),
-                    samplerFactory = SamplerFactory()
+                    samplerFactory = SamplerFactory(),
+                    rendererFactory = RendererFactory()
                 )
             ).mapCatching(::DefaultKlarityPlayer).getOrThrow()
         }

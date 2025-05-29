@@ -28,25 +28,18 @@ fun RendererComponent(
 ) {
     val generationId by foreground.renderer.generationId.collectAsState()
 
-    val drawsNothing = remember(foreground.renderer, generationId) { foreground.renderer.drawsNothing() }
-
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val boxSize = Size(maxWidth.value, maxHeight.value)
 
             val foregroundSize by remember(
-                foreground.renderer.format.width,
-                foreground.renderer.format.height,
-                foreground.imageScale,
-                boxSize
+                foreground.renderer.format.width, foreground.renderer.format.height, foreground.imageScale, boxSize
             ) {
                 derivedStateOf {
                     foreground.imageScale.scale(
                         srcSize = Size(
-                            foreground.renderer.format.width.toFloat(),
-                            foreground.renderer.format.height.toFloat()
-                        ),
-                        dstSize = boxSize
+                            foreground.renderer.format.width.toFloat(), foreground.renderer.format.height.toFloat()
+                        ), dstSize = boxSize
                     )
                 }
             }
@@ -69,10 +62,10 @@ fun RendererComponent(
                 }
             }
 
-            if (drawsNothing) {
-                placeholder()
-            } else {
-                key(generationId) {
+            key(generationId) {
+                if (foreground.renderer.drawsNothing()) {
+                    placeholder()
+                } else {
                     Canvas(modifier = modifier.fillMaxSize()) {
                         foreground.renderer.draw { surface ->
                             drawBackground(
@@ -81,7 +74,6 @@ fun RendererComponent(
                                 backgroundOffset = backgroundOffset,
                                 surface = surface,
                             )
-
                             drawForeground(
                                 foregroundSize = foregroundSize,
                                 foregroundOffset = foregroundOffset,
@@ -130,9 +122,7 @@ private fun DrawScope.drawBackground(
 
                 surface.draw(canvas.nativeCanvas, 0, 0, SkPaint().apply {
                     imageFilter = ImageFilter.makeBlur(
-                        sigmaX = background.sigma,
-                        sigmaY = background.sigma,
-                        mode = FilterTileMode.CLAMP
+                        sigmaX = background.sigma, sigmaY = background.sigma, mode = FilterTileMode.CLAMP
                     )
                 })
             }

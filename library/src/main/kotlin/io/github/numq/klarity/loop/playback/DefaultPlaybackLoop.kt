@@ -15,10 +15,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
 internal class DefaultPlaybackLoop(
-    private val pipeline: Pipeline,
-    private val getVolume: () -> Float,
-    private val getPlaybackSpeedFactor: () -> Float,
-    private val getRenderers: suspend () -> List<Renderer>
+    private val pipeline: Pipeline, private val getVolume: () -> Float, private val getPlaybackSpeedFactor: () -> Float
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
@@ -49,9 +46,7 @@ internal class DefaultPlaybackLoop(
                     audioClock.set(frameTime)
 
                     sampler.write(
-                        frame = frame,
-                        volume = getVolume(),
-                        playbackSpeedFactor = getPlaybackSpeedFactor()
+                        frame = frame, volume = getVolume(), playbackSpeedFactor = getPlaybackSpeedFactor()
                     ).getOrThrow()
                 }
 
@@ -74,6 +69,7 @@ internal class DefaultPlaybackLoop(
         mediaDuration: Duration,
         pool: Pool<Data>,
         buffer: Buffer<Frame>,
+        renderer: Renderer,
         onTimestamp: suspend (Duration) -> Unit,
     ) {
         var isFirstFrame = true
@@ -114,15 +110,7 @@ internal class DefaultPlaybackLoop(
 
                         currentCoroutineContext().ensureActive()
 
-                        coroutineScope {
-                            getRenderers().map { renderer ->
-                                async {
-                                    renderer.render(frame)
-                                }
-                            }.awaitAll().fold(Result.success(Unit)) { acc, result ->
-                                acc.fold(onSuccess = { result }, onFailure = { acc })
-                            }.getOrThrow()
-                        }
+                        renderer.render(frame).getOrThrow()
 
                         onTimestamp(frameTime)
 
@@ -181,7 +169,11 @@ internal class DefaultPlaybackLoop(
                             )
 
                             is Pipeline.Video -> handleVideoPlayback(
-                                mediaDuration = media.duration, pool = pool, buffer = buffer, onTimestamp = onTimestamp
+                                mediaDuration = media.duration,
+                                pool = pool,
+                                buffer = buffer,
+                                renderer = renderer,
+                                onTimestamp = onTimestamp
                             )
 
                             is Pipeline.AudioVideo -> {
@@ -189,9 +181,7 @@ internal class DefaultPlaybackLoop(
 
                                 val audioJob = launch {
                                     handleAudioPlayback(
-                                        buffer = audioBuffer,
-                                        sampler = sampler,
-                                        onTimestamp = { frameTimestamp ->
+                                        buffer = audioBuffer, sampler = sampler, onTimestamp = { frameTimestamp ->
                                             if (frameTimestamp > lastFrameTimestamp) {
                                                 onTimestamp(frameTimestamp)
 
@@ -205,6 +195,7 @@ internal class DefaultPlaybackLoop(
                                         mediaDuration = media.duration,
                                         pool = videoPool,
                                         buffer = videoBuffer,
+                                        renderer = renderer,
                                         onTimestamp = { frameTimestamp ->
                                             if (frameTimestamp > lastFrameTimestamp) {
                                                 onTimestamp(frameTimestamp)

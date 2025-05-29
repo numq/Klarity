@@ -2,7 +2,7 @@ package io.github.numq.klarity.sampler
 
 import io.github.numq.klarity.frame.Frame
 
-interface Sampler {
+internal interface Sampler {
     suspend fun getLatency(): Result<Long>
 
     suspend fun start(): Result<Unit>
@@ -18,7 +18,7 @@ interface Sampler {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun create(sampleRate: Int, channels: Int): Result<Sampler> = runCatching {
+        fun create(sampleRate: Int, channels: Int): Result<Sampler> = runCatching {
             DefaultSampler(sampler = NativeSampler(sampleRate, channels))
         }
     }

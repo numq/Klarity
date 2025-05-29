@@ -23,7 +23,7 @@ internal interface Decoder<Media> {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun probe(
+        fun probe(
             location: String,
             findAudioStream: Boolean,
             findVideoStream: Boolean,
@@ -83,7 +83,7 @@ internal interface Decoder<Media> {
             }
         }
 
-        internal fun createAudioDecoder(location: String): Result<Decoder<Media.Audio>> = runCatching {
+        fun createAudioDecoder(location: String): Result<Decoder<Media.Audio>> = runCatching {
             val nativeDecoder = NativeDecoder(
                 location = location,
                 findAudioStream = true,
@@ -122,7 +122,7 @@ internal interface Decoder<Media> {
             }
         }
 
-        internal fun createVideoDecoder(
+        fun createVideoDecoder(
             location: String,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
         ): Result<Decoder<Media.Video>> = runCatching {

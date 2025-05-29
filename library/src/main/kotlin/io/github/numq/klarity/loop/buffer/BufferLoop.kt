@@ -4,7 +4,7 @@ import io.github.numq.klarity.pipeline.Pipeline
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
 
-interface BufferLoop {
+internal interface BufferLoop {
     val isBuffering: Boolean
 
     suspend fun start(
@@ -19,7 +19,7 @@ interface BufferLoop {
     suspend fun close(): Result<Unit>
 
     companion object {
-        internal fun create(pipeline: Pipeline): Result<BufferLoop> = runCatching {
+        fun create(pipeline: Pipeline): Result<BufferLoop> = runCatching {
             DefaultBufferLoop(pipeline = pipeline)
         }
     }

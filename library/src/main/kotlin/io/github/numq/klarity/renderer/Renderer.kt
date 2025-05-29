@@ -8,7 +8,7 @@ import org.jetbrains.skia.Surface
 /**
  * A renderer for drawing video frames.
  */
-interface Renderer {
+sealed interface Renderer {
     /**
      * A video format used by the renderer.
      */

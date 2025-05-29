@@ -3,7 +3,7 @@ package io.github.numq.klarity.command
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import kotlin.time.Duration
 
-sealed interface Command {
+internal sealed interface Command {
     enum class Descriptor {
         PREPARE, PLAY, PAUSE, RESUME, STOP, SEEK_TO, RELEASE
     }

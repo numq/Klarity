@@ -10,7 +10,7 @@ object ProbeManager {
     /**
      * Probes the specified location.
      *
-     * @param location The path or URI of the media file to probe
+     * @param location the path or URI of the media file to probe
      *
      * @return [Result] containing [Media]
      */
