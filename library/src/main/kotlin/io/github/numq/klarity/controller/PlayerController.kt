@@ -39,6 +39,12 @@ internal interface PlayerController {
     suspend fun close(): Result<Unit>
 
     companion object {
+        const val MIN_PLAYBACK_SPEED_FACTOR = .5F
+
+        const val MAX_PLAYBACK_SPEED_FACTOR = 2F
+
+        const val NORMAL_PLAYBACK_SPEED_FACTOR = 1F
+
         fun create(
             initialSettings: PlayerSettings?,
             audioDecoderFactory: AudioDecoderFactory,

@@ -2,6 +2,8 @@ package io.github.numq.klarity.controller
 
 import io.github.numq.klarity.buffer.BufferFactory
 import io.github.numq.klarity.command.Command
+import io.github.numq.klarity.controller.PlayerController.Companion.MAX_PLAYBACK_SPEED_FACTOR
+import io.github.numq.klarity.controller.PlayerController.Companion.MIN_PLAYBACK_SPEED_FACTOR
 import io.github.numq.klarity.decoder.AudioDecoderFactory
 import io.github.numq.klarity.decoder.Decoder
 import io.github.numq.klarity.decoder.VideoDecoderFactory
@@ -408,8 +410,7 @@ internal class DefaultPlayerController(
                 parameters = PlaybackLoopFactory.Parameters(
                     pipeline = pipeline,
                     getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
-                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor }
-                )
+                    getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor })
             ).onFailure {
                 bufferLoop.close().getOrThrow()
 
@@ -651,6 +652,10 @@ internal class DefaultPlayerController(
 
     override suspend fun changeSettings(newSettings: PlayerSettings) = commandMutex.withLock {
         runCatching {
+            require(newSettings.playbackSpeedFactor in MIN_PLAYBACK_SPEED_FACTOR..MAX_PLAYBACK_SPEED_FACTOR) {
+                "Invalid playback speed factor"
+            }
+
             settings.emit(newSettings)
         }
     }

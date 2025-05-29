@@ -1,6 +1,7 @@
 package io.github.numq.klarity.player
 
 import io.github.numq.klarity.buffer.BufferFactory
+import io.github.numq.klarity.controller.PlayerController
 import io.github.numq.klarity.controller.PlayerControllerFactory
 import io.github.numq.klarity.decoder.AudioDecoderFactory
 import io.github.numq.klarity.decoder.VideoDecoderFactory
@@ -146,6 +147,12 @@ interface KlarityPlayer {
         const val MIN_AUDIO_BUFFER_SIZE = 4
 
         const val MIN_VIDEO_BUFFER_SIZE = 2
+
+        const val MIN_PLAYBACK_SPEED_FACTOR = PlayerController.MIN_PLAYBACK_SPEED_FACTOR
+
+        const val MAX_PLAYBACK_SPEED_FACTOR = PlayerController.MAX_PLAYBACK_SPEED_FACTOR
+
+        const val NORMAL_PLAYBACK_SPEED_FACTOR = PlayerController.NORMAL_PLAYBACK_SPEED_FACTOR
 
         /**
          * Loads the native libraries.

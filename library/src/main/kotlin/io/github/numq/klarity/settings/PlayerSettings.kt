@@ -1,5 +1,7 @@
 package io.github.numq.klarity.settings
 
+import io.github.numq.klarity.player.KlarityPlayer
+
 /**
  * A data class representing the settings for the media player.
  *
@@ -13,6 +15,10 @@ data class PlayerSettings(
     val isMuted: Boolean
 ) {
     companion object {
-        val DEFAULT = PlayerSettings(playbackSpeedFactor = 1f, volume = 1f, isMuted = false)
+        val DEFAULT = PlayerSettings(
+            playbackSpeedFactor = KlarityPlayer.NORMAL_PLAYBACK_SPEED_FACTOR,
+            volume = 1f,
+            isMuted = false
+        )
     }
 }
