@@ -11,7 +11,6 @@ import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
-import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
@@ -25,11 +24,6 @@ import kotlin.time.Duration
  * Interface representing a media player.
  */
 interface KlarityPlayer {
-    /**
-     * A flow that emits the renderer of the player or null.
-     */
-    val renderer: StateFlow<Renderer?>
-
     /**
      * A flow that emits the current settings of the player.
      */
@@ -56,6 +50,22 @@ interface KlarityPlayer {
     val events: SharedFlow<PlayerEvent>
 
     /**
+     * Attaches the renderer to the player.
+     *
+     * @param renderer the new renderer to attach
+     *
+     * @return [Result] indicating success
+     */
+    suspend fun attachRenderer(renderer: Renderer): Result<Unit>
+
+    /**
+     * Detaches the renderer from the player.
+     *
+     * @return [Result] containing the detached renderer or null
+     */
+    suspend fun detachRenderer(): Result<Renderer?>
+
+    /**
      * Changes the settings of the player.
      *
      * @param settings the new settings to apply
@@ -79,7 +89,7 @@ interface KlarityPlayer {
      * @param videoBufferSize if the size is less than or equal to zero, it disables audio, otherwise it sets the video buffer size in frames
      * @param hardwareAccelerationCandidates hardware acceleration candidates
      *
-     * @return A [Result] indicating success
+     * @return [Result] indicating success
      */
     suspend fun prepare(
         location: String,
@@ -239,8 +249,7 @@ interface KlarityPlayer {
                     bufferFactory = BufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),
-                    samplerFactory = SamplerFactory(),
-                    rendererFactory = RendererFactory()
+                    samplerFactory = SamplerFactory()
                 )
             ).mapCatching(::DefaultKlarityPlayer).getOrThrow()
         }

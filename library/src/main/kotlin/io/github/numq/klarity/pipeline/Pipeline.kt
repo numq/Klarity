@@ -5,7 +5,6 @@ import io.github.numq.klarity.decoder.Decoder
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pool.Pool
-import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.Sampler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -36,12 +35,9 @@ internal sealed interface Pipeline {
         override val media: Media.Video,
         val decoder: Decoder<Media.Video>,
         val pool: Pool<Data>,
-        val buffer: Buffer<Frame>,
-        val renderer: Renderer
+        val buffer: Buffer<Frame>
     ) : Pipeline {
         override suspend fun close() = runCatching {
-            renderer.close().getOrThrow()
-
             buffer.close().getOrThrow()
 
             decoder.close().getOrThrow()
@@ -57,8 +53,7 @@ internal sealed interface Pipeline {
         val videoPool: Pool<Data>,
         val audioBuffer: Buffer<Frame>,
         val videoBuffer: Buffer<Frame>,
-        val sampler: Sampler,
-        val renderer: Renderer
+        val sampler: Sampler
     ) : Pipeline {
         override suspend fun close() = runCatching {
             coroutineScope {
@@ -71,8 +66,6 @@ internal sealed interface Pipeline {
                 }
 
                 val videoJob = async {
-                    renderer.close()
-
                     videoBuffer.close()
 
                     videoDecoder.close()

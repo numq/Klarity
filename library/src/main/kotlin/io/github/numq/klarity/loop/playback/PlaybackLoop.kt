@@ -1,6 +1,7 @@
 package io.github.numq.klarity.loop.playback
 
 import io.github.numq.klarity.pipeline.Pipeline
+import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
 
@@ -20,12 +21,14 @@ internal interface PlaybackLoop {
         fun create(
             pipeline: Pipeline,
             getVolume: () -> Float,
-            getPlaybackSpeedFactor: () -> Float
+            getPlaybackSpeedFactor: () -> Float,
+            getRenderer: suspend () -> Renderer?
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,
                 getVolume = getVolume,
-                getPlaybackSpeedFactor = getPlaybackSpeedFactor
+                getPlaybackSpeedFactor = getPlaybackSpeedFactor,
+                getRenderer = getRenderer
             )
         }
     }
