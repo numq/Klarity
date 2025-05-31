@@ -3,29 +3,32 @@ package scale
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.DragData
+import androidx.compose.ui.draganddrop.dragData
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.loadImageBitmap
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.singleWindowApplication
-import com.github.numq.klarity.compose.scale.ImageScale
+import io.github.numq.klarity.renderer.compose.ImageScale
 import org.jetbrains.skia.Bitmap
 import java.io.File
 import java.net.URI
-import java.nio.file.LinkOption
-import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.toPath
 
 fun main() = singleWindowApplication { BuildImageScalePreview() }
 
@@ -76,21 +79,25 @@ fun BuildImageScalePreview() {
         }
     }
 
-    Scaffold(modifier = Modifier.onExternalDrag(onDrop = { externalDragValue ->
-        when (val data = externalDragValue.dragData) {
-            is DragData.FilesList -> {
-                images = data.readFiles().asSequence().map {
-                    URI(it).toPath()
-                }.filter { path ->
-                    path.exists(LinkOption.NOFOLLOW_LINKS)
-                }.map(Path::toFile).map(File::inputStream).map { inputStream ->
-                    inputStream.use { loadImageBitmap((it)) }
-                }.toList()
-            }
+    val dropTarget = remember {
+        object : DragAndDropTarget {
+            override fun onDrop(event: DragAndDropEvent): Boolean {
+                images = when (val data = event.dragData()) {
+                    is DragData.FilesList -> data.readFiles().map { file ->
+                        File(URI(file)).inputStream().use { loadImageBitmap((it)) }
+                    }
 
-            else -> Unit
+                    else -> emptyList()
+                }
+
+                return true
+            }
         }
-    }), topBar = {
+    }
+
+    Scaffold(modifier = Modifier.dragAndDropTarget(shouldStartDragAndDrop = { event ->
+        event.dragData() !is DragData.Image
+    }, target = dropTarget), topBar = {
         TopAppBar(modifier = Modifier.fillMaxWidth(), title = {
             Text("Image scale preview")
         }, navigationIcon = {
@@ -111,12 +118,7 @@ fun BuildImageScalePreview() {
 fun ImageScaleMultiplePreview(images: List<ImageBitmap>) {
     val scaleModes = remember {
         mutableStateListOf(
-            ImageScale.None,
-            ImageScale.Crop,
-            ImageScale.Fit,
-            ImageScale.Fill,
-            ImageScale.FitWidth,
-            ImageScale.FitHeight
+            ImageScale.None, ImageScale.Crop, ImageScale.Fit, ImageScale.Fill, ImageScale.FitWidth, ImageScale.FitHeight
         )
     }
 
@@ -158,9 +160,10 @@ fun ImageScaleMultiplePreview(images: List<ImageBitmap>) {
                                         Canvas(
                                             Modifier.weight(1f).aspectRatio(dstRatio).background(Color.Green)
                                         ) {
-                                            drawImage(image, dstSize = imageScale.scaleDp(
-                                                DpSize(image.width.dp, image.height.dp), size.toDpSize()
-                                            ).let { (w, h) -> IntSize(w.value.toInt(), h.value.toInt()) })
+                                            drawImage(
+                                                image, dstSize = imageScale.scale(
+                                                    Size(image.width.toFloat(), image.height.toFloat()), size
+                                                ).let { (w, h) -> IntSize(w.toInt(), h.toInt()) })
                                         }
                                     }
                                 }

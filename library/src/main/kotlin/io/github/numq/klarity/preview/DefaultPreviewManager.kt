@@ -22,12 +22,7 @@ internal class DefaultPreviewManager(
     ) = runCatching {
         check(timestamp in Duration.ZERO..decoder.media.duration) { "Preview timestamp is out of range" }
 
-        if (timestamp.isPositive()) {
-            decoder.seekTo(
-                timestamp = timestamp.coerceIn(Duration.ZERO..decoder.media.duration),
-                keyframesOnly = keyframesOnly
-            ).getOrThrow()
-        }
+        decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
 
         val data = pool.acquire().getOrThrow()
 
