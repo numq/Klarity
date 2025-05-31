@@ -680,7 +680,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         throw DecoderException("Timestamp out of bounds");
     }
 
-    if (format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
+    if (format.frameRate == 0 || format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
         return 0;
     }
 
