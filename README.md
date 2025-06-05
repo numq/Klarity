@@ -1,4 +1,4 @@
-<a href="coff.ee/numq"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=numq&button_colour=17517e&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" /></a>
+<a href="https://www.buymeacoffee.com/numq"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=numq&button_colour=17517e&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" /></a>
 
 <div align="center">
 <h1>Klarity</h1>
@@ -143,13 +143,13 @@ depending on your system.
 - The `KlarityPlayer.load()` method should be called once during the application lifecycle
 
 ```kotlin
-KlarityPlayer.load().onFailure { t -> ... }.getOrThrow()
+KlarityPlayer.load().onFailure { t -> }.getOrThrow()
 ```
 
 ### Get probe (information about a [media](library/src/main/kotlin/io/github/numq/klarity/media/Media.kt))
 
 ```kotlin
-val media = ProbeManager.probe("path/to/media").onFailure { t -> ... }.getOrThrow()
+val media = ProbeManager.probe("path/to/media").onFailure { t -> }.getOrThrow()
 ```
 
 ## Get video frames (snapshots)
@@ -162,12 +162,12 @@ val media = ProbeManager.probe("path/to/media").onFailure { t -> ... }.getOrThro
 val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.onFailure { t -> ... }.getOrThrow()
 
 snapshots.forEach { snapshot ->
-    snapshot.close().onFailure { t -> ... }.getOrThrow()
+    snapshot.close().onFailure { t -> }.getOrThrow()
 }
 
 val snapshot = SnapshotManager.snapshot("path/to/media") { timestamp }.onFailure { t -> ... }.getOrThrow()
 
-snapshot.close().onFailure { t -> ... }.getOrThrow()
+snapshot.close().onFailure { t -> }.getOrThrow()
 ```
 
 ## Get preview frames (for example, for the timeline)
@@ -179,9 +179,9 @@ snapshot.close().onFailure { t -> ... }.getOrThrow()
 ```kotlin
 val previewManager = PreviewManager.create("path/to/media").onFailure { t -> ... }.getOrThrow()
 
-previewManager.render(renderer, timestamp).onFailure { t -> ... }.getOrThrow()
+previewManager.render(renderer, timestamp).onFailure { t -> }.getOrThrow()
 
-previewManager.close().onFailure { t -> ... }.getOrThrow()
+previewManager.close().onFailure { t -> }.getOrThrow()
 ```
 
 ### Get media file played
@@ -192,23 +192,23 @@ previewManager.close().onFailure { t -> ... }.getOrThrow()
 `close()` method
 
 ```kotlin
-val player = KlarityPlayer.create().onFailure { t -> ... }.getOrThrow()
+val player = KlarityPlayer.create().onFailure { t -> }.getOrThrow()
 
 val format = checkNotNull(player.state.media.videoFormat)
 
-val renderer = Renderer.create(format).onFailure { t -> ... }.getOrThrow()
+val renderer = Renderer.create(format).onFailure { t -> }.getOrThrow()
 
 player.attach(renderer).getOrThrow()
 
-player.prepare("path/to/media").onFailure { t -> ... }.getOrThrow()
+player.prepare("path/to/media").onFailure { t -> }.getOrThrow()
 
-player.play().onFailure { t -> ... }.getOrThrow()
+player.play().onFailure { t -> }.getOrThrow()
 
-player.stop().onFailure { t -> ... }.getOrThrow()
+player.stop().onFailure { t -> }.getOrThrow()
 
-player.close().onFailure { t -> ... }.getOrThrow()
+player.close().onFailure { t -> }.getOrThrow()
 
-renderer.close().onFailure { t -> ... }.getOrThrow()
+renderer.close().onFailure { t -> }.getOrThrow()
 ```
 
 ## Used libraries
