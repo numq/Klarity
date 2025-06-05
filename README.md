@@ -38,7 +38,7 @@
 - Slow down and speed up playback speed without changing pitch
 - Getting a preview of a media file
 - Getting frames (snapshots) of a media file
-- Using Coroutine/Flow API
+- Coroutine/Flow API
 
 ## Architecture
 
