@@ -1,11 +1,11 @@
-<a href="https://www.buymeacoffee.com/numq"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a one way ticket&emoji=✈️&slug=numq&button_colour=5F7FFF&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" /></a>
+<a href="coff.ee/numq"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=numq&button_colour=17517e&font_colour=ffffff&font_family=Inter&outline_colour=000000&coffee_colour=FFDD00" /></a>
 
 <div align="center">
 <h1>Klarity</h1>
 <img src="media/logo.png" alt="logo" height="128px"/>
 </div>
 
-### Klarity is an FFMpeg-based media player library written in C++ and Kotlin, and supports use in Jetpack Compose Desktop projects.
+### Klarity is a media layer for Jetpack Compose Desktop, written in Kotlin and C++, built on native FFMpeg and PortAudio libraries, and rendered using the Skiko library.
 
 <div align="center">
 <img src="media/screenshot.png" alt="screenshot"/>
@@ -15,27 +15,30 @@
 
 ## Table of Content
 
+* [Supported operating systems](#supported-operating-systems)
 * [Features](#features)
 * [Architecture](#architecture)
     * [Dependency graph](#dependency-graph)
     * [State diagram](#state-diagram)
     * [Transition table](#transition-table)
-* [Supported formats](#supported-formats)
-* [Modules](#modules)
-    * [Core](#core)
-    * [Compose](#compose)
-    * [Example](#example)
-* [Components](#components)
-* [Installation](#installation-and-usage)
+* [Installation](#installation)
+* [Usage](#usage)
+* [Used libraries](#used-libraries)
+
+# Supported operating systems
+
+- Windows x64
+- Linux x64
+- macOS x64
 
 # Features
 
-- Media playback (audio, video)
-- Change playback speed with time stretching (without affecting pitch)
-- Continuous preview for timeline-like features
-- Creation of snapshots by timestamps
-- Coroutines/Flow based API
-- Compose video rendering
+- Media files probing
+- Audio and video playback of media files
+- Slow down and speed up playback speed without changing pitch
+- Getting a preview of a media file
+- Getting frames (snapshots) of a media file
+- Using Coroutine/Flow API
 
 ## Architecture
 
@@ -56,7 +59,8 @@ graph TD
     BufferLoop --> Pipeline
     PlaybackLoop --> BufferLoop
     PlaybackLoop --> Pipeline
-    PlayerController --> Pipeline
+    PlaybackLoop --> Renderer
+    PlaybackLoop --> Settings
     subgraph Pipeline
         Pipeline.AudioVideo --> Media
         Pipeline.AudioVideo --> AudioDecoder
@@ -64,7 +68,7 @@ graph TD
         Pipeline.AudioVideo --> AudioBuffer
         Pipeline.AudioVideo --> VideoBuffer
         Pipeline.AudioVideo --> Sampler
-        Pipeline.AudioVideo --> Renderer
+        Pipeline.AudioVideo --> VideoPool
         Pipeline.Audio --> Media
         Pipeline.Audio --> AudioDecoder
         Pipeline.Audio --> AudioBuffer
@@ -72,7 +76,7 @@ graph TD
         Pipeline.Video --> Media
         Pipeline.Video --> VideoDecoder
         Pipeline.Video --> VideoBuffer
-        Pipeline.Video --> Renderer
+        Pipeline.Video --> VideoPool
     end
     Sampler --> JNI\nNativeSampler --> C++\nSampler
     AudioDecoder --> JNI\nNativeDecoder
@@ -88,7 +92,7 @@ stateDiagram-v2
         [*] --> Empty
         Empty --> Preparing: Prepare Media
         Preparing --> Ready: Media Ready
-        Preparing --> Empty: Release
+        Preparing --> Empty: Release/Error
 
         state Ready {
             [*] --> Stopped
@@ -103,9 +107,9 @@ stateDiagram-v2
             Stopped --> Seeking: SeekTo
             Completed --> Stopped: Stop
             Completed --> Seeking: SeekTo
-            Seeking --> Seeking: SeekTo
             Seeking --> Paused: Seek Completed
             Seeking --> Stopped: Stop
+            Seeking --> Seeking: SeekTo
         }
 
         Ready --> Empty: Release
@@ -114,78 +118,102 @@ stateDiagram-v2
 
 ### Transition table
 
-| Current State \ Target State | Empty | Preparing | Ready (Stopped) | Ready (Playing) | Ready (Paused) | Ready (Completed) | Ready (Seeking) | Released |
-|------------------------------|-------|-----------|-----------------|-----------------|----------------|-------------------|-----------------|----------|
-| **Empty**                    | N/A   | Prepare   | N/A             | N/A             | N/A            | N/A               | N/A             | N/A      |
-| **Preparing**                | N/A   | N/A       | Media Ready     | N/A             | N/A            | N/A               | N/A             | Release  |
-| **Ready (Stopped)**          | N/A   | N/A       | N/A             | Play            | N/A            | N/A               | SeekTo          | Release  |
-| **Ready (Playing)**          | N/A   | N/A       | Stop            | N/A             | Pause          | N/A               | SeekTo          | N/A      |
-| **Ready (Paused)**           | N/A   | N/A       | Stop            | Resume          | N/A            | N/A               | SeekTo          | N/A      |
-| **Ready (Completed)**        | N/A   | N/A       | Stop            | N/A             | N/A            | N/A               | SeekTo          | N/A      |
-| **Ready (Seeking)**          | N/A   | N/A       | Stop            | N/A             | Seek Completed | N/A               | SeekTo          | N/A      |
+| Current State \ Target State | Empty         | Preparing | Ready (Stopped) | Ready (Playing) | Ready (Paused) | Ready (Completed) | Ready (Seeking) |
+|------------------------------|---------------|-----------|-----------------|-----------------|----------------|-------------------|-----------------|
+| **Empty**                    | N/A           | Prepare   | N/A             | N/A             | N/A            | N/A               | N/A             |
+| **Preparing**                | Release/Error | N/A       | Media Ready     | N/A             | N/A            | N/A               | N/A             |
+| **Ready (Stopped)**          | Release       | N/A       | N/A             | Play            | N/A            | N/A               | SeekTo          |
+| **Ready (Playing)**          | N/A           | N/A       | Stop            | N/A             | Pause          | N/A               | SeekTo          |
+| **Ready (Paused)**           | N/A           | N/A       | Stop            | Resume          | N/A            | N/A               | SeekTo          |
+| **Ready (Completed)**        | N/A           | N/A       | Stop            | N/A             | N/A            | N/A               | SeekTo          |
+| **Ready (Seeking)**          | N/A           | N/A       | Stop            | N/A             | Seek Completed | N/A               | SeekTo          |
 
-## Supported formats
+## Installation
 
-[Full list of formats supported by FFmpeg](https://ffmpeg.org/ffmpeg-formats.html)
+Download the [latest release](https://github.com/numq/Klarity/releases/tag/1.0.0) and include jar files to your project
+depending on your system.
 
-## Modules
+## Usage
 
-### Core
+> [!NOTE]
+> Check out the example to see a full implementation in Clean Architecture using the Reduce & Conquer pattern.
 
-> Contains basic components such as: controller, player, preview manager, snapshot manager
+### Load library
 
-#### Dependencies
+- The `KlarityPlayer.load()` method should be called once during the application lifecycle
 
-- [klarity-decoder](https://github.com/numq/klarity-decoder)
-    - [FFmpeg](https://www.ffmpeg.org/)
+```kotlin
+KlarityPlayer.load().onFailure { t -> ... }.getOrThrow()
+```
 
-- [klarity-sampler](https://github.com/numq/klarity-sampler)
-    - [PortAudio](https://github.com/PortAudio/portaudio/)
-    - [Signalsmith Audio](https://github.com/Signalsmith-Audio/signalsmith-stretch)
+### Get probe (information about a [media](library/src/main/kotlin/io/github/numq/klarity/media/Media.kt))
 
-### Compose
+```kotlin
+val media = ProbeManager.probe("path/to/media").onFailure { t -> ... }.getOrThrow()
+```
 
-> Contains a Compose component for rendering video
-
-#### Dependencies
-
-- [Core Module](#core)
-
-### Example
-
-> Contains a demo application
-
-#### Dependencies
-
-- [Core Module](#core)
-- [Compose Module](#compose)
-
-To run demo application place the binaries appropriate to your platform into the `example/bin` folder and run
-the [Application](example/src/main/kotlin/application/Application.kt).
-
-### Components
-
-- [KlarityPlayer](core/src/main/kotlin/com/github/numq/klarity/core/player/KlarityPlayer.kt) - contains the media player
-  logic.
-- [SnapshotManager](core/src/main/kotlin/com/github/numq/klarity/core/snapshot/SnapshotManager.kt) - allows to get
-  frames (snapshots) with a
-  specified timestamp once per session. Use case - previewing keyframes.
-- [PreviewManager](core/src/main/kotlin/com/github/numq/klarity/core/preview/PreviewManager.kt) - allows to get frames (
-  snapshots) with a
-  specific timestamp during a continuous session. Use case - previewing the timeline.
-- [Renderer](compose/src/main/kotlin/com/github/numq/klarity/compose/renderer/Renderer.kt) - Provides functionality for
-  rendering background and
-  foreground.
-
-### Installation and usage
+## Get video frames (snapshots)
 
 > [!IMPORTANT]
-> Binaries must be located in the filesystem, however, they can be part of a jar - for this the binaries must be
-> opened as temporary files whose path can be used by the loader.
+> [Snapshot](library/src/main/kotlin/io/github/numq/klarity/snapshot/Snapshot.kt) must be closed using the `close()`
+> method.
 
-- Include the library jars in project
-- Place binaries in folder
-- Load binaries by specifying path in calls to `loadDecoder` and `loadSampler` functions
-  of [Klarity](core/src/main/kotlin/com/github/numq/klarity/core/loader/Klarity.kt) loader object
-- Instantiate and use **core** media player components located in `com.github.numq.klarity.core`
-- Instantiate and use specific **Jetpack Compose** components located in `com.github.numq.klarity.compose`
+```kotlin
+val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.onFailure { t -> ... }.getOrThrow()
+
+snapshots.forEach { snapshot ->
+    snapshot.close().onFailure { t -> ... }.getOrThrow()
+}
+
+val snapshot = SnapshotManager.snapshot("path/to/media") { timestamp }.onFailure { t -> ... }.getOrThrow()
+
+snapshot.close().onFailure { t -> ... }.getOrThrow()
+```
+
+## Get preview frames (for example, for the timeline)
+
+> [!IMPORTANT]
+> [PreviewManager](library/src/main/kotlin/io/github/numq/klarity/preview/PreviewManager.kt) must be closed using the
+`close()` method.
+
+```kotlin
+val previewManager = PreviewManager.create("path/to/media").onFailure { t -> ... }.getOrThrow()
+
+previewManager.render(renderer, timestamp).onFailure { t -> ... }.getOrThrow()
+
+previewManager.close().onFailure { t -> ... }.getOrThrow()
+```
+
+### Get media file played
+
+> [!IMPORTANT]
+> [KlarityPlayer](library/src/main/kotlin/io/github/numq/klarity/player/KlarityPlayer.kt)
+> and [Renderer](library/src/main/kotlin/io/github/numq/klarity/renderer/Renderer.kt) must be closed using the
+`close()` method
+
+```kotlin
+val player = KlarityPlayer.create().onFailure { t -> ... }.getOrThrow()
+
+val format = checkNotNull(player.state.media.videoFormat)
+
+val renderer = Renderer.create(format).onFailure { t -> ... }.getOrThrow()
+
+player.attach(renderer).getOrThrow()
+
+player.prepare("path/to/media").onFailure { t -> ... }.getOrThrow()
+
+player.play().onFailure { t -> ... }.getOrThrow()
+
+player.stop().onFailure { t -> ... }.getOrThrow()
+
+player.close().onFailure { t -> ... }.getOrThrow()
+
+renderer.close().onFailure { t -> ... }.getOrThrow()
+```
+
+## Used libraries
+
+- [FFMPEG](https://ffmpeg.org/)
+- [PortAudio](https://www.portaudio.com/)
+- [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch/)
+- [Skiko](https://github.com/JetBrains/skiko/)
