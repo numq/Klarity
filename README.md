@@ -6,8 +6,7 @@
 </div>
 
 **Klarity** is a media player for **Jetpack Compose Desktop**, written in **Kotlin** and **C++**, built on top of the
-native **FFMpeg** and
-**PortAudio** libraries, and rendered using the **Skiko** library.
+native **FFMpeg** and **PortAudio** libraries, and rendered using the **Skiko** library.
 
 Since frames are rendered directly into the `Composable`, this eliminates the need for compatibility components like
 `SwingPanel`, making it possible to display any `Composable` as an overlay on top of a frame.
