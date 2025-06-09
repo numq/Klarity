@@ -5,7 +5,7 @@
 <img src="media/logo.png" alt="logo" height="128px"/>
 </div>
 
-**Klarity** is a media player for **Jetpack Compose Desktop**, written in **Kotlin** and **C++**, built on top of the
+**Klarity** is a media playback for **Jetpack Compose Desktop**, written in **Kotlin** and **C++**, built on top of the
 native **FFMpeg** and **PortAudio** libraries, and rendered using the **Skiko** library.
 
 Since frames are rendered directly into the `Composable`, this eliminates the need for compatibility components like
@@ -198,21 +198,21 @@ previewManager.close().onFailure { t -> }.getOrThrow()
 `close()` method
 
 ```kotlin
-val player = KlarityPlayer.create().onFailure { t -> }.getOrThrow()
+val playback = KlarityPlayer.create().onFailure { t -> }.getOrThrow()
 
-val format = checkNotNull(player.state.media.videoFormat)
+val format = checkNotNull(playback.state.media.videoFormat)
 
 val renderer = Renderer.create(format).onFailure { t -> }.getOrThrow()
 
-player.attach(renderer).getOrThrow()
+playback.attach(renderer).getOrThrow()
 
-player.prepare("path/to/media").onFailure { t -> }.getOrThrow()
+playback.prepare("path/to/media").onFailure { t -> }.getOrThrow()
 
-player.play().onFailure { t -> }.getOrThrow()
+playback.play().onFailure { t -> }.getOrThrow()
 
-player.stop().onFailure { t -> }.getOrThrow()
+playback.stop().onFailure { t -> }.getOrThrow()
 
-player.close().onFailure { t -> }.getOrThrow()
+playback.close().onFailure { t -> }.getOrThrow()
 
 renderer.close().onFailure { t -> }.getOrThrow()
 ```
