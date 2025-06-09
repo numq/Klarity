@@ -32,7 +32,7 @@ interface MediaQueue<Item> {
      * A StateFlow that represents the currently selected item in the queue.
      * It can be `Absent` if no item is selected, or `Present` with the selected item.
      */
-    val selectedItem: StateFlow<SelectedItem<Item>>
+    val selectedItem: StateFlow<SelectedItem>
 
     /**
      * A StateFlow that indicates whether there is a previous item to navigate to in the queue.

@@ -18,7 +18,7 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
 
     override val repeatMode = MutableStateFlow(RepeatMode.NONE)
 
-    override val selectedItem = MutableStateFlow<SelectedItem<Item>>(SelectedItem.Absent)
+    override val selectedItem = MutableStateFlow<SelectedItem>(SelectedItem.Absent)
 
     override val hasPrevious = MutableStateFlow(false)
 
@@ -37,8 +37,8 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
     private suspend fun updateSelection(offset: Int) {
         if (_items.isEmpty()) return
 
-        if (selectedItem.value is SelectedItem.Present) {
-            val currentIndex = items.value.indexOf((selectedItem.value as SelectedItem.Present<Item>).item)
+        if (selectedItem.value is SelectedItem.Present<*>) {
+            val currentIndex = items.value.indexOf((selectedItem.value as SelectedItem.Present<*>).item)
 
             if (currentIndex < 0) return
 
@@ -115,7 +115,7 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
             if (item in _items) {
                 val currentSelectedItem = selectedItem.value
 
-                if (currentSelectedItem is SelectedItem.Present && currentSelectedItem.item == item) {
+                if (currentSelectedItem is SelectedItem.Present<*> && currentSelectedItem.item == item) {
                     when {
                         hasNext.value -> next()
 
@@ -137,7 +137,7 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
     override suspend fun replace(from: Item, to: Item) = mutex.withLock {
         runCatching {
             if (from in _items) {
-                if (selectedItem.value is SelectedItem.Present && selectedItem.value == from) {
+                if (selectedItem.value is SelectedItem.Present<*> && selectedItem.value == from) {
                     select(to)
                 }
 

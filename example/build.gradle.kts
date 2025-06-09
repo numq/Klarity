@@ -1,9 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "1.9.0"
-    id("org.jetbrains.compose") version "1.5.10"
+    kotlin("jvm") version "2.1.21"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21"
+    id("org.jetbrains.compose") version "1.8.1"
 }
 
 group = "com.github.numq"
@@ -18,12 +19,20 @@ repositories {
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material:material-icons-extended-desktop:1.5.10")
+    implementation("io.insert-koin:koin-compose:4.0.4")
+    implementation("io.insert-koin:koin-core:4.0.4")
     implementation(project(":library"))
 }
 
-tasks.withType<KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "${JavaVersion.VERSION_17}"
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 

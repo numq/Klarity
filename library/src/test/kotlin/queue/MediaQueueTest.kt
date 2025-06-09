@@ -42,7 +42,7 @@ class MediaQueueTest {
 
         mediaQueue.delete(1)
 
-        assertEquals(2, (mediaQueue.selectedItem.first() as SelectedItem.Present).item)
+        assertEquals(2, (mediaQueue.selectedItem.first() as SelectedItem.Present<*>).item)
 
         mediaQueue.delete(2)
 
@@ -104,8 +104,8 @@ class MediaQueueTest {
         mediaQueue.previous()
 
         val selectedItem = mediaQueue.selectedItem.first()
-        assertTrue(selectedItem is SelectedItem.Present)
-        assertEquals(1, (selectedItem as SelectedItem.Present).item)
+        assertTrue(selectedItem is SelectedItem.Present<*>)
+        assertEquals(1, (selectedItem as SelectedItem.Present<*>).item)
     }
 
     @Test
@@ -117,7 +117,7 @@ class MediaQueueTest {
         mediaQueue.next()
 
         val selectedItem = mediaQueue.selectedItem.first()
-        assertTrue(selectedItem is SelectedItem.Present)
-        assertEquals(2, (selectedItem as SelectedItem.Present).item)
+        assertTrue(selectedItem is SelectedItem.Present<*>)
+        assertEquals(2, (selectedItem as SelectedItem.Present<*>).item)
     }
 }
