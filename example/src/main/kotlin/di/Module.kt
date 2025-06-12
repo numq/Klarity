@@ -15,16 +15,13 @@ import org.koin.core.component.getScopeName
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.dsl.onClose
-import playback.ChangePlaybackSpeed
-import playback.ControlPlayback
-import playback.GetPlaybackState
-import playback.PlaybackService
+import playback.*
 import playlist.PlaylistFeature
 import playlist.PlaylistReducer
 import preview.*
 import probe.ProbeService
+import renderer.RendererManager
 import renderer.RendererRepository
-import renderer.RendererService
 
 private val HUB_SCOPE = Scope.HUB.getScopeName()
 
@@ -42,7 +39,7 @@ private val item = module {
 
         scoped { GetItems(get()) }
 
-        scoped { AddItem(get(), get(), get(), get(), get(), get()) }
+        scoped { AddItem(get(), get(), get(), get(), get()) }
 
         scoped { RemoveItem(get(), get(), get()) }
     }
@@ -52,7 +49,7 @@ private val item = module {
 
         scoped { GetItems(get()) }
 
-        scoped { AddItem(get(), get(), get(), get(), get(), get()) }
+        scoped { AddItem(get(), get(), get(), get(), get()) }
 
         scoped { RemoveItem(get(), get(), get()) }
     }
@@ -61,7 +58,7 @@ private val item = module {
 private val probe = module {
     single { ProbeManager }
 
-    single { ProbeService(get()) }
+    single { ProbeService.Implementation(get()) } bind ProbeService::class
 }
 
 private val preview = module {
@@ -94,7 +91,7 @@ private val renderer = module {
             }
         }
 
-        scoped { RendererService.Implementation(get()) } bind RendererService::class
+        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
     }
 
     scope(PLAYLIST_SCOPE) {
@@ -104,7 +101,7 @@ private val renderer = module {
             }
         }
 
-        scoped { RendererService.Implementation(get()) } bind RendererService::class
+        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
     }
 }
 
@@ -112,9 +109,13 @@ private val playback = module {
     scope(HUB_SCOPE) {
         scoped { KlarityPlayer.create().getOrThrow() }
 
-        scoped { PlaybackService(get()) }
+        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
 
         scoped { GetPlaybackState(get()) }
+
+        scoped { ToggleMute(get()) }
+
+        scoped { ChangeVolume(get()) }
 
         scoped { ChangePlaybackSpeed(get()) }
 
@@ -124,9 +125,13 @@ private val playback = module {
     scope(PLAYLIST_SCOPE) {
         scoped { KlarityPlayer.create().getOrThrow() }
 
-        scoped { PlaybackService(get()) }
+        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
 
         scoped { GetPlaybackState(get()) }
+
+        scoped { ToggleMute(get()) }
+
+        scoped { ChangeVolume(get()) }
 
         scoped { ChangePlaybackSpeed(get()) }
 
@@ -136,7 +141,7 @@ private val playback = module {
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         scoped { HubFeature(get()) } onClose { it?.close() }
     }
@@ -144,7 +149,7 @@ private val hub = module {
 
 private val playlist = module {
     scope(PLAYLIST_SCOPE) {
-        scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         scoped { PlaylistFeature(get()) } onClose { it?.close() }
     }
