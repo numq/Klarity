@@ -119,8 +119,8 @@ interface MediaQueue<Item> {
          *
          * @param <Item> the type of the media items in the queue
          *
-         * @return new instance of MediaQueue
+         * @return [Result] containing a [MediaQueue] instance
          */
-        fun <Item> create(): MediaQueue<Item> = DefaultMediaQueue()
+        fun <Item> create(): Result<MediaQueue<Item>> = runCatching { DefaultMediaQueue() }
     }
 }
