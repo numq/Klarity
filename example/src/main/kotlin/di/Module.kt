@@ -1,8 +1,8 @@
 package di
 
-import hub.HubFeature
 import hub.HubItemRepository
-import hub.HubReducer
+import hub.presentation.HubFeature
+import hub.presentation.HubReducer
 import io.github.numq.klarity.player.KlarityPlayer
 import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.queue.MediaQueue
@@ -15,6 +15,9 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 import playback.*
+import playlist.DeselectPlaylistItem
+import playlist.GetPlaylistSettings
+import playlist.PlaylistInteractionRepository
 import playlist.PlaylistItemRepository
 import playlist.presentation.PlaylistFeature
 import playlist.presentation.PlaylistReducer
@@ -157,7 +160,13 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistItemRepository(get()) } bind ItemRepository::class
 
-        scoped { SelectItem(get()) }
+        scoped { PlaylistInteractionRepository.Implementation(get()) } bind PlaylistInteractionRepository::class
+
+        scoped { GetPlaylistSettings(get()) }
+
+        scoped { SelectPlaylistItem(get()) }
+
+        scoped { DeselectPlaylistItem(get()) }
 
         scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
