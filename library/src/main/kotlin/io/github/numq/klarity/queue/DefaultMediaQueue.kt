@@ -58,13 +58,17 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
         }
     }
 
-    override suspend fun shuffle() = mutex.withLock {
+    override suspend fun setShuffleEnabled(enabled: Boolean) = mutex.withLock {
         runCatching {
-            shuffleSeed = if (shuffleSeed == null) Random.nextLong() else null
+            shuffleSeed = if (enabled) Random.nextLong() else null
 
-            isShuffled.emit(shuffleSeed != null)
+            isShuffled.emit(enabled)
 
-            val shuffledItems = shuffleSeed?.let { seed -> _items.shuffled(Random(seed)) } ?: _items.toList()
+            val shuffledItems = if (enabled) {
+                _items.shuffled(Random(shuffleSeed!!))
+            } else {
+                _items.toList()
+            }
 
             items.emit(shuffledItems)
 

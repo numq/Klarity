@@ -47,11 +47,14 @@ interface MediaQueue<Item> {
     val hasNext: StateFlow<Boolean>
 
     /**
-     * Shuffles the current queue of media items. If the queue is already shuffled, this operation resets it to the original order.
+     * Enables or disables shuffling of the queue. If enabled, the queue will be randomized based on a new seed;
+     * if disabled, it resets to its original order.
+     *
+     * @param enabled whether shuffling should be enabled
      *
      * @return [Result] indicating success or failure of the operation
      */
-    suspend fun shuffle(): Result<Unit>
+    suspend fun setShuffleEnabled(enabled: Boolean): Result<Unit>
 
     /**
      * Sets the repeat mode for the queue.
