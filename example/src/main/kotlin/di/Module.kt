@@ -1,6 +1,6 @@
 package di
 
-import hub.HubItemRepository
+import hub.HubRepository
 import hub.presentation.HubFeature
 import hub.presentation.HubReducer
 import io.github.numq.klarity.player.KlarityPlayer
@@ -15,10 +15,7 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.dsl.onClose
 import playback.*
-import playlist.DeselectPlaylistItem
-import playlist.GetPlaylistSettings
-import playlist.PlaylistInteractionRepository
-import playlist.PlaylistItemRepository
+import playlist.*
 import playlist.presentation.PlaylistFeature
 import playlist.presentation.PlaylistReducer
 import preview.*
@@ -92,63 +89,9 @@ private val renderer = module {
     }
 }
 
-private val navigation = module {
-    single { NavigationReducer() }
-
-    single { NavigationFeature(get()) } onClose { it?.close() }
-}
-
-private val item = module {
-    scope(HUB_SCOPE) {
-        scoped { GetItems(get()) }
-
-        scoped { AddItem(get(), get(), get(), get(), get()) }
-
-        scoped { RemoveItem(get(), get(), get()) }
-    }
-
-    scope(PLAYLIST_SCOPE) {
-        scoped { GetItems(get()) }
-
-        scoped { AddItem(get(), get(), get(), get(), get()) }
-
-        scoped { RemoveItem(get(), get(), get()) }
-    }
-}
-
-private val playback = module {
-    scope(HUB_SCOPE) {
-        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
-
-        scoped { GetPlaybackItem(get(), get()) }
-
-        scoped { ToggleMute(get()) }
-
-        scoped { ChangeVolume(get()) }
-
-        scoped { ChangePlaybackSpeed(get()) }
-
-        scoped { ControlPlayback(get()) }
-    }
-
-    scope(PLAYLIST_SCOPE) {
-        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
-
-        scoped { GetPlaybackItem(get(), get()) }
-
-        scoped { ToggleMute(get()) }
-
-        scoped { ChangeVolume(get()) }
-
-        scoped { ChangePlaybackSpeed(get()) }
-
-        scoped { ControlPlayback(get()) }
-    }
-}
-
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubItemRepository() } bind ItemRepository::class
+        scoped { HubRepository() } bind ItemRepository::class
 
         scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
@@ -156,22 +99,84 @@ private val hub = module {
     }
 }
 
+private val item = module {
+    scope(HUB_SCOPE) {
+        scoped { GetItems(get()) }
+
+        scoped { AddItem(get(), get()) }
+
+        scoped { RemoveItem(get()) }
+    }
+
+    scope(PLAYLIST_SCOPE) {
+        scoped { GetItems(get()) }
+
+        scoped { AddItem(get(), get()) }
+
+        scoped { RemoveItem(get()) }
+    }
+}
+
+private val navigation = module {
+    single { NavigationReducer() }
+
+    single { NavigationFeature(get()) } onClose { it?.close() }
+}
+
+private val playback = module {
+    scope(HUB_SCOPE) {
+        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
+
+        scoped { ChangePlaybackSpeed(get()) }
+
+        scoped { ChangeVolume(get()) }
+
+        scoped { ControlPlayback(get()) }
+
+        scoped { GetPlaybackState(get()) }
+
+        scoped { ToggleMute(get()) }
+    }
+
+    scope(PLAYLIST_SCOPE) {
+        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class
+
+        scoped { ChangePlaybackSpeed(get()) }
+
+        scoped { ChangeVolume(get()) }
+
+        scoped { ControlPlayback(get()) }
+
+        scoped { GetPlaybackState(get()) }
+
+        scoped { ToggleMute(get()) }
+    }
+}
+
 private val playlist = module {
     scope(PLAYLIST_SCOPE) {
-        scoped { PlaylistItemRepository(get()) } bind ItemRepository::class
+        scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistInteractionRepository.Implementation(get()) } bind PlaylistInteractionRepository::class
-
-        scoped { GetPlaylistSettings(get()) }
+        scoped { PlaylistRepository(get()) } bind ItemRepository::class
 
         scoped { SelectPlaylistItem(get()) }
 
         scoped { DeselectPlaylistItem(get()) }
 
-        scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped { ChangePlaylistMode(get()) }
+
+        scoped { ChangePlaylistShuffling(get()) }
+
+        scoped { GetPlaylist(get()) }
+
+        scoped { PreviousPlaylistItem(get()) }
+
+        scoped { NextPlaylistItem(get()) }
+
+        scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         scoped { PlaylistFeature(get()) } onClose { it?.close() }
     }
 }
 
-internal val appModule = listOf(probe, preview, player, renderer, navigation, item, playback, hub, playlist)
+internal val appModule = listOf(probe, preview, player, renderer, hub, item, navigation, playback, playlist)
