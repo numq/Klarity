@@ -699,7 +699,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     const auto targetTimestamp = av_rescale_q(timestampMicros, {1, AV_TIME_BASE}, timeBase);
 
     if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
-        throw DecoderException("Seek failed");
+        throw DecoderException("Error seeking stream");
     }
 
     if (videoCodecContext) {
@@ -733,7 +733,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     auto frame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
 
     if (!frame) {
-        throw DecoderException("Failed to allocate frame");
+        throw DecoderException("Could not allocate frame");
     }
 
     int64_t audioTimestamp = _hasAudio() ? -1 : 0;
