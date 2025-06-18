@@ -672,91 +672,42 @@ std::optional<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
 uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!_isValid()) {
-        throw DecoderException("Could not use uninitialized decoder");
-    }
+    if (!_isValid()) throw DecoderException("Uninitialized decoder");
 
     if (timestampMicros < 0 || timestampMicros > format.durationMicros) {
         throw DecoderException("Timestamp out of bounds");
     }
 
-    if (format.frameRate == 0 || format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
+    const int seekFlags = keyframesOnly ? AVSEEK_FLAG_BACKWARD : AVSEEK_FLAG_ANY;
+
+    int streamIndex;
+
+    AVRational timeBase;
+
+    if (videoStream) {
+        streamIndex = videoStream->index;
+
+        timeBase = videoStream->time_base;
+    } else if (audioStream) {
+        streamIndex = audioStream->index;
+
+        timeBase = audioStream->time_base;
+    } else {
         return 0;
     }
 
-    const auto stream = videoStream ? videoStream : audioStream;
-
-    const int streamIndex = stream->index;
-
-    const auto targetTimestamp = av_rescale_q(
-            timestampMicros,
-            {1, AV_TIME_BASE},
-            stream->time_base
-    );
-
-    if (videoCodecContext) avcodec_flush_buffers(videoCodecContext.get());
-
-    if (audioCodecContext) avcodec_flush_buffers(audioCodecContext.get());
-
-    const int seekFlags = keyframesOnly ? AVSEEK_FLAG_BACKWARD : (AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
+    const auto targetTimestamp = av_rescale_q(timestampMicros, {1, AV_TIME_BASE}, timeBase);
 
     if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
-        throw DecoderException("Error seeking to timestamp");
+        throw DecoderException("Seek failed");
     }
 
-    uint64_t resultTimestampMicros = timestampMicros;
+    if (videoCodecContext) {
+        avcodec_flush_buffers(videoCodecContext.get());
+    }
 
-    if (!keyframesOnly) {
-        auto frame = av_frame_alloc();
-
-        if (!frame) {
-            throw DecoderException("Failed to allocate frame");
-        }
-
-        const int maxFramesToDecode = 100;
-
-        int framesDecoded = 0;
-
-        try {
-            while (framesDecoded++ < maxFramesToDecode && av_read_frame(formatContext.get(), packet.get()) == 0) {
-                if (packet->stream_index == streamIndex) {
-                    auto codecContext = _hasVideo() ? videoCodecContext.get() : audioCodecContext.get();
-
-                    if (avcodec_send_packet(codecContext, packet.get()) < 0) {
-                        av_packet_unref(packet.get());
-
-                        continue;
-                    }
-
-                    av_packet_unref(packet.get());
-
-                    if (avcodec_receive_frame(codecContext, frame) >= 0) {
-                        int64_t frameTimestamp =
-                                frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp
-                                                                               : frame->pts;
-
-                        if (frameTimestamp != AV_NOPTS_VALUE) {
-                            resultTimestampMicros = av_rescale_q(
-                                    frameTimestamp,
-                                    stream->time_base,
-                                    {1, AV_TIME_BASE}
-                            );
-
-                            if (resultTimestampMicros >= timestampMicros) {
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    av_packet_unref(packet.get());
-                }
-            }
-
-            av_frame_free(&frame);
-        } catch (...) {
-            av_frame_free(&frame);
-            throw;
-        }
+    if (audioCodecContext) {
+        avcodec_flush_buffers(audioCodecContext.get());
     }
 
     if (packet) {
@@ -779,7 +730,71 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     audioBuffer.shrink_to_fit();
 
-    return resultTimestampMicros;
+    auto frame = std::unique_ptr<AVFrame, AVFrameDeleter>(av_frame_alloc());
+
+    if (!frame) {
+        throw DecoderException("Failed to allocate frame");
+    }
+
+    int64_t audioTimestamp = _hasAudio() ? -1 : 0;
+
+    int64_t videoTimestamp = _hasVideo() ? -1 : 0;
+
+    int maxFrames = 200;
+
+    int framesDecoded = 0;
+
+    const int64_t targetMicros = timestampMicros;
+
+    while (((_hasAudio() && audioTimestamp < targetMicros) ||
+            (_hasVideo() && videoTimestamp < targetMicros)) &&
+           framesDecoded++ < maxFrames) {
+        if (av_read_frame(formatContext.get(), packet.get()) < 0) break;
+
+        if (_hasVideo() && packet->stream_index == videoStream->index) {
+            if (avcodec_send_packet(videoCodecContext.get(), packet.get()) == 0) {
+                while (avcodec_receive_frame(videoCodecContext.get(), frame.get()) == 0) {
+                    int64_t pts =
+                            frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp : frame->pts;
+
+                    if (pts != AV_NOPTS_VALUE) {
+                        int64_t micros = av_rescale_q(pts, videoStream->time_base, {1, AV_TIME_BASE});
+
+                        if (micros >= targetMicros || videoTimestamp < 0) {
+                            videoTimestamp = micros;
+                        }
+                    }
+
+                    av_frame_unref(frame.get());
+                }
+            }
+        }
+
+        if (_hasAudio() && packet->stream_index == audioStream->index) {
+            if (avcodec_send_packet(audioCodecContext.get(), packet.get()) == 0) {
+                while (avcodec_receive_frame(audioCodecContext.get(), frame.get()) == 0) {
+                    int64_t pts =
+                            frame->best_effort_timestamp != AV_NOPTS_VALUE ? frame->best_effort_timestamp : frame->pts;
+
+                    if (pts != AV_NOPTS_VALUE) {
+                        int64_t micros = av_rescale_q(pts, audioStream->time_base, {1, AV_TIME_BASE});
+
+                        if (micros >= targetMicros || audioTimestamp < 0) {
+                            audioTimestamp = micros;
+                        }
+                    }
+
+                    av_frame_unref(frame.get());
+                }
+            }
+        }
+
+        av_packet_unref(packet.get());
+    }
+
+    frame.reset();
+
+    return std::max<int64_t>(audioTimestamp, videoTimestamp);
 }
 
 void Decoder::reset() {
