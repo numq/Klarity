@@ -51,7 +51,7 @@ private val preview = module {
 
         scoped { StopPreview(get()) }
 
-        scoped { ResetPreview(get(), get(), get()) }
+        scoped { GetPreview(get(), get(), get()) }
     }
 }
 
@@ -93,7 +93,7 @@ private val hub = module {
     scope(HUB_SCOPE) {
         scoped { HubRepository() } bind ItemRepository::class
 
-        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         scoped { HubFeature(get()) } onClose { it?.close() }
     }
@@ -103,7 +103,7 @@ private val item = module {
     scope(HUB_SCOPE) {
         scoped { GetItems(get()) }
 
-        scoped { AddItem(get(), get()) }
+        scoped { AddItem(get(), get(), get(), get(), get()) }
 
         scoped { RemoveItem(get()) }
     }
@@ -111,7 +111,7 @@ private val item = module {
     scope(PLAYLIST_SCOPE) {
         scoped { GetItems(get()) }
 
-        scoped { AddItem(get(), get()) }
+        scoped { AddItem(get(), get(), get(), get(), get()) }
 
         scoped { RemoveItem(get()) }
     }
@@ -161,11 +161,11 @@ private val playlist = module {
 
         scoped { SelectPlaylistItem(get()) }
 
-        scoped { DeselectPlaylistItem(get()) }
-
         scoped { ChangePlaylistMode(get()) }
 
         scoped { ChangePlaylistShuffling(get()) }
+
+        scoped { GetSelectedItem(get()) }
 
         scoped { GetPlaylist(get()) }
 
@@ -173,7 +173,27 @@ private val playlist = module {
 
         scoped { NextPlaylistItem(get()) }
 
-        scoped { PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped {
+            PlaylistReducer(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get()
+            )
+        }
 
         scoped { PlaylistFeature(get()) } onClose { it?.close() }
     }
