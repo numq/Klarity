@@ -672,7 +672,14 @@ std::optional<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
 uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
-    if (!_isValid()) throw DecoderException("Uninitialized decoder");
+    if (!_isValid()) {
+        throw DecoderException("Could not use uninitialized decoder");
+    }
+
+    if (format.frameRate == 0 || static_cast<float>(format.durationMicros) < (1'000 / format.frameRate) ||
+        (!_hasAudio() && !_hasVideo())) {
+        return timestampMicros;
+    }
 
     if (timestampMicros < 0 || timestampMicros > format.durationMicros) {
         throw DecoderException("Timestamp out of bounds");
@@ -688,18 +695,18 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         streamIndex = videoStream->index;
 
         timeBase = videoStream->time_base;
-    } else if (audioStream) {
+    } else {
         streamIndex = audioStream->index;
 
         timeBase = audioStream->time_base;
-    } else {
-        return 0;
     }
 
     const auto targetTimestamp = av_rescale_q(timestampMicros, {1, AV_TIME_BASE}, timeBase);
 
     if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, seekFlags) < 0) {
-        throw DecoderException("Error seeking stream");
+        if (av_seek_frame(formatContext.get(), streamIndex, targetTimestamp, AVSEEK_FLAG_BACKWARD) < 0) {
+            throw DecoderException("Error seeking stream");
+        }
     }
 
     if (videoCodecContext) {
@@ -804,7 +811,8 @@ void Decoder::reset() {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (format.durationMicros == 0 || (!_hasAudio() && !_hasVideo())) {
+    if (format.frameRate == 0 || static_cast<float>(format.durationMicros) < (1'000 / format.frameRate) ||
+        (!_hasAudio() && !_hasVideo())) {
         return;
     }
 
