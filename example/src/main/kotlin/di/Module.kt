@@ -1,6 +1,6 @@
 package di
 
-import hub.HubRepository
+import hub.HubItemRepository
 import hub.presentation.HubFeature
 import hub.presentation.HubReducer
 import io.github.numq.klarity.player.KlarityPlayer
@@ -34,11 +34,11 @@ private val probe = module {
 }
 
 private val preview = module {
-    single { PreviewRepository.Implementation() } bind PreviewRepository::class onClose {
-        runBlocking {
-            it?.close()?.getOrThrow()
-        }
-    }
+//    single { PreviewRepository.Implementation() } bind PreviewRepository::class onClose {
+//        runBlocking {
+//            it?.close()?.getOrThrow()
+//        }
+//    }
 
     single { PreviewService.Implementation() } bind PreviewService::class onClose {
         runBlocking {
@@ -47,11 +47,13 @@ private val preview = module {
     }
 
     scope(PLAYLIST_SCOPE) {
+        scoped { GetPreview(get(), get(), get()) }
+
+        scoped { GetPreviewState(get()) }
+
         scoped { StartPreview(get(), get(), get()) }
 
         scoped { StopPreview(get()) }
-
-        scoped { GetPreview(get(), get(), get()) }
     }
 }
 
@@ -91,9 +93,9 @@ private val renderer = module {
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubRepository() } bind ItemRepository::class
+        scoped { HubItemRepository() } bind ItemRepository::class
 
-        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
         scoped { HubFeature(get()) } onClose { it?.close() }
     }
@@ -157,7 +159,7 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistRepository(get()) } bind ItemRepository::class
+        scoped { PlaylistItemRepository(get()) } bind ItemRepository::class
 
         scoped { SelectPlaylistItem(get()) }
 
