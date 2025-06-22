@@ -2,9 +2,11 @@ package di
 
 import hub.*
 import hub.presentation.*
+import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.player.KlarityPlayer
 import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.queue.MediaQueue
+import io.github.numq.klarity.renderer.Renderer
 import item.Item
 import kotlinx.coroutines.runBlocking
 import navigation.NavigationFeature
@@ -21,7 +23,6 @@ import preview.PreviewService
 import preview.ResetPreview
 import probe.ProbeService
 import renderer.RendererManager
-import renderer.RendererRepository
 import snapshot.SnapshotRepository
 
 private val HUB_SCOPE = Scope.HUB.getScopeName()
@@ -71,22 +72,35 @@ private val player = module {
 }
 
 private val renderer = module {
-    scope(HUB_SCOPE) {
-        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
+    single { (format: VideoFormat) -> Renderer.create(format = format).getOrThrow() } onClose {
+        runBlocking {
+            it?.close()?.getOrThrow()
         }
+    }
 
-        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
+    scope(HUB_SCOPE) {
+//        scoped { (format: VideoFormat) -> Renderer.create(format = format).getOrThrow() } onClose {
+//            runBlocking {
+//                it?.close()?.getOrThrow()
+//            }
+//        }
+
+//        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
+//            runBlocking {
+//                it?.close()?.getOrThrow()
+//            }
+//        }
+//
+//        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
     }
 
     scope(PLAYLIST_SCOPE) {
-        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
-        }
+
+//        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
+//            runBlocking {
+//                it?.close()?.getOrThrow()
+//            }
+//        }
 
         scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
     }
@@ -166,7 +180,7 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistRepository.Implementation(get()) } bind PlaylistRepository::class
+        scoped { PlaylistRepository.Implementation(get(), get()) } bind PlaylistRepository::class
 
         scoped { GetPlaylist(get()) }
 
