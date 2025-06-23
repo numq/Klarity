@@ -2,11 +2,10 @@ package di
 
 import hub.*
 import hub.presentation.*
-import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.player.KlarityPlayer
 import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.queue.MediaQueue
-import io.github.numq.klarity.renderer.Renderer
+import io.github.numq.klarity.snapshot.SnapshotManager
 import item.Item
 import kotlinx.coroutines.runBlocking
 import navigation.NavigationFeature
@@ -19,11 +18,10 @@ import playback.*
 import playlist.*
 import playlist.presentation.PlaylistFeature
 import playlist.presentation.PlaylistReducer
-import preview.PreviewService
-import preview.ResetPreview
-import probe.ProbeService
-import renderer.RendererManager
-import snapshot.SnapshotRepository
+import preview.LoopPreviewService
+import preview.TimelinePreviewService
+import renderer.RendererRegistry
+import thumbnail.ThumbnailRepository
 
 private val HUB_SCOPE = Scope.HUB.getScopeName()
 
@@ -31,32 +29,20 @@ private val PLAYLIST_SCOPE = Scope.PLAYLIST.getScopeName()
 
 private val probe = module {
     single { ProbeManager }
+}
 
-    single { ProbeService.Implementation(get()) } bind ProbeService::class
+private val snapshot = module {
+    single { SnapshotManager }
 }
 
 private val preview = module {
-//    single { PreviewRepository.Implementation() } bind PreviewRepository::class onClose {
-//        runBlocking {
-//            it?.close()?.getOrThrow()
-//        }
-//    }
-
-    single { PreviewService.Implementation() } bind PreviewService::class onClose {
-        runBlocking {
-            it?.close()?.getOrThrow()
-        }
-    }
-
     scope(HUB_SCOPE) {
-        factory { ResetPreview(get(), get()) }
+        scoped { LoopPreviewService.Implementation(get()) } bind LoopPreviewService::class
     }
 
-//    scope(PLAYLIST_SCOPE) {
-//        scoped { StartPreview(get(), get(), get()) }
-//
-//        scoped { StopPreview(get()) }
-//    }
+    scope(PLAYLIST_SCOPE) {
+        scoped { TimelinePreviewService.Implementation(get()) } bind TimelinePreviewService::class
+    }
 }
 
 private val player = module {
@@ -72,65 +58,40 @@ private val player = module {
 }
 
 private val renderer = module {
-    single { (format: VideoFormat) -> Renderer.create(format = format).getOrThrow() } onClose {
+    single { RendererRegistry.Implementation() } bind RendererRegistry::class onClose {
         runBlocking {
             it?.close()?.getOrThrow()
         }
     }
 
-    scope(HUB_SCOPE) {
-//        scoped { (format: VideoFormat) -> Renderer.create(format = format).getOrThrow() } onClose {
-//            runBlocking {
-//                it?.close()?.getOrThrow()
-//            }
-//        }
-
-//        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
-//            runBlocking {
-//                it?.close()?.getOrThrow()
-//            }
-//        }
-//
-//        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
-    }
-
-    scope(PLAYLIST_SCOPE) {
-
-//        scoped { RendererRepository.Implementation() } bind RendererRepository::class onClose {
-//            runBlocking {
-//                it?.close()?.getOrThrow()
-//            }
-//        }
-
-        scoped { RendererManager.Implementation(get(), get()) } bind RendererManager::class
-    }
+    single { (id: String) -> runBlocking { get<RendererRegistry>().get(id = id) } }
 }
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubRepository.Implementation() } bind HubRepository::class
+        scoped { HubRepository.Implementation(get(), get(), get()) } bind HubRepository::class
 
-        scoped { GetHubItems(get()) }
+        scoped { GetHub(get()) }
 
-        scoped { AddHubItem(get(), get(), get(), get()) }
+        scoped { AddHubItem(get(), get()) }
 
         scoped { RemoveHubItem(get(), get()) }
 
-        scoped { StartHubPlayback(get(), get(), get(), get()) }
+        scoped { StartHubPlayback(get(), get()) }
 
-        scoped { StartHubPreview(get(), get(), get()) }
+        scoped { StartHubPreview(get()) }
 
-        scoped { StopHubPlayback(get(), get()) }
+        scoped { StopHubPlayback(get()) }
 
-        scoped { StopHubPreview(get(), get(), get()) }
+        scoped { StopHubPreview(get()) }
 
         scoped { HubInteractionReducer() }
 
-        scoped { HubPlaybackReducer(get(), get(), get(), get()) }
+        scoped { HubPlaybackReducer(get(), get(), get()) }
 
         scoped { HubPreviewReducer(get(), get()) }
 
-        scoped { HubReducer(get(), get(), get(), get(), get(), get(), get()) }
+        scoped { HubReducer(get(), get(), get(), get(), get(), get()) }
 
         scoped { HubFeature(get()) } onClose { it?.close() }
     }
@@ -144,7 +105,7 @@ private val navigation = module {
 
 private val playback = module {
     scope(HUB_SCOPE) {
-        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class onClose {
+        scoped { PlaybackService.Implementation(get(), get()) } bind PlaybackService::class onClose {
             runBlocking {
                 it?.close()?.getOrThrow()
             }
@@ -154,13 +115,11 @@ private val playback = module {
 
         scoped { ChangeVolume(get()) }
 
-        scoped { GetHubPlaybackState(get(), get()) }
-
         scoped { ToggleMute(get()) }
     }
 
     scope(PLAYLIST_SCOPE) {
-        scoped { PlaybackService.Implementation(get()) } bind PlaybackService::class onClose {
+        scoped { PlaybackService.Implementation(get(), get()) } bind PlaybackService::class onClose {
             runBlocking {
                 it?.close()?.getOrThrow()
             }
@@ -184,7 +143,7 @@ private val playlist = module {
 
         scoped { GetPlaylist(get()) }
 
-        scoped { AddPlaylistItem(get(), get(), get(), get()) }
+        scoped { AddPlaylistItem(get()) }
 
         scoped { RemovePlaylistItem(get(), get()) }
 
@@ -212,15 +171,6 @@ private val playlist = module {
                 get(),
                 get(),
                 get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
                 get()
             )
         }
@@ -229,22 +179,12 @@ private val playlist = module {
     }
 }
 
-private val snapshot = module {
-    scope(HUB_SCOPE) {
-        scoped { SnapshotRepository.Implementation() } bind SnapshotRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
-        }
-    }
-
-    scope(PLAYLIST_SCOPE) {
-        scoped { SnapshotRepository.Implementation() } bind SnapshotRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
+private val thumbnail = module {
+    single { ThumbnailRepository.Implementation(get()) } bind ThumbnailRepository::class onClose {
+        runBlocking {
+            it?.close()?.getOrThrow()
         }
     }
 }
 
-internal val appModule = listOf(probe, preview, player, renderer, hub, navigation, playback, playlist, snapshot)
+internal val appModule = listOf(probe, preview, player, renderer, hub, navigation, playback, playlist, thumbnail)
