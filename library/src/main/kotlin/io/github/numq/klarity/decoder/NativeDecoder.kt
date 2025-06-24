@@ -26,7 +26,7 @@ internal class NativeDecoder(
             findVideoStream: Boolean,
             decodeAudioStream: Boolean,
             decodeVideoStream: Boolean,
-            hardwareAccelerationCandidates: IntArray
+            hardwareAccelerationCandidates: IntArray,
         ): Long
 
         @JvmStatic

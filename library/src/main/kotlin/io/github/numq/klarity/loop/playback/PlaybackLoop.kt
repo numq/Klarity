@@ -22,7 +22,7 @@ internal interface PlaybackLoop {
             pipeline: Pipeline,
             getVolume: () -> Float,
             getPlaybackSpeedFactor: () -> Float,
-            getRenderer: suspend () -> Renderer?
+            getRenderer: suspend () -> Renderer?,
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,

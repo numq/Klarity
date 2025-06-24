@@ -20,7 +20,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     override var isBuffering = false
 
     private suspend fun handleAudioBuffer(
-        decoder: AudioDecoder, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: AudioDecoder, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
             when (val frame = decoder.decodeAudio().getOrThrow()) {
@@ -48,7 +48,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     }
 
     private suspend fun handleVideoBuffer(
-        decoder: VideoDecoder, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit
+        decoder: VideoDecoder, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
@@ -107,9 +107,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                     when (pipeline) {
                         is Pipeline.Audio -> with(pipeline) {
                             handleAudioBuffer(
-                                decoder = decoder as AudioDecoder,
-                                buffer = buffer,
-                                onTimestamp = onTimestamp
+                                decoder = decoder as AudioDecoder, buffer = buffer, onTimestamp = onTimestamp
                             )
                         }
 
@@ -126,8 +124,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                             var lastFrameTimestamp = Duration.ZERO
 
                             val audioJob = launch {
-                                handleAudioBuffer(
-                                    decoder = audioDecoder as AudioDecoder,
+                                handleAudioBuffer(decoder = audioDecoder as AudioDecoder,
                                     buffer = audioBuffer,
                                     onTimestamp = { frameTimestamp ->
                                         if (frameTimestamp > lastFrameTimestamp) {
@@ -139,8 +136,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
                             }
 
                             val videoJob = launch {
-                                handleVideoBuffer(
-                                    decoder = videoDecoder as VideoDecoder,
+                                handleVideoBuffer(decoder = videoDecoder as VideoDecoder,
                                     pool = videoPool,
                                     buffer = videoBuffer,
                                     onTimestamp = { frameTimestamp ->
@@ -170,6 +166,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         runCatching {
             try {
                 job?.cancelAndJoin()
+
                 job = null
             } finally {
                 isBuffering = false
@@ -181,6 +178,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         runCatching {
             try {
                 job?.cancel()
+
                 job = null
             } finally {
                 isBuffering = false

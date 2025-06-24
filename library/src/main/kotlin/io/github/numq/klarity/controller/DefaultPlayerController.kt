@@ -35,7 +35,7 @@ internal class DefaultPlayerController(
     private val bufferFactory: BufferFactory,
     private val bufferLoopFactory: BufferLoopFactory,
     private val playbackLoopFactory: PlaybackLoopFactory,
-    private val samplerFactory: SamplerFactory
+    private val samplerFactory: SamplerFactory,
 ) : PlayerController {
     /**
      * Coroutines
@@ -76,7 +76,7 @@ internal class DefaultPlayerController(
     private suspend fun <T> withInternalState(
         onEmpty: (suspend InternalPlayerState.Empty.() -> T)? = null,
         onPreparing: (suspend InternalPlayerState.Preparing.() -> T)? = null,
-        onReady: (suspend InternalPlayerState.Ready.() -> T)? = null
+        onReady: (suspend InternalPlayerState.Ready.() -> T)? = null,
     ) = when (val state = internalState) {
         is InternalPlayerState.Empty -> onEmpty?.invoke(state)
 
@@ -207,7 +207,7 @@ internal class DefaultPlayerController(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>?
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     ) = executeMediaCommand {
         updateState(InternalPlayerState.Preparing)
 
@@ -251,10 +251,9 @@ internal class DefaultPlayerController(
 
                 is Media.Video -> with(media) {
                     val pool = poolFactory.create(
-                        parameters = PoolFactory.Parameters(
-                            poolCapacity = videoBufferSize, createData = {
-                                Data.makeUninitialized(videoFormat.bufferCapacity)
-                            })
+                        parameters = PoolFactory.Parameters(poolCapacity = videoBufferSize, createData = {
+                            Data.makeUninitialized(videoFormat.bufferCapacity)
+                        })
                     ).getOrThrow()
 
                     val decoder = videoDecoderFactory.create(
@@ -282,10 +281,9 @@ internal class DefaultPlayerController(
 
                 is Media.AudioVideo -> with(media) {
                     val videoPool = poolFactory.create(
-                        parameters = PoolFactory.Parameters(
-                            poolCapacity = videoBufferSize, createData = {
-                                Data.makeUninitialized(videoFormat.bufferCapacity)
-                            })
+                        parameters = PoolFactory.Parameters(poolCapacity = videoBufferSize, createData = {
+                            Data.makeUninitialized(videoFormat.bufferCapacity)
+                        })
                     ).getOrThrow()
 
                     val audioDecoder = audioDecoderFactory.create(
@@ -373,8 +371,7 @@ internal class DefaultPlayerController(
             }.getOrThrow()
 
             val playbackLoop = playbackLoopFactory.create(
-                parameters = PlaybackLoopFactory.Parameters(
-                    pipeline = pipeline,
+                parameters = PlaybackLoopFactory.Parameters(pipeline = pipeline,
                     getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
                     getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
                     getRenderer = { rendererMutex.withLock { renderer } })
@@ -411,14 +408,12 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
         }
 
-        playbackLoop.start(
-            coroutineScope = playbackScope,
+        playbackLoop.start(coroutineScope = playbackScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
             onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
 
-        bufferLoop.start(
-            coroutineScope = bufferScope,
+        bufferLoop.start(coroutineScope = bufferScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
             onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
@@ -450,8 +445,7 @@ internal class DefaultPlayerController(
             is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
         }
 
-        playbackLoop.start(
-            coroutineScope = playbackScope,
+        playbackLoop.start(coroutineScope = playbackScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
             onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
@@ -510,7 +504,7 @@ internal class DefaultPlayerController(
     }
 
     private suspend fun InternalPlayerState.Ready.handleSeekTo(
-        timestamp: Duration, keyFramesOnly: Boolean
+        timestamp: Duration, keyFramesOnly: Boolean,
     ) = executePlaybackCommand {
         playbackLoop.stop().getOrThrow()
 
@@ -570,8 +564,7 @@ internal class DefaultPlayerController(
             }
         }
 
-        bufferLoop.start(
-            coroutineScope = bufferScope,
+        bufferLoop.start(coroutineScope = bufferScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
             onEndOfMedia = { handleBufferCompletion() }).getOrThrow()

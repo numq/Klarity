@@ -18,7 +18,7 @@ internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
     private val getVolume: () -> Float,
     private val getPlaybackSpeedFactor: () -> Float,
-    private val getRenderer: suspend () -> Renderer?
+    private val getRenderer: suspend () -> Renderer?,
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
@@ -178,8 +178,9 @@ internal class DefaultPlaybackLoop(
                                 var lastFrameTimestamp = Duration.ZERO
 
                                 val audioJob = launch {
-                                    handleAudioPlayback(
-                                        buffer = audioBuffer, sampler = sampler, onTimestamp = { frameTimestamp ->
+                                    handleAudioPlayback(buffer = audioBuffer,
+                                        sampler = sampler,
+                                        onTimestamp = { frameTimestamp ->
                                             if (frameTimestamp > lastFrameTimestamp) {
                                                 onTimestamp(frameTimestamp)
 
@@ -189,8 +190,7 @@ internal class DefaultPlaybackLoop(
                                 }
 
                                 val videoJob = launch {
-                                    handleVideoPlayback(
-                                        mediaDuration = media.duration,
+                                    handleVideoPlayback(mediaDuration = media.duration,
                                         pool = videoPool,
                                         buffer = videoBuffer,
                                         onTimestamp = { frameTimestamp ->
