@@ -14,76 +14,91 @@ import org.koin.core.component.getScopeName
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.dsl.onClose
-import playback.*
+import playback.ChangePlaybackSpeed
+import playback.ChangeVolume
+import playback.PlaybackService
+import playback.ToggleMute
 import playlist.*
-import playlist.presentation.PlaylistFeature
-import playlist.presentation.PlaylistReducer
+import playlist.presentation.*
 import preview.LoopPreviewService
 import preview.TimelinePreviewService
 import renderer.RendererRegistry
-import thumbnail.ThumbnailRepository
+import renderer.RendererService
 
 private val HUB_SCOPE = Scope.HUB.getScopeName()
 
 private val PLAYLIST_SCOPE = Scope.PLAYLIST.getScopeName()
 
-private val probe = module {
+private val application = module {
     single { ProbeManager }
-}
 
-private val snapshot = module {
     single { SnapshotManager }
-}
 
-private val preview = module {
     scope(HUB_SCOPE) {
-        scoped { LoopPreviewService.Implementation(get()) } bind LoopPreviewService::class
+        scoped { KlarityPlayer.create().getOrThrow() } onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
     }
 
     scope(PLAYLIST_SCOPE) {
-        scoped { TimelinePreviewService.Implementation(get()) } bind TimelinePreviewService::class
-    }
-}
-
-private val player = module {
-    scope(HUB_SCOPE) {
-        scoped { KlarityPlayer.create().getOrThrow() }
-    }
-
-    scope(PLAYLIST_SCOPE) {
-        scoped { KlarityPlayer.create().getOrThrow() }
+        scoped { KlarityPlayer.create().getOrThrow() } onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
 
         scoped { MediaQueue.create<Item>().getOrThrow() }
     }
 }
 
+private val preview = module {
+    scope(HUB_SCOPE) {
+        scoped { LoopPreviewService.Implementation(get()) } bind LoopPreviewService::class onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
+    }
+
+    scope(PLAYLIST_SCOPE) {
+        scoped { TimelinePreviewService.Implementation(get()) } bind TimelinePreviewService::class onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
+    }
+}
+
+
 private val renderer = module {
-    single { RendererRegistry.Implementation() } bind RendererRegistry::class onClose {
+    single { RendererRegistry.Implementation(get()) } bind RendererRegistry::class onClose {
         runBlocking {
             it?.close()?.getOrThrow()
         }
     }
 
-    single { (id: String) -> runBlocking { get<RendererRegistry>().get(id = id) } }
+    single { RendererService.Implementation(get()) } bind RendererService::class
 }
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubRepository.Implementation(get(), get(), get()) } bind HubRepository::class
+        scoped { HubRepository.Implementation(get(), get()) } bind HubRepository::class
 
         scoped { GetHub(get()) }
 
-        scoped { AddHubItem(get(), get()) }
+        scoped { AddHubItem(get()) }
 
         scoped { RemoveHubItem(get(), get()) }
 
-        scoped { StartHubPlayback(get(), get()) }
+        scoped { StartHubPlayback(get(), get(), get()) }
 
-        scoped { StartHubPreview(get()) }
+        scoped { StartHubPreview(get(), get()) }
 
-        scoped { StopHubPlayback(get()) }
+        scoped { StopHubPlayback(get(), get()) }
 
-        scoped { StopHubPreview(get()) }
+        scoped { StopHubPreview(get(), get()) }
 
         scoped { HubInteractionReducer() }
 
@@ -104,34 +119,20 @@ private val navigation = module {
 }
 
 private val playback = module {
-    scope(HUB_SCOPE) {
-        scoped { PlaybackService.Implementation(get(), get()) } bind PlaybackService::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
+    Scope.entries.forEach { scope ->
+        scope(scope.getScopeName()) {
+            scoped { PlaybackService.Implementation(get(), get(), get()) } bind PlaybackService::class onClose {
+                runBlocking {
+                    it?.close()?.getOrThrow()
+                }
             }
+
+            scoped { ChangePlaybackSpeed(get()) }
+
+            scoped { ChangeVolume(get()) }
+
+            scoped { ToggleMute(get()) }
         }
-
-        scoped { ChangePlaybackSpeed(get()) }
-
-        scoped { ChangeVolume(get()) }
-
-        scoped { ToggleMute(get()) }
-    }
-
-    scope(PLAYLIST_SCOPE) {
-        scoped { PlaybackService.Implementation(get(), get()) } bind PlaybackService::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
-        }
-
-        scoped { ChangePlaybackSpeed(get()) }
-
-        scoped { ChangeVolume(get()) }
-
-        scoped { GetPlaybackState(get(), get()) }
-
-        scoped { ToggleMute(get()) }
     }
 }
 
@@ -139,7 +140,7 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistRepository.Implementation(get(), get()) } bind PlaylistRepository::class
+        scoped { PlaylistRepository.Implementation(get(), get(), get(), get()) } bind PlaylistRepository::class
 
         scoped { GetPlaylist(get()) }
 
@@ -158,6 +159,14 @@ private val playlist = module {
         scoped { NextPlaylistItem(get()) }
 
         scoped { ControlPlaylistPlayback(get()) }
+
+        scoped { GetTimelinePreview(get()) }
+
+        scoped { PlaylistInteractionReducer() }
+
+        scoped { PlaylistPlaybackReducer(get(), get(), get(), get(), get()) }
+
+        scoped { PlaylistPreviewReducer(get()) }
 
         scoped {
             PlaylistReducer(
@@ -179,12 +188,4 @@ private val playlist = module {
     }
 }
 
-private val thumbnail = module {
-    single { ThumbnailRepository.Implementation(get()) } bind ThumbnailRepository::class onClose {
-        runBlocking {
-            it?.close()?.getOrThrow()
-        }
-    }
-}
-
-internal val appModule = listOf(probe, preview, player, renderer, hub, navigation, playback, playlist, thumbnail)
+internal val appModule = listOf(application, preview, renderer, hub, navigation, playback, playlist)
