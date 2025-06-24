@@ -676,11 +676,6 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (format.frameRate == 0 || static_cast<float>(format.durationMicros) < (1'000 / format.frameRate) ||
-        (!_hasAudio() && !_hasVideo())) {
-        return timestampMicros;
-    }
-
     if (timestampMicros < 0 || timestampMicros > format.durationMicros) {
         throw DecoderException("Timestamp out of bounds");
     }
@@ -811,12 +806,14 @@ void Decoder::reset() {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (format.frameRate == 0 || static_cast<float>(format.durationMicros) < (1'000 / format.frameRate) ||
-        (!_hasAudio() && !_hasVideo())) {
-        return;
+    if (audioCodecContext) {
+        avcodec_flush_buffers(audioCodecContext.get());
+    }
+    if (videoCodecContext) {
+        avcodec_flush_buffers(videoCodecContext.get());
     }
 
-    if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_ANY) < 0) {
+    if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_BACKWARD) < 0) {
         throw DecoderException("Error resetting stream");
     }
 
@@ -834,14 +831,6 @@ void Decoder::reset() {
 
     if (hwVideoFrame) {
         av_frame_unref(hwVideoFrame.get());
-    }
-
-    if (audioCodecContext) {
-        avcodec_flush_buffers(audioCodecContext.get());
-    }
-
-    if (videoCodecContext) {
-        avcodec_flush_buffers(videoCodecContext.get());
     }
 
     audioBuffer.clear();
