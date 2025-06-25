@@ -84,21 +84,25 @@ private val renderer = module {
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubRepository.Implementation(get(), get()) } bind HubRepository::class
+        scoped { HubRepository.Implementation(get()) } bind HubRepository::class onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
 
-        scoped { GetHub(get()) }
+        scoped { GetHub(get(), get()) }
 
-        scoped { AddHubItem(get()) }
+        scoped { AddHubItem(get(), get(), get()) }
 
-        scoped { RemoveHubItem(get(), get()) }
+        scoped { RemoveHubItem(get()) }
 
-        scoped { StartHubPlayback(get(), get(), get()) }
+        scoped { StartHubPlayback(get(), get(), get(), get()) }
 
-        scoped { StartHubPreview(get(), get()) }
+        scoped { StartHubPreview(get()) }
 
-        scoped { StopHubPlayback(get(), get()) }
+        scoped { StopHubPlayback(get()) }
 
-        scoped { StopHubPreview(get(), get()) }
+        scoped { StopHubPreview(get()) }
 
         scoped { HubInteractionReducer() }
 
@@ -140,13 +144,17 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistRepository.Implementation(get(), get(), get(), get()) } bind PlaylistRepository::class
+        scoped { PlaylistRepository.Implementation(get(), get()) } bind PlaylistRepository::class onClose {
+            runBlocking {
+                it?.close()?.getOrThrow()
+            }
+        }
 
         scoped { GetPlaylist(get()) }
 
-        scoped { AddPlaylistItem(get()) }
+        scoped { AddPlaylistItem(get(), get(), get()) }
 
-        scoped { RemovePlaylistItem(get(), get()) }
+        scoped { RemovePlaylistItem(get(), get(), get()) }
 
         scoped { SelectPlaylistItem(get()) }
 
