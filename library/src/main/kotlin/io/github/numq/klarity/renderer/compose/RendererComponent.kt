@@ -115,6 +115,8 @@ private fun DrawScope.drawBackground(
         is Background.Color -> drawRect(color = with(background) { Color(red = r, green = g, blue = b, alpha = a) })
 
         is Background.Blur -> drawIntoCanvas { canvas ->
+            if (surface.isClosed) return@drawIntoCanvas
+
             canvas.withSave {
                 canvas.translate(backgroundOffset.x, backgroundOffset.y)
 
@@ -136,6 +138,8 @@ private fun DrawScope.drawForeground(
     surface: Surface,
 ) {
     drawIntoCanvas { canvas ->
+        if (surface.isClosed) return@drawIntoCanvas
+
         canvas.withSave {
             canvas.translate(foregroundOffset.x, foregroundOffset.y)
 

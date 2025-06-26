@@ -19,6 +19,8 @@ internal class SkiaRenderer(
 
     private val renderMutex = Mutex()
 
+    private val drawLock = Any()
+
     private val isClosed = AtomicBoolean(false)
 
     private val imageInfo = ImageInfo(
@@ -45,8 +47,8 @@ internal class SkiaRenderer(
 
     override fun drawsNothing() = _generationId.value == DRAWS_NOTHING_ID
 
-    override fun draw(callback: (Surface) -> Unit) {
-        if (isClosed.get() || surface.isClosed || pixmap.isClosed) {
+    override fun draw(callback: (Surface) -> Unit) = synchronized(drawLock) {
+        if (isClosed.get()) {
             return
         }
 
@@ -65,6 +67,10 @@ internal class SkiaRenderer(
 
             pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
 
+            if (!isRenderable(frame)) {
+                return@runCatching
+            }
+
             surface.writePixels(pixmap, 0, 0)
 
             val renderTime = System.nanoTime().nanoseconds - startTime
@@ -81,7 +87,7 @@ internal class SkiaRenderer(
 
     override suspend fun flush() = renderMutex.withLock {
         runCatching {
-            if (isFlushable()) {
+            if (!isFlushable()) {
                 return@runCatching
             }
 
