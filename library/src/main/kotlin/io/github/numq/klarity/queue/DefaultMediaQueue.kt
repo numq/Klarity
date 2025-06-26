@@ -4,13 +4,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.nanoseconds
 
 internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
     private val mutex = Mutex()
 
-    private var shuffleSeed: Long? = null
+    private val _originalItems = mutableListOf<Item>()
 
-    private val _items = mutableListOf<Item>()
+    private val _shuffledItems = mutableListOf<Item>()
 
     override val items = MutableStateFlow<List<Item>>(emptyList())
 
@@ -24,91 +25,126 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
 
     override val hasNext = MutableStateFlow(false)
 
+    private var shuffleSeed: Long = Random.nextLong()
+
+    private var shuffleRandom: Random = Random(shuffleSeed)
+
     private suspend fun updateStates() {
-        val currentItem = selectedItem.value
+        val currentIndex = getCurrentIndex()
 
-        val index = (currentItem as? SelectedItem.Present<*>)?.let { items.value.indexOf(it.item) } ?: -1
+        val itemCount = items.value.size
 
-        hasPrevious.emit(repeatMode.value != RepeatMode.NONE || index > 0)
+        hasPrevious.emit(repeatMode.value != RepeatMode.NONE || currentIndex > 0)
 
-        hasNext.emit(repeatMode.value != RepeatMode.NONE || index < items.value.lastIndex)
+        hasNext.emit(repeatMode.value != RepeatMode.NONE || currentIndex < itemCount - 1)
     }
 
-    private suspend fun updateSelection(offset: Int) {
-        if (_items.isEmpty()) return
+    private fun getCurrentIndex() = (selectedItem.value as? SelectedItem.Present<*>)?.let { present ->
+        items.value.indexOfFirst { it == present.item }
+    } ?: -1
 
-        if (selectedItem.value is SelectedItem.Present<*>) {
-            val currentIndex = items.value.indexOf((selectedItem.value as SelectedItem.Present<*>).item)
+    private suspend fun rebuildItemsList() = when {
+        isShuffled.value -> _shuffledItems.toList()
 
-            if (currentIndex < 0) return
-
-            val targetIndex = when (repeatMode.value) {
-                RepeatMode.NONE -> currentIndex + offset
-
-                RepeatMode.CIRCULAR -> (currentIndex + offset).mod(items.value.size)
-
-                RepeatMode.SINGLE -> currentIndex
-            }
-
-            val newSelectedItem = items.value.getOrNull(targetIndex)?.let { item ->
-                SelectedItem.Present(item, System.nanoTime())
-            } ?: SelectedItem.Absent
-
-            selectedItem.emit(newSelectedItem)
-        }
+        else -> _originalItems.toList()
+    }.let { item ->
+        items.emit(item)
     }
 
     override suspend fun setShuffleEnabled(enabled: Boolean) = mutex.withLock {
         runCatching {
-            shuffleSeed = if (enabled) Random.nextLong() else null
+            if (isShuffled.value == enabled) return@runCatching
 
             isShuffled.emit(enabled)
 
-            val shuffledItems = if (enabled) {
-                _items.shuffled(Random(shuffleSeed!!))
-            } else {
-                _items.toList()
+            if (enabled) {
+                shuffleSeed = Random.nextLong()
+
+                shuffleRandom = Random(shuffleSeed)
+
+                _shuffledItems.clear()
+
+                _shuffledItems.addAll(_originalItems.shuffled(shuffleRandom))
+
             }
 
-            items.emit(shuffledItems)
+            rebuildItemsList()
+
+            preserveSelectionAfterShuffle()
 
             updateStates()
         }
     }
 
-    override suspend fun setRepeatMode(repeatMode: RepeatMode) = runCatching {
-        this.repeatMode.emit(repeatMode)
+    private suspend fun preserveSelectionAfterShuffle() {
+        (selectedItem.value as? SelectedItem.Present<*>)?.let { present ->
+            if (present.item in items.value) {
+                selectedItem.emit(SelectedItem.Present(present.item, System.nanoTime().nanoseconds))
+            }
+        }
+    }
+
+    override suspend fun setRepeatMode(repeatMode: RepeatMode) = mutex.withLock {
+        runCatching {
+            this.repeatMode.emit(repeatMode)
+
+            updateStates()
+        }
+    }
+
+    override suspend fun previous() = mutex.withLock {
+        navigate(-1)
+    }
+
+    override suspend fun next() = mutex.withLock {
+        navigate(1)
+    }
+
+    private suspend fun navigate(offset: Int) = runCatching {
+        if (items.value.isEmpty()) return@runCatching
+
+        val currentIndex = getCurrentIndex()
+
+        if (currentIndex < 0) return@runCatching
+
+        val newIndex = when (repeatMode.value) {
+            RepeatMode.NONE -> (currentIndex + offset).coerceIn(0, items.value.lastIndex)
+
+            RepeatMode.CIRCULAR -> (currentIndex + offset).mod(items.value.size)
+
+            RepeatMode.SINGLE -> currentIndex
+        }
+
+        items.value.getOrNull(newIndex)?.let { item ->
+            selectedItem.emit(SelectedItem.Present(item, System.nanoTime().nanoseconds))
+        }
 
         updateStates()
     }
 
-    override suspend fun previous() = runCatching {
-        updateSelection(-1)
+    override suspend fun select(item: Item?) = mutex.withLock {
+        runCatching {
+            val newSelection = item?.takeIf { item ->
+                item in items.value
+            }?.let { item ->
+                SelectedItem.Present(item, System.nanoTime().nanoseconds)
+            } ?: SelectedItem.Absent
 
-        updateStates()
-    }
+            selectedItem.emit(newSelection)
 
-    override suspend fun next() = runCatching {
-        updateSelection(1)
-
-        updateStates()
-    }
-
-    override suspend fun select(item: Item?) = runCatching {
-        val newItem = item?.takeIf { it in items.value }?.let {
-            SelectedItem.Present(it, System.nanoTime())
-        } ?: SelectedItem.Absent
-
-        selectedItem.emit(newItem)
-
-        updateStates()
+            updateStates()
+        }
     }
 
     override suspend fun add(item: Item) = mutex.withLock {
         runCatching {
-            _items += item
+            _originalItems.add(item)
 
-            items.emit(_items.toList())
+            if (isShuffled.value) {
+                _shuffledItems.add(shuffleRandom.nextInt(_shuffledItems.size + 1), item)
+            }
+
+            rebuildItemsList()
 
             updateStates()
         }
@@ -116,22 +152,22 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
 
     override suspend fun delete(item: Item) = mutex.withLock {
         runCatching {
-            if (item in _items) {
-                val currentSelectedItem = selectedItem.value
+            if (item in _originalItems) {
+                val wasSelected = (selectedItem.value as? SelectedItem.Present<*>)?.item == item
 
-                if (currentSelectedItem is SelectedItem.Present<*> && currentSelectedItem.item == item) {
-                    when {
-                        hasNext.value -> next()
+                _originalItems.remove(item)
 
-                        hasPrevious.value -> previous()
+                _shuffledItems.remove(item)
 
-                        else -> selectedItem.emit(SelectedItem.Absent)
+                rebuildItemsList()
+
+                if (wasSelected) {
+                    if (items.value.isNotEmpty()) {
+                        select(items.value.first())
+                    } else {
+                        selectedItem.emit(SelectedItem.Absent)
                     }
                 }
-
-                _items -= item
-
-                items.emit(_items.toList())
 
                 updateStates()
             }
@@ -140,15 +176,33 @@ internal class DefaultMediaQueue<Item> : MediaQueue<Item> {
 
     override suspend fun replace(from: Item, to: Item) = mutex.withLock {
         runCatching {
-            if (from in _items) {
-                if (selectedItem.value is SelectedItem.Present<*> && selectedItem.value == from) {
+            if (from in _originalItems) {
+                val wasSelected = (selectedItem.value as? SelectedItem.Present<*>)?.item == from
+
+                _originalItems.replaceAll { if (it == from) to else it }
+
+                _shuffledItems.replaceAll { if (it == from) to else it }
+
+                rebuildItemsList()
+
+                if (wasSelected) {
                     select(to)
                 }
-
-                _items.replaceAll { if (it == from) to else it }
-
-                items.emit(_items.toList())
             }
+        }
+    }
+
+    override suspend fun clear() = mutex.withLock {
+        runCatching {
+            _originalItems.clear()
+
+            _shuffledItems.clear()
+
+            items.emit(emptyList())
+
+            selectedItem.emit(SelectedItem.Absent)
+
+            updateStates()
         }
     }
 }

@@ -116,6 +116,13 @@ interface MediaQueue<Item> {
      */
     suspend fun replace(from: Item, to: Item): Result<Unit>
 
+    /**
+     * Clears the queue.
+     *
+     * @return [Result] indicating success or failure of the operation
+     */
+    suspend fun clear(): Result<Unit>
+
     companion object {
         /**
          * Creates a new instance of the default MediaQueue implementation.

@@ -14,7 +14,7 @@ class MediaQueueTest {
 
     @BeforeEach
     fun beforeEach() {
-        mediaQueue = MediaQueue.create()
+        mediaQueue = MediaQueue.create<Int>().getOrThrow()
     }
 
     @Test
@@ -55,7 +55,7 @@ class MediaQueueTest {
         mediaQueue.add(2)
         mediaQueue.add(3)
 
-        mediaQueue.shuffle()
+        mediaQueue.setShuffleEnabled(true)
 
         assertTrue(mediaQueue.isShuffled.first())
 
@@ -119,5 +119,18 @@ class MediaQueueTest {
         val selectedItem = mediaQueue.selectedItem.first()
         assertTrue(selectedItem is SelectedItem.Present<*>)
         assertEquals(2, (selectedItem as SelectedItem.Present<*>).item)
+    }
+
+    @Test
+    fun `clear queue`() = runTest {
+        mediaQueue.add(1)
+        mediaQueue.add(2)
+        mediaQueue.select(1)
+
+        mediaQueue.clear()
+
+        val selectedItem = mediaQueue.selectedItem.first()
+        assertTrue(selectedItem is SelectedItem.Absent)
+        assertEquals(emptyList<Int>(), mediaQueue.items.first())
     }
 }
