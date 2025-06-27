@@ -23,10 +23,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
-fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Color, onValueChange: (Int) -> Unit) {
+fun StepSlider(steps: Int, step: Int, sliderColor: Color, pointColor: Color, onValueChange: (Int) -> Unit) {
     require(steps > 0) { "Steps should be positive" }
 
-    require(initialStep in 0..steps) { "Initial step is out of range" }
+    require(step in 0..steps) { "Step is out of range" }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -35,8 +35,6 @@ fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Col
     var iconWidth by remember { mutableStateOf(0f) }
 
     var sliderWidth by remember { mutableStateOf(0f) }
-
-    var selectedStep by remember(initialStep) { mutableStateOf(initialStep) }
 
     val stepWidth by remember(sliderWidth) {
         derivedStateOf {
@@ -53,14 +51,13 @@ fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Col
 
     LaunchedEffect(stepWidth) {
         if (stepWidth > 0) {
-            offsetX.snapTo(selectedStep * stepWidth)
+            offsetX.snapTo(step * stepWidth)
         }
     }
 
     LaunchedEffect(x) {
         if (stepWidth > 0 && x % stepWidth == 0f) {
-            selectedStep = (x / stepWidth).roundToInt()
-            onValueChange(selectedStep)
+            onValueChange((x / stepWidth).roundToInt())
         }
     }
 
@@ -70,7 +67,9 @@ fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Col
                 detectTapGestures { tapOffset ->
                     coroutineScope.launch {
                         val snappedValue = calculateSnappedValue(tapOffset.x - horizontalPadding.value, stepWidth)
-                        selectedStep = snappedValue
+
+                        onValueChange(snappedValue)
+
                         offsetX.animateTo(snappedValue * stepWidth)
                     }
                 }
@@ -79,13 +78,15 @@ fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Col
                     onDragCancel = {
                         coroutineScope.launch {
                             snapToNearestStep(offsetX, stepWidth)
-                            selectedStep = (offsetX.value / stepWidth).roundToInt()
+
+                            onValueChange((offsetX.value / stepWidth).roundToInt())
                         }
                     },
                     onDragEnd = {
                         coroutineScope.launch {
                             snapToNearestStep(offsetX, stepWidth)
-                            selectedStep = (offsetX.value / stepWidth).roundToInt()
+
+                            onValueChange((offsetX.value / stepWidth).roundToInt())
                         }
                     }
                 ) { change, _ ->
@@ -95,8 +96,10 @@ fun StepSlider(initialStep: Int, steps: Int, sliderColor: Color, pointColor: Col
                             0f,
                             sliderWidth - 2 * horizontalPadding.value
                         )
+
                         offsetX.snapTo(newX)
-                        selectedStep = (newX / stepWidth).roundToInt()
+
+                        onValueChange((newX / stepWidth).roundToInt())
                     }
                 }
             }.drawBehind {

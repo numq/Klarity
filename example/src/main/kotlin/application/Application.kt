@@ -6,7 +6,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,64 +20,61 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
 import decoration.DecorationBox
+import di.appModule
 import io.github.numq.klarity.player.KlarityPlayer
-import navigation.Navigation
+import navigation.NavigationView
+import org.koin.compose.koinInject
+import org.koin.core.context.startKoin
 import theme.KlarityTheme
 import java.awt.Dimension
-import java.awt.FileDialog
 import java.io.File
 import kotlin.system.exitProcess
 
 private const val APP_NAME = "Klarity"
 
-private val windowState = WindowState(position = WindowPosition(Alignment.Center), size = DpSize(700.dp, 700.dp))
+private val windowSize = DpSize(512.dp, 512.dp)
 
-fun main() = singleWindowApplication(state = windowState, undecorated = true) {
-    val isSystemInDarkTheme = isSystemInDarkTheme()
+private val windowState = WindowState(position = WindowPosition(Alignment.Center), size = windowSize)
 
-    val (isDarkTheme, setIsDarkTheme) = remember(isSystemInDarkTheme) {
-        mutableStateOf(isSystemInDarkTheme)
-    }
+fun main() {
+    KlarityPlayer.load().getOrThrow()
 
-    val iconSvg = remember {
-        File("media/logo.svg").inputStream().use {
+    startKoin { modules(appModule) }
+
+    singleWindowApplication(state = windowState, undecorated = true) {
+        val iconSvg = File("media/logo.svg").inputStream().use {
             loadSvgPainter(it, Density(1f))
         }
-    }
-
-    DisposableEffect(Unit) {
-        KlarityPlayer.load().getOrThrow()
 
         window.iconImage = iconSvg.toAwtImage(Density(1f), LayoutDirection.Ltr)
 
-        window.minimumSize = Dimension(700, 700)
+        window.minimumSize = Dimension(windowSize.width.value.toInt(), windowSize.height.value.toInt())
 
-        onDispose {
+        val isSystemInDarkTheme = isSystemInDarkTheme()
+
+        val (isDarkTheme, setIsDarkTheme) = remember(isSystemInDarkTheme) {
+            mutableStateOf(isSystemInDarkTheme)
         }
-    }
 
-    KlarityTheme(isDarkTheme = isDarkTheme) {
-        Column(
-            modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            DecorationBox(
-                window = window,
-                isDarkTheme = isDarkTheme,
-                changeTheme = setIsDarkTheme,
-                close = { exitProcess(0) }) {
-                Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
-                    Image(iconSvg, "icon")
+        KlarityTheme(isDarkTheme = isDarkTheme) {
+            Column(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                DecorationBox(
+                    window = window,
+                    isDarkTheme = isDarkTheme,
+                    changeTheme = setIsDarkTheme,
+                    close = { exitProcess(0) }) {
+                    Box(modifier = Modifier.padding(4.dp), contentAlignment = Alignment.Center) {
+                        Image(iconSvg, "icon")
+                    }
+                    Text(APP_NAME, color = MaterialTheme.colors.primary)
                 }
-                Text(APP_NAME, color = MaterialTheme.colors.primary)
+
+                NavigationView(feature = koinInject())
             }
-            Navigation(openFileChooser = {
-                FileDialog(window, "Upload media", FileDialog.LOAD).apply {
-                    isMultipleMode = true
-                    isVisible = true
-                }.files.toList()
-            })
         }
     }
 }

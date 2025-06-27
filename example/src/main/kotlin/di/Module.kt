@@ -30,12 +30,16 @@ private val HUB_SCOPE = Scope.HUB.getScopeName()
 private val PLAYLIST_SCOPE = Scope.PLAYLIST.getScopeName()
 
 private val application = module {
-    single { ProbeManager }
+    Scope.entries.forEach { scope ->
+        scope(scope.getScopeName()) {
+            scoped { ProbeManager } bind ProbeManager::class
 
-    single { SnapshotManager }
+            scoped { SnapshotManager } bind SnapshotManager::class
+        }
+    }
 
     scope(HUB_SCOPE) {
-        scoped { KlarityPlayer.create().getOrThrow() } onClose {
+        scoped { KlarityPlayer.create().getOrThrow() } bind KlarityPlayer::class onClose {
             runBlocking {
                 it?.close()?.getOrThrow()
             }
@@ -43,13 +47,13 @@ private val application = module {
     }
 
     scope(PLAYLIST_SCOPE) {
-        scoped { KlarityPlayer.create().getOrThrow() } onClose {
+        scoped { KlarityPlayer.create().getOrThrow() } bind KlarityPlayer::class onClose {
             runBlocking {
                 it?.close()?.getOrThrow()
             }
         }
 
-        scoped { MediaQueue.create<Item>().getOrThrow() }
+        scoped { MediaQueue.create<Item, Item.Loaded>().getOrThrow() } bind MediaQueue::class
     }
 }
 
@@ -73,24 +77,24 @@ private val preview = module {
 
 
 private val renderer = module {
-    single { RendererRegistry.Implementation(get()) } bind RendererRegistry::class onClose {
-        runBlocking {
-            it?.close()?.getOrThrow()
+    Scope.entries.forEach { scope ->
+        scope(scope.getScopeName()) {
+            scoped { RendererRegistry.Implementation(get()) } bind RendererRegistry::class onClose {
+                runBlocking {
+                    it?.close()?.getOrThrow()
+                }
+            }
+
+            scoped { RendererService.Implementation(get()) } bind RendererService::class
         }
     }
-
-    single { RendererService.Implementation(get()) } bind RendererService::class
 }
 
 private val hub = module {
     scope(HUB_SCOPE) {
-        scoped { HubRepository.Implementation(get()) } bind HubRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
-        }
+        scoped { HubRepository.Implementation(get()) } bind HubRepository::class
 
-        scoped { GetHub(get(), get()) }
+        scoped { GetHub(get(), get(), get()) }
 
         scoped { AddHubItem(get(), get(), get()) }
 
@@ -98,11 +102,11 @@ private val hub = module {
 
         scoped { StartHubPlayback(get(), get(), get(), get()) }
 
-        scoped { StartHubPreview(get()) }
+        scoped { StartHubPreview(get(), get()) }
 
-        scoped { StopHubPlayback(get()) }
+        scoped { StopHubPlayback(get(), get(), get()) }
 
-        scoped { StopHubPreview(get()) }
+        scoped { StopHubPreview(get(), get(), get()) }
 
         scoped { HubInteractionReducer() }
 
@@ -144,17 +148,13 @@ private val playlist = module {
     scope(PLAYLIST_SCOPE) {
         scoped { PlaylistService.Implementation(get()) } bind PlaylistService::class
 
-        scoped { PlaylistRepository.Implementation(get(), get()) } bind PlaylistRepository::class onClose {
-            runBlocking {
-                it?.close()?.getOrThrow()
-            }
-        }
+        scoped { PlaylistRepository.Implementation(get(), get()) } bind PlaylistRepository::class
 
-        scoped { GetPlaylist(get()) }
+        scoped { GetPlaylist(get(), get(), get(), get(), get()) }
 
         scoped { AddPlaylistItem(get(), get(), get()) }
 
-        scoped { RemovePlaylistItem(get(), get(), get()) }
+        scoped { RemovePlaylistItem(get()) }
 
         scoped { SelectPlaylistItem(get()) }
 
@@ -172,23 +172,13 @@ private val playlist = module {
 
         scoped { PlaylistInteractionReducer() }
 
-        scoped { PlaylistPlaybackReducer(get(), get(), get(), get(), get()) }
+        scoped { PlaylistPlaybackReducer(get(), get(), get(), get()) }
 
         scoped { PlaylistPreviewReducer(get()) }
 
         scoped {
             PlaylistReducer(
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get()
+                get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()
             )
         }
 
