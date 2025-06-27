@@ -8,9 +8,9 @@ import kotlinx.coroutines.flow.StateFlow
  * as well as navigating between items in the queue.
  *
  * @param <Item> The type of the media items in the queue.
+ * @param <SelectedItem> The type of the selected item.
  */
-interface MediaQueue<Item> {
-
+interface MediaQueue<Item, SelectedItem : Item> {
     /**
      * A StateFlow containing the current list of media items in the queue.
      */
@@ -32,7 +32,7 @@ interface MediaQueue<Item> {
      * A StateFlow that represents the currently selected item in the queue.
      * It can be `Absent` if no item is selected, or `Present` with the selected item.
      */
-    val selectedItem: StateFlow<SelectedItem>
+    val selection: StateFlow<MediaQueueSelection<SelectedItem>>
 
     /**
      * A StateFlow that indicates whether there is a previous item to navigate to in the queue.
@@ -131,6 +131,8 @@ interface MediaQueue<Item> {
          *
          * @return [Result] containing a [MediaQueue] instance
          */
-        fun <Item> create(): Result<MediaQueue<Item>> = runCatching { DefaultMediaQueue() }
+        fun <Item, SelectedItem : Item> create(): Result<MediaQueue<Item, SelectedItem>> = runCatching {
+            DefaultMediaQueue()
+        }
     }
 }

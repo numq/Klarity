@@ -1,8 +1,8 @@
 package queue
 
 import io.github.numq.klarity.queue.MediaQueue
+import io.github.numq.klarity.queue.MediaQueueSelection
 import io.github.numq.klarity.queue.RepeatMode
-import io.github.numq.klarity.queue.SelectedItem
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -10,11 +10,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class MediaQueueTest {
-    private lateinit var mediaQueue: MediaQueue<Int>
+    private lateinit var mediaQueue: MediaQueue<Int, Int>
 
     @BeforeEach
     fun beforeEach() {
-        mediaQueue = MediaQueue.create<Int>().getOrThrow()
+        mediaQueue = MediaQueue.create<Int, Int>().getOrThrow()
     }
 
     @Test
@@ -42,11 +42,11 @@ class MediaQueueTest {
 
         mediaQueue.delete(1)
 
-        assertEquals(2, (mediaQueue.selectedItem.first() as SelectedItem.Present<*>).item)
+        assertEquals(2, (mediaQueue.selection.first() as MediaQueueSelection.Present).item)
 
         mediaQueue.delete(2)
 
-        assertTrue(mediaQueue.selectedItem.first() is SelectedItem.Absent)
+        assertTrue(mediaQueue.selection.first() is MediaQueueSelection.Absent)
     }
 
     @Test
@@ -103,9 +103,9 @@ class MediaQueueTest {
 
         mediaQueue.previous()
 
-        val selectedItem = mediaQueue.selectedItem.first()
-        assertTrue(selectedItem is SelectedItem.Present<*>)
-        assertEquals(1, (selectedItem as SelectedItem.Present<*>).item)
+        val selectedItem = mediaQueue.selection.first()
+        assertTrue(selectedItem is MediaQueueSelection.Present)
+        assertEquals(1, (selectedItem as MediaQueueSelection.Present).item)
     }
 
     @Test
@@ -116,9 +116,9 @@ class MediaQueueTest {
 
         mediaQueue.next()
 
-        val selectedItem = mediaQueue.selectedItem.first()
-        assertTrue(selectedItem is SelectedItem.Present<*>)
-        assertEquals(2, (selectedItem as SelectedItem.Present<*>).item)
+        val selectedItem = mediaQueue.selection.first()
+        assertTrue(selectedItem is MediaQueueSelection.Present)
+        assertEquals(2, (selectedItem as MediaQueueSelection.Present).item)
     }
 
     @Test
@@ -129,8 +129,8 @@ class MediaQueueTest {
 
         mediaQueue.clear()
 
-        val selectedItem = mediaQueue.selectedItem.first()
-        assertTrue(selectedItem is SelectedItem.Absent)
+        val selectedItem = mediaQueue.selection.first()
+        assertTrue(selectedItem is MediaQueueSelection.Absent)
         assertEquals(emptyList<Int>(), mediaQueue.items.first())
     }
 }
