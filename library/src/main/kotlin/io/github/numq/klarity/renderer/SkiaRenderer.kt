@@ -13,15 +13,23 @@ import kotlin.time.Duration.Companion.nanoseconds
 internal class SkiaRenderer(
     override val format: VideoFormat
 ) : Renderer {
-    companion object {
+    private companion object {
         const val DRAWS_NOTHING_ID = 0
     }
 
+    init {
+        require(format.width > 0 && format.height > 0) {
+            "Invalid image dimensions"
+        }
+    }
+
+    private val operationLock = Any()
+
     private val renderMutex = Mutex()
 
-    private val drawLock = Any()
-
     private val isClosed = AtomicBoolean(false)
+
+    private val isValid = AtomicBoolean(true)
 
     private val imageInfo = ImageInfo(
         width = format.width,
@@ -30,72 +38,79 @@ internal class SkiaRenderer(
         alphaType = ColorAlphaType.UNPREMUL
     )
 
-    private val pixmap = Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes)
+    private val surface: Surface by lazy { Surface.makeRaster(imageInfo) }
 
-    private val surface = Surface.makeRaster(imageInfo)
+    private val pixmap: Pixmap by lazy { Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes) }
 
     private val minByteSize by lazy { imageInfo.computeMinByteSize() }
-
-    private fun isRenderable(frame: Frame.Content.Video) =
-        !isClosed.get() && !surface.isClosed && !pixmap.isClosed && !frame.data.isClosed && frame.data.size >= minByteSize
-
-    private fun isFlushable() = !isClosed.get() && !surface.isClosed && !pixmap.isClosed
 
     private val _generationId = MutableStateFlow(DRAWS_NOTHING_ID)
 
     override val generationId = _generationId.asStateFlow()
 
+    private fun checkValid(): Boolean = !isClosed.get() && isValid.get() && !surface.isClosed && !pixmap.isClosed
+
     override fun drawsNothing() = _generationId.value == DRAWS_NOTHING_ID
 
-    override fun draw(callback: (Surface) -> Unit) = synchronized(drawLock) {
-        if (isClosed.get()) {
-            return
+    override fun draw(callback: (Surface) -> Unit) = synchronized(operationLock) {
+        if (checkValid()) {
+            try {
+                callback(surface)
+            } catch (e: Exception) {
+                markInvalid()
+            }
         }
-
-        callback(surface)
     }
 
     override suspend fun render(frame: Frame.Content.Video) = renderMutex.withLock {
         runCatching {
-            if (!isRenderable(frame)) {
+            if (isClosed.get() || frame.data.isClosed || frame.data.size < minByteSize) {
                 return@runCatching
             }
 
-            frame.onRenderStart?.invoke()
+            synchronized(operationLock) {
+                if (!checkValid()) {
+                    return@synchronized
+                }
 
-            val startTime = System.nanoTime().nanoseconds
+                try {
+                    frame.onRenderStart?.invoke()
 
-            pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
+                    val startTime = System.nanoTime().nanoseconds
 
-            if (!isRenderable(frame)) {
-                return@runCatching
-            }
+                    pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
 
-            surface.writePixels(pixmap, 0, 0)
+                    surface.writePixels(pixmap, 0, 0)
 
-            val renderTime = System.nanoTime().nanoseconds - startTime
+                    val renderTime = System.nanoTime().nanoseconds - startTime
 
-            frame.onRenderComplete?.invoke(renderTime)
-        }.onFailure {
-            _generationId.value = DRAWS_NOTHING_ID
-        }.onSuccess {
-            if (!surface.isClosed) {
-                _generationId.value = surface.generationId
+                    frame.onRenderComplete?.invoke(renderTime)
+
+                    _generationId.value = surface.generationId
+                } catch (e: Exception) {
+                    markInvalid()
+                }
             }
         }
     }
 
     override suspend fun flush() = renderMutex.withLock {
         runCatching {
-            if (!isFlushable()) {
-                return@runCatching
+            synchronized(operationLock) {
+                if (!checkValid()) {
+                    return@synchronized
+                }
+
+                try {
+                    pixmap.reset()
+
+                    surface.flush()
+
+                    _generationId.value = DRAWS_NOTHING_ID
+                } catch (e: Exception) {
+                    markInvalid()
+                }
             }
-
-            pixmap.reset()
-
-            surface.flush()
-        }.onSuccess {
-            _generationId.value = DRAWS_NOTHING_ID
         }
     }
 
@@ -105,15 +120,36 @@ internal class SkiaRenderer(
                 return@runCatching
             }
 
-            if (!surface.isClosed) {
-                surface.close()
-            }
+            synchronized(operationLock) {
+                try {
+                    if (!surface.isClosed) {
+                        surface.flush()
+                        surface.close()
+                    }
 
-            if (!pixmap.isClosed) {
-                pixmap.close()
+                    if (!pixmap.isClosed) {
+                        pixmap.close()
+                    }
+
+                    _generationId.value = DRAWS_NOTHING_ID
+                } catch (e: Exception) {
+                    try {
+                        surface.close()
+                    } catch (_: Exception) {
+                    }
+
+                    try {
+                        pixmap.close()
+                    } catch (_: Exception) {
+                    }
+                }
             }
-        }.onSuccess {
-            _generationId.value = DRAWS_NOTHING_ID
         }
+    }
+
+    private fun markInvalid() {
+        isValid.set(false)
+
+        _generationId.value = DRAWS_NOTHING_ID
     }
 }
