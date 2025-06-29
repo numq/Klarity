@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.compose") version "1.8.1"
 }
 
-group = "com.github.numq"
+group = "io.github.numq"
 version = "1.0.0"
 
 repositories {
