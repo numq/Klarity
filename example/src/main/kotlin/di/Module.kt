@@ -98,7 +98,7 @@ private val hub = module {
 
         scoped { AddHubItem(get(), get(), get()) }
 
-        scoped { RemoveHubItem(get()) }
+        scoped { RemoveHubItem(get(), get()) }
 
         scoped { StartHubPlayback(get(), get(), get(), get()) }
 

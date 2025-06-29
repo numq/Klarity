@@ -49,8 +49,7 @@ fun ColumnScope.PlaylistPlayback(
     decreasePlaybackSpeed: () -> Unit,
     increasePlaybackSpeed: () -> Unit,
     resetPlaybackSpeed: () -> Unit,
-    onPreviewTimestamp: (PreviewTimestamp?) -> Unit,
-    remove: () -> Unit,
+    onPreviewTimestamp: (PreviewTimestamp?) -> Unit
 ) {
     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
         Column(
@@ -60,15 +59,13 @@ fun ColumnScope.PlaylistPlayback(
         ) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
                 Box(
-                    modifier = Modifier.fillMaxSize().pointerInput(playbackState) {
+                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                         detectTapGestures(onPress = {
                             awaitRelease()
 
                             resetPlaybackSpeed()
                         }, onLongPress = { (x, y) ->
-                            if (playbackState !is PlaybackState.Ready.Playing) {
-                                remove()
-                            } else if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) {
+                            if (x in 0f..size.width / 2f && y in 0f..size.height.toFloat()) {
                                 decreasePlaybackSpeed()
                             } else {
                                 increasePlaybackSpeed()

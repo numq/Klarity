@@ -38,7 +38,7 @@ class HubReducer(
             })
 
         is HubCommand.RemoveFromHub -> removeHubItem.execute(
-            input = RemoveHubItem.Input(item = command.item)
+            input = RemoveHubItem.Input(item = command.item, playbackItem = state.hub.playbackItem)
         ).fold(onSuccess = {
             transition(state.copy(hub = state.hub.copy(previewItem = state.hub.previewItem.takeIf { previewItem -> previewItem == command.item })))
         }, onFailure = {

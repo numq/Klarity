@@ -4,8 +4,6 @@ plugins {
     kotlin("jvm") version "2.1.21"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.21"
     id("org.jetbrains.compose") version "1.8.1"
-    `maven-publish`
-    signing
 }
 
 group = "io.github.numq"
@@ -32,8 +30,6 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
-    withJavadocJar()
-    withSourcesJar()
 }
 
 kotlin {
@@ -47,60 +43,4 @@ tasks.test {
     testLogging {
         events("passed", "skipped", "failed")
     }
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("mavenJava") {
-            artifactId = "klarity"
-
-            from(components["java"])
-
-            pom {
-                name.set("Klarity")
-                description.set("Jetpack Compose Desktop media player library based on FFmpeg and PortAudio")
-                url.set("https://github.com/numq/klarity")
-
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("numq")
-                        name.set("Alexander")
-                        email.set("numq.dev@gmail.com")
-                    }
-                }
-
-                scm {
-                    connection.set("scm:git:git://github.com/numq/klarity.git")
-                    developerConnection.set("scm:git:ssh://github.com/numq/klarity.git")
-                    url.set("https://github.com/numq/klarity")
-                }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            name = "OSSRH"
-
-            val releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            val snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-            url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
-
-            credentials {
-                username = project.findProperty("ossrhUsername") as? String ?: System.getenv("OSSRH_USERNAME")
-                password = project.findProperty("ossrhPassword") as? String ?: System.getenv("OSSRH_PASSWORD")
-            }
-        }
-    }
-}
-
-signing {
-    sign(publishing.publications["mavenJava"])
 }

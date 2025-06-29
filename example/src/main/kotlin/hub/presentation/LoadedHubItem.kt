@@ -81,7 +81,7 @@ fun LoadedHubItem(
         Card {
             Box(
                 modifier = Modifier.fillMaxSize().aspectRatio(1f).hoverable(interactionSource = interactionSource)
-                    .pointerInput(Unit) {
+                    .pointerInput(isPlaying) {
                         detectTapGestures(onTap = {
                             if (isPlaying) stopPlayback() else startPlayback()
                         }, onPress = {

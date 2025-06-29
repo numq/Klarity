@@ -278,11 +278,6 @@ fun PlaylistView(feature: PlaylistFeature, listState: LazyListState, rendererReg
                                     coroutineScope.launch {
                                         feature.execute(PlaylistCommand.Preview.GetTimestamp(previewTimestamp = previewTimestamp))
                                     }
-                                },
-                                remove = {
-                                    coroutineScope.launch {
-                                        feature.execute(PlaylistCommand.RemoveFromPlaylist(item))
-                                    }
                                 })
                         }
                     }
