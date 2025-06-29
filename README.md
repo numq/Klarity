@@ -142,7 +142,8 @@ depending on your system.
 ## Usage
 
 > [!NOTE]
-> Check out the example to see a full implementation in Clean Architecture using the Reduce & Conquer pattern.
+> Check out the [example](example) to see a full implementation in Clean Architecture using
+> the [Reduce & Conquer](https://github.com/numq/reduce-and-conquer) pattern.
 
 ### Load library
 
