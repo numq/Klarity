@@ -5,8 +5,12 @@ import feature.Transition
 
 class PlaylistInteractionReducer : Reducer<PlaylistCommand.Interaction, PlaylistState, PlaylistEvent> {
     override suspend fun reduce(
-        state: PlaylistState, command: PlaylistCommand.Interaction
+        state: PlaylistState, command: PlaylistCommand.Interaction,
     ): Transition<PlaylistState, PlaylistEvent> = when (command) {
+        is PlaylistCommand.Interaction.ShowOverlay -> transition(state.copy(isOverlayVisible = true))
+
+        is PlaylistCommand.Interaction.HideOverlay -> transition(state.copy(isOverlayVisible = false))
+
         is PlaylistCommand.Interaction.ShowPlaylist -> transition(state.copy(isPlaylistVisible = true))
 
         is PlaylistCommand.Interaction.HidePlaylist -> transition(state.copy(isPlaylistVisible = false))

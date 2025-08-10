@@ -18,12 +18,14 @@ import timestamp.formatTimestamp
 fun TimelinePreview(
     width: Float,
     height: Float,
+    bottomPadding: Float,
     previewTimestamp: PreviewTimestamp,
-    renderer: Renderer
+    renderer: Renderer,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
         Card(modifier = Modifier.padding(4.dp).graphicsLayer {
             translationX = (previewTimestamp.offset.x - width.div(2)).coerceIn(0f, maxWidth.value - width)
+            translationY = -bottomPadding
         }) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

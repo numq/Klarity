@@ -194,6 +194,17 @@ fun PlaylistView(feature: PlaylistFeature, listState: LazyListState, rendererReg
                                 playbackRenderer = playbackRenderer,
                                 previewRenderer = previewRenderer,
                                 previewTimestamp = state.previewTimestamp,
+                                isOverlayVisible = state.isOverlayVisible,
+                                showOverlay = {
+                                    coroutineScope.launch {
+                                        feature.execute(PlaylistCommand.Interaction.ShowOverlay)
+                                    }
+                                },
+                                hideOverlay = {
+                                    coroutineScope.launch {
+                                        feature.execute(PlaylistCommand.Interaction.HideOverlay)
+                                    }
+                                },
                                 isShuffled = state.playlist.isShuffled,
                                 mode = state.playlist.mode,
                                 hasPrevious = state.playlist.hasPrevious,

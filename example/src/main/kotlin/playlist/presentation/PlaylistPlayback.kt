@@ -1,5 +1,9 @@
 package playlist.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Icon
@@ -31,6 +35,9 @@ fun ColumnScope.PlaylistPlayback(
     playbackRenderer: Renderer?,
     previewRenderer: Renderer?,
     previewTimestamp: PreviewTimestamp?,
+    isOverlayVisible: Boolean,
+    showOverlay: () -> Unit,
+    hideOverlay: () -> Unit,
     isShuffled: Boolean,
     mode: PlaylistMode,
     hasPrevious: Boolean,
@@ -49,7 +56,7 @@ fun ColumnScope.PlaylistPlayback(
     decreasePlaybackSpeed: () -> Unit,
     increasePlaybackSpeed: () -> Unit,
     resetPlaybackSpeed: () -> Unit,
-    onPreviewTimestamp: (PreviewTimestamp?) -> Unit
+    onPreviewTimestamp: (PreviewTimestamp?) -> Unit,
 ) {
     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
         Column(
@@ -59,8 +66,14 @@ fun ColumnScope.PlaylistPlayback(
         ) {
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomStart) {
                 Box(
-                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    modifier = Modifier.fillMaxSize().pointerInput(isOverlayVisible) {
                         detectTapGestures(onPress = {
+                            when {
+                                isOverlayVisible -> hideOverlay()
+
+                                else -> showOverlay()
+                            }
+
                             awaitRelease()
 
                             resetPlaybackSpeed()
@@ -101,66 +114,79 @@ fun ColumnScope.PlaylistPlayback(
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BoxWithConstraints(
-                        modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
+                this@Column.AnimatedVisibility(
+                    visible = isOverlayVisible,
+                    enter = slideInVertically { it },
+                    exit = slideOutVertically { it }) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colors.surface.copy(alpha = .5f))
+                            .padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(space = 8.dp, alignment = Alignment.CenterVertically)
                     ) {
-                        Text(
-                            text = "${playbackState.playbackTimestamp.inWholeMilliseconds.formatTimestamp()}/${playbackState.duration.inWholeMilliseconds.formatTimestamp()}",
-                            modifier = Modifier.padding(8.dp),
-                            color = MaterialTheme.colors.primary
-                        )
-                    }
-                    PlaylistControls(
-                        modifier = Modifier.wrapContentWidth(),
-                        playbackState = playbackState,
-                        color = MaterialTheme.colors.primary,
-                        isShuffled = isShuffled,
-                        shuffle = shuffle,
-                        mode = mode,
-                        setMode = setMode,
-                        hasPrevious = hasPrevious,
-                        hasNext = hasNext,
-                        previous = previous,
-                        next = next,
-                        play = play,
-                        pause = pause,
-                        resume = resume,
-                        stop = stop
-                    )
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        VolumeControls(
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            volume = playbackState.volume,
-                            isMuted = playbackState.isMuted,
-                            toggleMute = toggleMute,
-                            changeVolume = changeVolume
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BoxWithConstraints(
+                                modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
+                            ) {
+                                Text(
+                                    text = "${playbackState.playbackTimestamp.inWholeMilliseconds.formatTimestamp()}/${playbackState.duration.inWholeMilliseconds.formatTimestamp()}",
+                                    modifier = Modifier.padding(8.dp),
+                                    color = MaterialTheme.colors.onSurface
+                                )
+                            }
+                            PlaylistControls(
+                                modifier = Modifier.wrapContentWidth(),
+                                playbackState = playbackState,
+                                color = MaterialTheme.colors.onSurface,
+                                isShuffled = isShuffled,
+                                shuffle = shuffle,
+                                mode = mode,
+                                setMode = setMode,
+                                hasPrevious = hasPrevious,
+                                hasNext = hasNext,
+                                previous = previous,
+                                next = next,
+                                play = play,
+                                pause = pause,
+                                resume = resume,
+                                stop = stop
+                            )
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                VolumeControls(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    volume = playbackState.volume,
+                                    isMuted = playbackState.isMuted,
+                                    toggleMute = toggleMute,
+                                    changeVolume = changeVolume
+                                )
+                            }
+                        }
+                        Timeline(
+                            modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
+                            duration = playbackState.duration,
+                            bufferTimestamp = playbackState.bufferTimestamp,
+                            playbackTimestamp = playbackState.playbackTimestamp,
+                            seekTo = seekTo,
+                            onPreviewTimestamp = onPreviewTimestamp
                         )
                     }
-                }
-                if (previewTimestamp != null) {
-                    previewRenderer?.takeIf { !it.drawsNothing() }?.let {
-                        TimelinePreview(
-                            width = 128f,
-                            height = 128f,
-                            previewTimestamp = previewTimestamp,
-                            renderer = previewRenderer,
-                        )
+                    if (previewTimestamp != null) {
+                        previewRenderer?.takeIf { !it.drawsNothing() }?.let {
+                            TimelinePreview(
+                                width = 128f,
+                                height = 128f,
+                                bottomPadding = 24f,
+                                previewTimestamp = previewTimestamp,
+                                renderer = previewRenderer,
+                            )
+                        }
                     }
                 }
             }
-            Timeline(
-                modifier = Modifier.fillMaxWidth().height(24.dp).padding(4.dp),
-                duration = playbackState.duration,
-                bufferTimestamp = playbackState.bufferTimestamp,
-                playbackTimestamp = playbackState.playbackTimestamp,
-                seekTo = seekTo,
-                onPreviewTimestamp = onPreviewTimestamp
-            )
         }
     }
 }

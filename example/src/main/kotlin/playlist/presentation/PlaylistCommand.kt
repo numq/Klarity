@@ -7,6 +7,10 @@ import kotlin.time.Duration
 
 sealed interface PlaylistCommand {
     sealed interface Interaction : PlaylistCommand {
+        data object ShowOverlay : Interaction
+
+        data object HideOverlay : Interaction
+
         data object ShowPlaylist : Interaction
 
         data object HidePlaylist : Interaction

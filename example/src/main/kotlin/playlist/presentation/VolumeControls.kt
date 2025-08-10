@@ -53,7 +53,7 @@ fun VolumeControls(
                         volume < .25f -> Icons.Default.VolumeDown
                         else -> Icons.Default.VolumeUp
                     }
-                }, contentDescription = "volume indicator", tint = MaterialTheme.colors.primary
+                }, contentDescription = "volume indicator", tint = MaterialTheme.colors.onSurface
             )
         }
         VolumeBar(
