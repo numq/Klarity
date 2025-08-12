@@ -696,7 +696,7 @@ uint64_t Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     int seekFlags = AVSEEK_FLAG_BACKWARD;
 
     if (av_seek_frame(formatContext.get(), seekStreamIndex, targetPts, seekFlags) < 0) {
-        throw DecoderException("av_seek_frame failed");
+        throw DecoderException("Error seeking stream");
     }
 
     avformat_flush(formatContext.get());
@@ -838,23 +838,15 @@ void Decoder::reset() {
         throw DecoderException("Could not use uninitialized decoder");
     }
 
-    if (audioCodecContext) {
-        avcodec_flush_buffers(audioCodecContext.get());
-    }
-    if (videoCodecContext) {
-        avcodec_flush_buffers(videoCodecContext.get());
-    }
-
     if (av_seek_frame(formatContext.get(), -1, 0, AVSEEK_FLAG_BACKWARD) < 0) {
         throw DecoderException("Error resetting stream");
     }
 
-    if (audioCodecContext) {
-        avcodec_flush_buffers(audioCodecContext.get());
-    }
-    if (videoCodecContext) {
-        avcodec_flush_buffers(videoCodecContext.get());
-    }
+    avformat_flush(formatContext.get());
+
+    if (videoCodecContext) avcodec_flush_buffers(videoCodecContext.get());
+
+    if (audioCodecContext) avcodec_flush_buffers(audioCodecContext.get());
 
     if (packet) {
         av_packet_unref(packet.get());
