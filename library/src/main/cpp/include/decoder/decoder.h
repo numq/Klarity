@@ -106,7 +106,7 @@ public:
 
     std::optional<VideoFrame> decodeVideo(uint8_t *buffer, int capacity);
 
-    uint64_t seekTo(long timestampMicros, bool keyframesOnly);
+    void seekTo(long timestampMicros, bool keyframesOnly);
 
     void reset();
 };

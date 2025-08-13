@@ -163,18 +163,18 @@ JNIEXPORT jobject JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_0002
     }, nullptr);
 }
 
-JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_seekTo(
+JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_seekTo(
         JNIEnv *env,
         jclass thisClass,
         jlong decoderHandle,
         jlong timestampMicros,
         jboolean keyframesOnly
 ) {
-    return handleException<jlong>(env, [&] {
+    return handleException(env, [&] {
         auto decoder = getDecoderPointer(decoderHandle);
 
-        return static_cast<jlong>(decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly));
-    }, -1);
+        decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly);
+    });
 }
 
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_reset(

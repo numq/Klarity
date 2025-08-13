@@ -49,7 +49,7 @@ JNIEXPORT jobject JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_0002
         jint capacity
 );
 
-JNIEXPORT jlong JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_seekTo(
+JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_seekTo(
         JNIEnv *env,
         jclass thisClass,
         jlong decoderHandle,
