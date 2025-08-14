@@ -32,6 +32,19 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
+## [1.0.2](https://github.com/numq/Klarity/releases/tag/1.0.2)
+
+### Fixed:
+
+- Fixed delayed external state updates after command execution
+- Fixed incorrect first frame display after seeking
+- Fixed event handling issues
+- Fixed improper loop stopping
+- Fixed buffer cleanup errors during channel closure
+
+<details>
+<summary>**📦 Previous versions**</summary>
+
 ## [1.0.1](https://github.com/numq/Klarity/releases/tag/1.0.1)
 
 ### Changed:
@@ -43,6 +56,8 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 ## [1.0.0](https://github.com/numq/Klarity/releases/tag/1.0.0)
 
 - Stable release
+
+</details>
 
 # Supported operating systems
 

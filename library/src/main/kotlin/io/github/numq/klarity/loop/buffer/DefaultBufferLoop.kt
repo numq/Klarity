@@ -149,6 +149,8 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
                 ensureActive()
 
+                onTimestamp(pipeline.media.duration)
+
                 onEndOfMedia()
             }
         }
@@ -156,9 +158,15 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
     override suspend fun stop() = mutex.withLock {
         runCatching {
-            job?.cancelAndJoin()
+            try {
+                job?.cancelAndJoin()
+            } catch (_: CancellationException) {
 
-            job = null
+            } finally {
+                job = null
+            }
+
+            Unit
         }
     }
 

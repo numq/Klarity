@@ -24,7 +24,9 @@ import io.github.numq.klarity.state.Destination
 import io.github.numq.klarity.state.InternalPlayerState
 import io.github.numq.klarity.state.PlayerState
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
@@ -73,12 +75,14 @@ internal class DefaultPlayerController(
 
     internal var onInternalPlayerState: ((InternalPlayerState) -> Unit)? = null
 
-    private var internalState = MutableStateFlow<InternalPlayerState>(InternalPlayerState.Empty)
+    private val internalState = MutableStateFlow<InternalPlayerState>(InternalPlayerState.Empty)
 
-    override val state = internalState.mapNotNull { state ->
-        onInternalPlayerState?.invoke(state)
+    override val state = MutableStateFlow<PlayerState>(PlayerState.Empty)
 
-        when (state) {
+    private suspend fun updateState(internalState: InternalPlayerState) {
+        onInternalPlayerState?.invoke(internalState)
+
+        val updatedState = when (internalState) {
             is InternalPlayerState.Empty -> PlayerState.Empty
 
             is InternalPlayerState.Preparing -> null
@@ -86,28 +90,38 @@ internal class DefaultPlayerController(
             is InternalPlayerState.Releasing -> null
 
             is InternalPlayerState.Error -> PlayerState.Error(
-                exception = when (val throwable = state.cause) {
+                exception = when (val throwable = internalState.cause) {
                     is Exception -> throwable
 
                     else -> Exception(throwable)
                 }
             )
 
-            is InternalPlayerState.Ready -> when (state) {
-                is InternalPlayerState.Ready.Playing -> PlayerState.Ready.Playing(media = state.media)
+            is InternalPlayerState.Ready -> when (internalState) {
+                is InternalPlayerState.Ready.Playing -> PlayerState.Ready.Playing(media = internalState.media)
 
-                is InternalPlayerState.Ready.Paused -> PlayerState.Ready.Paused(media = state.media)
+                is InternalPlayerState.Ready.Paused -> PlayerState.Ready.Paused(media = internalState.media)
 
-                is InternalPlayerState.Ready.Stopped -> PlayerState.Ready.Stopped(media = state.media)
+                is InternalPlayerState.Ready.Stopped -> PlayerState.Ready.Stopped(media = internalState.media)
 
-                is InternalPlayerState.Ready.Completed -> PlayerState.Ready.Completed(media = state.media)
+                is InternalPlayerState.Ready.Completed -> PlayerState.Ready.Completed(media = internalState.media)
 
-                is InternalPlayerState.Ready.Seeking -> PlayerState.Ready.Seeking(media = state.media)
+                is InternalPlayerState.Ready.Seeking -> PlayerState.Ready.Seeking(media = internalState.media)
 
                 is InternalPlayerState.Ready.Transition -> null
             }
         }
-    }.stateIn(scope = controllerScope, started = SharingStarted.Eagerly, initialValue = PlayerState.Empty)
+
+        if (updatedState != null) {
+            state.emit(updatedState)
+        }
+    }
+
+    private suspend fun updateInternalState(updatedState: InternalPlayerState) {
+        internalState.emit(updatedState)
+
+        updateState(updatedState)
+    }
 
     private suspend fun <T> InternalPlayerState.Ready.withTransition(
         destination: Destination,
@@ -115,16 +129,18 @@ internal class DefaultPlayerController(
     ): T {
         val transition = startTransition(destination = destination)
 
-        internalState.emit(transition)
+        updateInternalState(transition)
 
         return try {
             val result = block()
 
-            internalState.emit(completeTransition(transition))
+            val updatedState = completeTransition(transition)
+
+            updateInternalState(updatedState)
 
             result
         } catch (e: Exception) {
-            internalState.emit(this)
+            updateInternalState(this)
 
             throw e
         }
@@ -157,8 +173,7 @@ internal class DefaultPlayerController(
      */
 
     private suspend fun handleException(throwable: Throwable) =
-        events.emit(PlayerEvent.Error(if (throwable is Exception) throwable else Exception(throwable)))
-
+        _events.send(PlayerEvent.Error(if (throwable is Exception) throwable else Exception(throwable)))
 
     /**
      * Completion
@@ -167,9 +182,7 @@ internal class DefaultPlayerController(
     private suspend fun InternalPlayerState.Ready.handleBufferCompletion() {
         bufferLoop.stop().getOrThrow()
 
-        bufferTimestamp.emit(media.duration)
-
-        events.emit(PlayerEvent.Buffer.Complete)
+        _events.send(PlayerEvent.Buffer.Complete)
     }
 
     private suspend fun InternalPlayerState.Ready.handlePlaybackCompletion() {
@@ -181,8 +194,6 @@ internal class DefaultPlayerController(
 
                 is Pipeline.AudioVideo -> pipeline.sampler.stop().getOrThrow()
             }
-
-            playbackTimestamp.emit(media.duration)
         }
     }
 
@@ -549,11 +560,7 @@ internal class DefaultPlayerController(
 
                         audioBuffer.put(item = frame).getOrThrow()
 
-                        (frame as? Frame.Content.Audio)?.timestamp?.let { timestamp ->
-                            timestampAfterSeek = timestamp
-                        }
-
-                        timestampAfterSeek
+                        (frame as? Frame.Content.Audio)?.timestamp
                     }
 
                     val seekVideoDeferred = controllerScope.async {
@@ -561,18 +568,16 @@ internal class DefaultPlayerController(
 
                         val data = videoPool.acquire().getOrThrow()
 
-                        val frame = videoDecoder.decodeVideo(data = data).getOrThrow()
+                        try {
+                            val frame = videoDecoder.decodeVideo(data = data).getOrThrow()
 
-                        videoBuffer.put(item = frame).getOrThrow()
-
-                        (frame as? Frame.Content.Audio)?.timestamp?.let { timestamp ->
-                            timestampAfterSeek = timestamp
+                            (frame as? Frame.Content.Audio)?.timestamp
+                        } finally {
+                            videoPool.release(item = data).getOrThrow()
                         }
-
-                        timestampAfterSeek
                     }
 
-                    timestampAfterSeek = awaitAll(seekAudioDeferred, seekVideoDeferred).max()
+                    timestampAfterSeek = awaitAll(seekAudioDeferred, seekVideoDeferred).filterNotNull().max()
                 }
             }
 
@@ -602,7 +607,9 @@ internal class DefaultPlayerController(
         playbackTimestamp.emit(Duration.ZERO)
     }
 
-    override val events = MutableSharedFlow<PlayerEvent>()
+    private val _events = Channel<PlayerEvent>(Channel.BUFFERED)
+
+    override val events = _events.receiveAsFlow()
 
     override suspend fun attachRenderer(renderer: Renderer) = runCatching {
         check(this.renderer == null) { "Detach the renderer before attaching a new one" }
@@ -669,13 +676,13 @@ internal class DefaultPlayerController(
                 }
 
                 is Command.Play -> when (val state = internalState.value) {
-                    is InternalPlayerState.Ready.Stopped -> {
-                        if (!state.media.isContinuous()) {
+                    is InternalPlayerState.Ready.Stopped -> with(state) {
+                        if (!media.isContinuous()) {
                             return@runCatching
                         }
 
-                        state.withTransition(Destination.PLAYING) {
-                            state.handlePlay()
+                        withTransition(Destination.PLAYING) {
+                            handlePlay()
                         }
                     }
 
@@ -683,13 +690,13 @@ internal class DefaultPlayerController(
                 }
 
                 is Command.Pause -> when (val state = internalState.value) {
-                    is InternalPlayerState.Ready.Playing -> {
-                        if (!state.media.isContinuous()) {
+                    is InternalPlayerState.Ready.Playing -> with(state) {
+                        if (!media.isContinuous()) {
                             return@runCatching
                         }
 
-                        state.withTransition(Destination.PAUSED) {
-                            state.handlePause()
+                        withTransition(Destination.PAUSED) {
+                            handlePause()
                         }
                     }
 
@@ -697,13 +704,13 @@ internal class DefaultPlayerController(
                 }
 
                 is Command.Resume -> when (val state = internalState.value) {
-                    is InternalPlayerState.Ready.Paused -> {
-                        if (!state.media.isContinuous()) {
+                    is InternalPlayerState.Ready.Paused -> with(state) {
+                        if (!media.isContinuous()) {
                             return@runCatching
                         }
 
-                        state.withTransition(Destination.PLAYING) {
-                            state.handleResume()
+                        withTransition(Destination.PLAYING) {
+                            handleResume()
                         }
                     }
 
@@ -711,47 +718,55 @@ internal class DefaultPlayerController(
                 }
 
                 is Command.Stop -> when (val state = internalState.value) {
-                    is InternalPlayerState.Ready.Playing,
-                    is InternalPlayerState.Ready.Paused,
-                    is InternalPlayerState.Ready.Completed,
-                    is InternalPlayerState.Ready.Seeking,
-                        -> with(state as InternalPlayerState.Ready) {
-                        if (!state.media.isContinuous()) {
-                            return@runCatching
+                    is InternalPlayerState.Ready -> when (state) {
+                        is InternalPlayerState.Ready.Playing,
+                        is InternalPlayerState.Ready.Paused,
+                        is InternalPlayerState.Ready.Completed,
+                        is InternalPlayerState.Ready.Seeking,
+                            -> with(state) {
+                            if (!media.isContinuous()) {
+                                return@runCatching
+                            }
+
+                            withTransition(Destination.STOPPED) {
+                                handleStop()
+                            }
                         }
 
-                        withTransition(Destination.STOPPED) {
-                            handleStop()
-                        }
+                        else -> return@runCatching
                     }
 
                     else -> return@runCatching
                 }
 
                 is Command.SeekTo -> when (val state = internalState.value) {
-                    is InternalPlayerState.Ready.Playing,
-                    is InternalPlayerState.Ready.Paused,
-                    is InternalPlayerState.Ready.Stopped,
-                    is InternalPlayerState.Ready.Completed,
-                    is InternalPlayerState.Ready.Seeking,
-                        -> with(state as InternalPlayerState.Ready) {
-                        if (!state.media.isContinuous()) {
-                            return@runCatching
+                    is InternalPlayerState.Ready -> when (state) {
+                        is InternalPlayerState.Ready.Playing,
+                        is InternalPlayerState.Ready.Paused,
+                        is InternalPlayerState.Ready.Stopped,
+                        is InternalPlayerState.Ready.Completed,
+                        is InternalPlayerState.Ready.Seeking,
+                            -> with(state) {
+                            if (!media.isContinuous()) {
+                                return@runCatching
+                            }
+
+                            handleSeekTo(
+                                timestamp = command.timestamp,
+                                keyFramesOnly = command.keyFramesOnly,
+                                onStartOfSeek = { block ->
+                                    withTransition(Destination.SEEKING) {
+                                        block()
+                                    }
+                                },
+                                onEndOfSeek = { block ->
+                                    (internalState.value as InternalPlayerState.Ready).withTransition(Destination.PAUSED) {
+                                        block()
+                                    }
+                                })
                         }
 
-                        handleSeekTo(
-                            timestamp = command.timestamp,
-                            keyFramesOnly = command.keyFramesOnly,
-                            onStartOfSeek = { block ->
-                                withTransition(Destination.SEEKING) {
-                                    block()
-                                }
-                            },
-                            onEndOfSeek = { block ->
-                                (internalState.value as InternalPlayerState.Ready).withTransition(Destination.PAUSED) {
-                                    block()
-                                }
-                            })
+                        else -> return@runCatching
                     }
 
                     else -> return@runCatching

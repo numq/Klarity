@@ -14,7 +14,7 @@ import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 import java.nio.file.Files
@@ -47,7 +47,7 @@ interface KlarityPlayer {
     /**
      * A flow that emits events related to the player's state and actions.
      */
-    val events: SharedFlow<PlayerEvent>
+    val events: Flow<PlayerEvent>
 
     /**
      * Attaches the renderer to the player.
@@ -95,7 +95,7 @@ interface KlarityPlayer {
         location: String,
         audioBufferSize: Int = MIN_AUDIO_BUFFER_SIZE,
         videoBufferSize: Int = MIN_VIDEO_BUFFER_SIZE,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null
+        hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
     ): Result<Unit>
 
     /**

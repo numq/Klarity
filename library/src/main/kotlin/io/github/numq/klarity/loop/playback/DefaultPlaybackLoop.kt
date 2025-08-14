@@ -105,15 +105,9 @@ internal class DefaultPlaybackLoop(
                             val deltaTime = frameTime - masterClockTime
 
                             when {
-                                deltaTime < -SYNC_THRESHOLD -> {
-                                    continue
-                                }
+                                deltaTime < -SYNC_THRESHOLD -> continue
 
-                                deltaTime > SYNC_THRESHOLD -> {
-                                    delay(deltaTime / playbackSpeedFactor.toDouble())
-
-                                    currentCoroutineContext().ensureActive()
-                                }
+                                deltaTime > SYNC_THRESHOLD -> delay(deltaTime / playbackSpeedFactor.toDouble())
                             }
                         }
 
@@ -211,6 +205,8 @@ internal class DefaultPlaybackLoop(
 
                 ensureActive()
 
+                onTimestamp(pipeline.media.duration)
+
                 onEndOfMedia()
             }
         }
@@ -218,13 +214,19 @@ internal class DefaultPlaybackLoop(
 
     override suspend fun stop() = mutex.withLock {
         runCatching {
-            job?.cancelAndJoin()
+            try {
+                job?.cancelAndJoin()
+            } catch (_: CancellationException) {
 
-            job = null
+            } finally {
+                job = null
 
-            audioClock.set(Duration.INFINITE)
+                audioClock.set(Duration.INFINITE)
 
-            videoClock.set(Duration.INFINITE)
+                videoClock.set(Duration.INFINITE)
+            }
+
+            Unit
         }
     }
 

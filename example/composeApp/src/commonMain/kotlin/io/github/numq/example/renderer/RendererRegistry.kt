@@ -57,7 +57,7 @@ interface RendererRegistry {
             if (registeredRenderer != null) {
                 val (location, renderer) = registeredRenderer
 
-                snapshotManager.snapshot(location = location) {
+                snapshotManager.snapshot(location = location, keyframesOnly = false) {
                     timestamp
                 }.getOrThrow()?.use { snapshot ->
                     renderer.render(frame = snapshot.frame).getOrThrow()

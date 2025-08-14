@@ -1,6 +1,6 @@
 {
   "name": "klarity",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "builtin-baseline": "ce613c41372b23b1f51333815feb3edd87ef8a8b",
   "dependencies": [
     {

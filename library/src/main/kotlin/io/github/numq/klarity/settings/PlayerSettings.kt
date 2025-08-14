@@ -12,13 +12,11 @@ import io.github.numq.klarity.player.KlarityPlayer
 data class PlayerSettings(
     val playbackSpeedFactor: Float,
     val volume: Float,
-    val isMuted: Boolean
+    val isMuted: Boolean,
 ) {
     companion object {
         val DEFAULT = PlayerSettings(
-            playbackSpeedFactor = KlarityPlayer.NORMAL_PLAYBACK_SPEED_FACTOR,
-            volume = 1f,
-            isMuted = false
+            playbackSpeedFactor = KlarityPlayer.NORMAL_PLAYBACK_SPEED_FACTOR, volume = 1f, isMuted = false
         )
     }
 }

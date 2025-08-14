@@ -12,7 +12,7 @@ import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 
@@ -25,7 +25,7 @@ internal interface PlayerController {
 
     val playbackTimestamp: StateFlow<Duration>
 
-    val events: SharedFlow<PlayerEvent>
+    val events: Flow<PlayerEvent>
 
     suspend fun attachRenderer(renderer: Renderer): Result<Unit>
 
