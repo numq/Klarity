@@ -5,7 +5,7 @@
 <img src="media/logo.png" alt="logo" height="128px"/>
 </div>
 
-**Klarity** is a media playback for **Jetpack Compose Desktop**, written in **Kotlin** and **C++**, built on top of the
+**Klarity** is a media (video and audio) player for **Compose Multiplatform** (desktop-only), built on top of the
 native **FFMpeg** and **PortAudio** libraries, and rendered using the **Skiko** library.
 
 Since frames are rendered directly into the `Composable`, this eliminates the need for compatibility components like
