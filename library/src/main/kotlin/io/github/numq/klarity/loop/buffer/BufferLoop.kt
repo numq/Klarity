@@ -5,13 +5,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlin.time.Duration
 
 internal interface BufferLoop {
-    val isBuffering: Boolean
-
     suspend fun start(
         coroutineScope: CoroutineScope,
         onException: suspend (BufferLoopException) -> Unit,
         onTimestamp: suspend (Duration) -> Unit,
-        onEndOfMedia: suspend () -> Unit
+        onEndOfMedia: suspend () -> Unit,
     ): Result<Unit>
 
     suspend fun stop(): Result<Unit>

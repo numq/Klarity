@@ -43,7 +43,7 @@ internal class DefaultKlarityPlayer(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
-        hardwareAccelerationCandidates: List<HardwareAcceleration>?
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     ) = playerController.execute(
         Command.Prepare(
             location = location,

@@ -7,6 +7,9 @@ import kotlin.time.Duration.Companion.nanoseconds
  * Represents the selection state of an item in the playlist-like queue.
  */
 sealed interface MediaQueueSelection<SelectedItem> {
+    /**
+     * The time in [Duration] when the item was last updated or selected.
+     */
     val updatedAt: Duration
 
     /**
@@ -15,7 +18,7 @@ sealed interface MediaQueueSelection<SelectedItem> {
      * @param updatedAt the time in [Duration] when the item was last updated or selected
      */
     data class Absent<SelectedItem>(
-        override val updatedAt: Duration = System.nanoTime().nanoseconds
+        override val updatedAt: Duration = System.nanoTime().nanoseconds,
     ) : MediaQueueSelection<SelectedItem>
 
     /**
@@ -25,6 +28,6 @@ sealed interface MediaQueueSelection<SelectedItem> {
      * @param updatedAt the time in [Duration] when the item was last updated or selected
      */
     data class Present<SelectedItem>(
-        val item: SelectedItem, override val updatedAt: Duration = System.nanoTime().nanoseconds
+        val item: SelectedItem, override val updatedAt: Duration = System.nanoTime().nanoseconds,
     ) : MediaQueueSelection<SelectedItem>
 }

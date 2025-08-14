@@ -17,8 +17,6 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
     private var job: Job? = null
 
-    override var isBuffering = false
-
     private suspend fun handleAudioBuffer(
         decoder: AudioDecoder, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit,
     ) {
@@ -48,7 +46,10 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     }
 
     private suspend fun handleVideoBuffer(
-        decoder: VideoDecoder, pool: Pool<Data>, buffer: Buffer<Frame>, onTimestamp: suspend (Duration) -> Unit,
+        decoder: VideoDecoder,
+        pool: Pool<Data>,
+        buffer: Buffer<Frame>,
+        onTimestamp: suspend (Duration) -> Unit,
     ) {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
@@ -90,11 +91,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         onEndOfMedia: suspend () -> Unit,
     ) = mutex.withLock {
         runCatching {
-            check(!isBuffering) { "Unable to start buffer loop, call stop first." }
-
-            require(job == null) { "Unable to start buffer loop" }
-
-            isBuffering = true
+            check(job == null) { "Unable to start buffer loop, call stop first." }
 
             val coroutineExceptionHandler = CoroutineExceptionHandler { _, exception ->
                 coroutineScope.launch {
@@ -103,86 +100,73 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
             }
 
             job = coroutineScope.launch(context = coroutineExceptionHandler) {
-                try {
-                    when (pipeline) {
-                        is Pipeline.Audio -> with(pipeline) {
-                            handleAudioBuffer(
-                                decoder = decoder as AudioDecoder, buffer = buffer, onTimestamp = onTimestamp
-                            )
-                        }
-
-                        is Pipeline.Video -> with(pipeline) {
-                            handleVideoBuffer(
-                                decoder = decoder as VideoDecoder,
-                                pool = pool,
-                                buffer = buffer,
-                                onTimestamp = onTimestamp
-                            )
-                        }
-
-                        is Pipeline.AudioVideo -> with(pipeline) {
-                            var lastFrameTimestamp = Duration.ZERO
-
-                            val audioJob = launch {
-                                handleAudioBuffer(decoder = audioDecoder as AudioDecoder,
-                                    buffer = audioBuffer,
-                                    onTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
-
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    })
-                            }
-
-                            val videoJob = launch {
-                                handleVideoBuffer(decoder = videoDecoder as VideoDecoder,
-                                    pool = videoPool,
-                                    buffer = videoBuffer,
-                                    onTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
-
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    })
-                            }
-
-                            joinAll(audioJob, videoJob)
-                        }
+                when (pipeline) {
+                    is Pipeline.Audio -> with(pipeline) {
+                        handleAudioBuffer(
+                            decoder = decoder as AudioDecoder, buffer = buffer, onTimestamp = onTimestamp
+                        )
                     }
 
-                    ensureActive()
+                    is Pipeline.Video -> with(pipeline) {
+                        handleVideoBuffer(
+                            decoder = decoder as VideoDecoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
+                        )
+                    }
 
-                    onEndOfMedia()
-                } finally {
-                    isBuffering = false
+                    is Pipeline.AudioVideo -> with(pipeline) {
+                        var lastFrameTimestamp = Duration.ZERO
+
+                        val audioJob = launch {
+                            handleAudioBuffer(
+                                decoder = audioDecoder as AudioDecoder,
+                                buffer = audioBuffer,
+                                onTimestamp = { frameTimestamp ->
+                                    if (frameTimestamp > lastFrameTimestamp) {
+                                        onTimestamp(frameTimestamp)
+
+                                        lastFrameTimestamp = frameTimestamp
+                                    }
+                                })
+                        }
+
+                        val videoJob = launch {
+                            handleVideoBuffer(
+                                decoder = videoDecoder as VideoDecoder,
+                                pool = videoPool,
+                                buffer = videoBuffer,
+                                onTimestamp = { frameTimestamp ->
+                                    if (frameTimestamp > lastFrameTimestamp) {
+                                        onTimestamp(frameTimestamp)
+
+                                        lastFrameTimestamp = frameTimestamp
+                                    }
+                                })
+                        }
+
+                        joinAll(audioJob, videoJob)
+                    }
                 }
+
+                ensureActive()
+
+                onEndOfMedia()
             }
         }
     }
 
     override suspend fun stop() = mutex.withLock {
         runCatching {
-            try {
-                job?.cancelAndJoin()
+            job?.cancelAndJoin()
 
-                job = null
-            } finally {
-                isBuffering = false
-            }
+            job = null
         }
     }
 
     override suspend fun close() = mutex.withLock {
         runCatching {
-            try {
-                job?.cancel()
+            job?.cancel()
 
-                job = null
-            } finally {
-                isBuffering = false
-            }
+            job = null
         }
     }
 }

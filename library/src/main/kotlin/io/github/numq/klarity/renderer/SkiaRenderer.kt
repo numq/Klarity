@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class SkiaRenderer(
-    override val format: VideoFormat
+    override val format: VideoFormat,
 ) : Renderer {
     private companion object {
         const val DRAWS_NOTHING_ID = 0

@@ -54,7 +54,7 @@ internal interface PlayerController {
             bufferFactory: BufferFactory,
             bufferLoopFactory: BufferLoopFactory,
             playbackLoopFactory: PlaybackLoopFactory,
-            samplerFactory: SamplerFactory
+            samplerFactory: SamplerFactory,
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,

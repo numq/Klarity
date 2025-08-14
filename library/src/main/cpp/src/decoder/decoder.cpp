@@ -23,10 +23,6 @@ bool Decoder::_hasAudio() {
         return false;
     }
 
-    if (!audioStream->codecpar || audioStream->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
-        return false;
-    }
-
     if (audioCodecContext->sample_fmt == AV_SAMPLE_FMT_NONE) {
         return false;
     }
@@ -706,11 +702,11 @@ void Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     AVCodecContext *codecContext = nullptr;
 
-    if (videoStream) {
+    if (videoStream && videoCodecContext) {
         seekStreamIndex = videoStream->index;
 
         codecContext = videoCodecContext.get();
-    } else if (audioStream) {
+    } else if (audioStream && audioCodecContext) {
         seekStreamIndex = audioStream->index;
 
         codecContext = audioCodecContext.get();
@@ -725,7 +721,9 @@ void Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
     );
 
     if (av_seek_frame(formatContext.get(), seekStreamIndex, targetPts, AVSEEK_FLAG_BACKWARD) < 0) {
-        throw DecoderException("Error seeking stream");
+        if (av_seek_frame(formatContext.get(), -1, timestampMicros, AVSEEK_FLAG_BACKWARD) < 0) {
+            throw DecoderException("Error seeking stream");
+        }
     }
 
     if (videoCodecContext) {

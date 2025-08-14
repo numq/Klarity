@@ -32,9 +32,7 @@ internal class AudioDecoder(
     override suspend fun decodeVideo(data: Data) = error("Decoder does not support video")
 
     override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
-        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly).map { timestampMicros ->
-            timestampMicros.microseconds
-        }
+        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly)
     }
 
     override suspend fun reset() = mutex.withLock {

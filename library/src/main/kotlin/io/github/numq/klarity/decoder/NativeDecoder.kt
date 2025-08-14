@@ -39,7 +39,7 @@ internal class NativeDecoder(
         external fun decodeVideo(handle: Long, buffer: Long, capacity: Int): NativeVideoFrame?
 
         @JvmStatic
-        external fun seekTo(handle: Long, timestampMicros: Long, keyframesOnly: Boolean): Long
+        external fun seekTo(handle: Long, timestampMicros: Long, keyframesOnly: Boolean)
 
         @JvmStatic
         external fun reset(handle: Long)
@@ -108,9 +108,7 @@ internal class NativeDecoder(
     fun seekTo(timestampMicros: Long, keyframesOnly: Boolean) = runCatching {
         ensureOpen()
 
-        Native.seekTo(
-            handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly
-        ).takeIf { it >= 0 } ?: timestampMicros
+        Native.seekTo(handle = nativeHandle.get(), timestampMicros = timestampMicros, keyframesOnly = keyframesOnly)
     }
 
     fun reset() = runCatching {

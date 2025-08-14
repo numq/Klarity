@@ -45,4 +45,9 @@ sealed interface PlayerState {
          */
         data class Seeking(override val media: Media) : Ready
     }
+
+    /**
+     * Represents the state when a fatal error occurred.
+     */
+    data class Error(val exception: Exception) : PlayerState
 }

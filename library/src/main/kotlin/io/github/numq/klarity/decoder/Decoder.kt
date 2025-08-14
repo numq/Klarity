@@ -16,7 +16,7 @@ internal interface Decoder<Media> {
 
     suspend fun decodeVideo(data: Data): Result<Frame>
 
-    suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean): Result<Duration>
+    suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean): Result<Unit>
 
     suspend fun reset(): Result<Unit>
 
