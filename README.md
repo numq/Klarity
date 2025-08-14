@@ -164,8 +164,8 @@ depending on your system.
 ## Usage
 
 > [!NOTE]
-> Check out the [example](example) to see a full implementation in Clean Architecture using
-> the [Reduce & Conquer](https://github.com/numq/reduce-and-conquer) pattern.
+> Check out the [example](example/composeApp/src/commonMain/kotlin/io/github/numq/example) to see a full implementation
+> in Clean Architecture using the [Reduce & Conquer](https://github.com/numq/reduce-and-conquer) pattern.
 
 ### Load library
 
