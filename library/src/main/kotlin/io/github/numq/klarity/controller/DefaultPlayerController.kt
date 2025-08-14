@@ -648,7 +648,7 @@ internal class DefaultPlayerController(
             when (command) {
                 is Command.Prepare -> when (val state = internalState.value) {
                     is InternalPlayerState.Empty, is InternalPlayerState.Error -> with(command) {
-                        internalState.emit(InternalPlayerState.Preparing)
+                        updateInternalState(InternalPlayerState.Preparing)
 
                         try {
                             val (pipeline, bufferLoop, playbackLoop) = handlePrepare(
@@ -658,7 +658,7 @@ internal class DefaultPlayerController(
                                 hardwareAccelerationCandidates = hardwareAccelerationCandidates
                             )
 
-                            internalState.emit(
+                            updateInternalState(
                                 InternalPlayerState.Ready.Stopped(
                                     media = pipeline.media,
                                     pipeline = pipeline,
@@ -668,7 +668,7 @@ internal class DefaultPlayerController(
                                 )
                             )
                         } catch (t: Throwable) {
-                            internalState.emit(InternalPlayerState.Error(cause = t, previous = state))
+                            updateInternalState(InternalPlayerState.Error(cause = t, previous = state))
                         }
                     }
 
@@ -760,7 +760,7 @@ internal class DefaultPlayerController(
                                     }
                                 },
                                 onEndOfSeek = { block ->
-                                    (internalState.value as InternalPlayerState.Ready).withTransition(Destination.PAUSED) {
+                                    (internalState.value as? InternalPlayerState.Ready)?.withTransition(Destination.PAUSED) {
                                         block()
                                     }
                                 })
@@ -774,11 +774,11 @@ internal class DefaultPlayerController(
 
                 is Command.Release -> when (val state = internalState.value) {
                     is InternalPlayerState.Ready -> {
-                        internalState.emit(InternalPlayerState.Releasing(previousState = state))
+                        updateInternalState(InternalPlayerState.Releasing(previousState = state))
 
                         state.handleRelease()
 
-                        internalState.emit(InternalPlayerState.Empty)
+                        updateInternalState(InternalPlayerState.Empty)
                     }
 
                     else -> return@runCatching

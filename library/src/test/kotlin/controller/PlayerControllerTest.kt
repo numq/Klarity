@@ -21,8 +21,8 @@ import io.github.numq.klarity.sampler.Sampler
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.state.Destination
 import io.github.numq.klarity.state.InternalPlayerState
+import io.github.numq.klarity.state.PlayerState
 import io.mockk.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.skia.Data
@@ -76,18 +76,6 @@ class PlayerControllerStateTest {
     private lateinit var pipeline: Pipeline
 
     private lateinit var playerController: DefaultPlayerController
-
-    private suspend fun captureInternalStates(block: suspend () -> Unit) = coroutineScope {
-        val internalStates = mutableListOf<InternalPlayerState>()
-
-        playerController.onInternalPlayerState = { internalPlayerState ->
-            internalStates.add(internalPlayerState)
-        }
-
-        block()
-
-        internalStates.toList()
-    }
 
     @BeforeEach
     fun beforeEach() {
@@ -208,7 +196,8 @@ class PlayerControllerStateTest {
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
                     previousState = null
-                ).also { previousState = it })
+                ).also { previousState = it }
+            )
             add(
                 InternalPlayerState.Ready.Transition(
                     media = media,
@@ -315,13 +304,29 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(InternalPlayerState.Releasing(previousState = previousState!!))
             add(InternalPlayerState.Empty)
         }
 
+        val expectedStates = listOf(
+            PlayerState.Ready.Stopped(media = media),
+            PlayerState.Ready.Playing(media = media),
+            PlayerState.Ready.Paused(media = media),
+            PlayerState.Ready.Playing(media = media),
+            PlayerState.Ready.Paused(media = media),
+            PlayerState.Ready.Stopped(media = media),
+            PlayerState.Empty
+        )
+
         val internalStates = mutableListOf<InternalPlayerState>()
+
+        val states = mutableListOf<PlayerState>()
+
+        playerController.onInternalPlayerState = { internalState ->
+            internalStates.add(internalState)
+        }
 
         listOf(
             Command.Prepare(location, 1, 1, null),
@@ -332,13 +337,15 @@ class PlayerControllerStateTest {
             Command.Stop,
             Command.Release
         ).map { command ->
-            internalStates.addAll(captureInternalStates {
-                playerController.execute(command = command).getOrThrow()
+            playerController.execute(command = command).getOrThrow()
 
-                delay(1_000L)
-            })
+            states.add(playerController.state.value)
+
+            delay(1_000L)
         }
 
         assertEquals(expectedInternalStates, internalStates)
+
+        assertEquals(expectedStates, states)
     }
 }
