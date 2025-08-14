@@ -17,8 +17,6 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 <img src="media/preview.png" alt="preview"/>
 </div>
 
----
-
 ## Table of Content
 
 * [Changelog](#changelog)
@@ -34,8 +32,6 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
----
-
 ## [1.0.1](https://github.com/numq/Klarity/releases/tag/1.0.1)
 
 ### Changed:
@@ -50,15 +46,11 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Supported operating systems
 
----
-
 - Windows x64
 - Linux x64
 - macOS x64
 
 # Features
-
----
 
 - Media files probing
 - Audio and video playback of media files
@@ -68,8 +60,6 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 - Coroutine/Flow API
 
 ## Architecture
-
----
 
 ### Dependency graph
 
@@ -168,14 +158,10 @@ stateDiagram-v2
 
 ## Installation
 
----
-
 Download the [latest release](https://github.com/numq/Klarity/releases/tag/1.0.1) and include jar files to your project
 depending on your system.
 
 ## Usage
-
----
 
 > [!NOTE]
 > Check out the [example](example) to see a full implementation in Clean Architecture using
@@ -214,8 +200,6 @@ snapshot.close().onFailure { t -> }.getOrThrow()
 ```
 
 ## Get preview frames (for example, for the timeline)
-
----
 
 > [!IMPORTANT]
 > [PreviewManager](library/src/main/kotlin/io/github/numq/klarity/preview/PreviewManager.kt) must be closed using the
@@ -257,8 +241,6 @@ renderer.close().onFailure { t -> }.getOrThrow()
 ```
 
 ## Used libraries
-
----
 
 - [FFMPEG](https://ffmpeg.org/)
 - [PortAudio](https://www.portaudio.com/)
