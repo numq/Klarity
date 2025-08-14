@@ -50,84 +50,85 @@ fun ValueSlider(
             (thumbRadius..constraints.maxWidth.toFloat() - thumbRadius)
         }
 
-        Canvas(modifier = Modifier.fillMaxSize().pointerInput(maxWidth, maxHeight) {
-            awaitEachGesture {
-                val event = awaitPointerEvent()
-                val position = event.changes.first().position
+        Canvas(
+            modifier = Modifier.fillMaxSize().pointerInput(trackRange, valueRange) {
+                awaitEachGesture {
+                    val event = awaitPointerEvent()
+                    val position = event.changes.first().position
 
-                when (event.type) {
-                    PointerEventType.Move -> {
-                        if (position.x in trackRange.start..trackRange.endInclusive && position.y in 0f..size.height.toFloat()) {
+                    when (event.type) {
+                        PointerEventType.Move -> {
+                            if (position.x in trackRange.start..trackRange.endInclusive && position.y in 0f..size.height.toFloat()) {
+                                hoveringJob?.cancel()
+                                hoveringJob = coroutineScope.launch {
+                                    val clampedX = position.x.coerceIn(trackRange.start, trackRange.endInclusive)
+                                    val newValue = sliderTransform(clampedX, trackRange, valueRange).coerceIn(
+                                        valueRange.start, valueRange.endInclusive
+                                    )
+                                    onHoveredValue?.invoke(HoveredValue(offset = position, value = newValue))
+                                }
+                            } else {
+                                onHoveredValue?.invoke(null)
+                            }
+                        }
+
+                        PointerEventType.Exit -> onHoveredValue?.invoke(null)
+                    }
+
+                    event.changes.first().consume()
+                }
+            }.pointerInput(trackRange, valueRange) {
+                detectTapGestures { (x, _) ->
+                    coroutineScope.launch {
+                        val clampedX = x.coerceIn(trackRange.start, trackRange.endInclusive)
+                        onPrimaryValueChange(
+                            sliderTransform(
+                                clampedX, trackRange, valueRange
+                            ).coerceIn(valueRange.start, valueRange.endInclusive)
+                        )
+                    }
+                }
+            }.pointerInput(trackRange, valueRange) {
+                detectDragGestures(onDragStart = { (x, _) ->
+                    draggingX = x
+                }, onDragCancel = {
+                    draggingX = null
+                    onHoveredValue?.invoke(null)
+                }, onDragEnd = {
+                    draggingX?.let { x ->
+                        val clampedX = x.coerceIn(trackRange.start, trackRange.endInclusive)
+                        coroutineScope.launch {
+                            onPrimaryValueChange(
+                                sliderTransform(clampedX, trackRange, valueRange).coerceIn(
+                                    valueRange.start, valueRange.endInclusive
+                                )
+                            )
+                            draggingX = null
+                        }
+                    }
+                    onHoveredValue?.invoke(null)
+                }) { change, (x, _) ->
+                    change.consume()
+                    if (change.position.x in trackRange.start..trackRange.endInclusive) {
+                        if (draggingX != null) {
+                            draggingX = (draggingX as Float) + x
+
                             hoveringJob?.cancel()
                             hoveringJob = coroutineScope.launch {
-                                val clampedX = position.x.coerceIn(trackRange.start, trackRange.endInclusive)
+                                val clampedX = change.position.x.coerceIn(trackRange.start, trackRange.endInclusive)
                                 val newValue = sliderTransform(clampedX, trackRange, valueRange).coerceIn(
                                     valueRange.start, valueRange.endInclusive
                                 )
-                                onHoveredValue?.invoke(HoveredValue(offset = position, value = newValue))
+                                onHoveredValue?.invoke(HoveredValue(offset = change.position, value = newValue))
                             }
                         } else {
                             onHoveredValue?.invoke(null)
                         }
-                    }
-
-                    PointerEventType.Exit -> onHoveredValue?.invoke(null)
-                }
-
-                event.changes.first().consume()
-            }
-        }.pointerInput(maxWidth, maxHeight) {
-            detectTapGestures { (x, _) ->
-                coroutineScope.launch {
-                    val clampedX = x.coerceIn(trackRange.start, trackRange.endInclusive)
-                    onPrimaryValueChange(
-                        sliderTransform(
-                            clampedX, trackRange, valueRange
-                        ).coerceIn(valueRange.start, valueRange.endInclusive)
-                    )
-                }
-            }
-        }.pointerInput(maxWidth, maxHeight) {
-            detectDragGestures(onDragStart = { (x, _) ->
-                draggingX = x
-            }, onDragCancel = {
-                draggingX = null
-                onHoveredValue?.invoke(null)
-            }, onDragEnd = {
-                draggingX?.let { x ->
-                    val clampedX = x.coerceIn(trackRange.start, trackRange.endInclusive)
-                    coroutineScope.launch {
-                        onPrimaryValueChange(
-                            sliderTransform(clampedX, trackRange, valueRange).coerceIn(
-                                valueRange.start, valueRange.endInclusive
-                            )
-                        )
-                        draggingX = null
-                    }
-                }
-                onHoveredValue?.invoke(null)
-            }) { change, (x, _) ->
-                change.consume()
-                if (change.position.x in trackRange.start..trackRange.endInclusive) {
-                    if (draggingX != null) {
-                        draggingX = (draggingX as Float) + x
-
-                        hoveringJob?.cancel()
-                        hoveringJob = coroutineScope.launch {
-                            val clampedX = change.position.x.coerceIn(trackRange.start, trackRange.endInclusive)
-                            val newValue = sliderTransform(clampedX, trackRange, valueRange).coerceIn(
-                                valueRange.start, valueRange.endInclusive
-                            )
-                            onHoveredValue?.invoke(HoveredValue(offset = change.position, value = newValue))
-                        }
                     } else {
                         onHoveredValue?.invoke(null)
                     }
-                } else {
-                    onHoveredValue?.invoke(null)
                 }
-            }
-        }) {
+            }) {
             drawLine(
                 color = backgroundColor,
                 start = Offset(trackRange.start, thumbRadius),
