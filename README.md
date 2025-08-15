@@ -43,7 +43,7 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 - Fixed buffer cleanup errors during channel closure
 
 <details>
-<summary>**📦 Previous versions**</summary>
+<summary>📦 Previous versions</summary>
 
 ## [1.0.1](https://github.com/numq/Klarity/releases/tag/1.0.1)
 
