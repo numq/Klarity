@@ -118,18 +118,20 @@ fun PlaylistPlayback(
                     else -> CircularProgressIndicator()
                 }
 
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "Playing on ${
-                            playbackState.playbackSpeedFactor.toString().replace(".0", "")
-                        }x speed", modifier = Modifier.drawBehind {
-                            drawRoundRect(
-                                color = Color.Black.copy(alpha = .5f), cornerRadius = CornerRadius(16f, 16f)
-                            )
-                        }.padding(8.dp), color = MaterialTheme.colorScheme.primary
-                    )
+                if (playbackState.playbackSpeedFactor != 1f) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Playing on ${
+                                playbackState.playbackSpeedFactor.toString().replace(".0", "")
+                            }x speed", modifier = Modifier.drawBehind {
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = .5f), cornerRadius = CornerRadius(16f, 16f)
+                                )
+                            }.padding(8.dp), color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
             this@Column.AnimatedVisibility(
