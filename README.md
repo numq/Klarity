@@ -40,12 +40,12 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 ### Changed
 
-- Changed seeking behavior - now always seeks to exact position
+- Enhanced seeking precision
 - Changed rendering behavior:
     - Renders first video frame during:
-        - Preparation
-        - Playback stop
-        - Seeking operations
+      • Preparation
+      • Playback stop
+      • Seeking
 - Performance and stability enhancements
 
 ___
