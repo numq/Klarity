@@ -18,18 +18,22 @@ class AddPlaylistItem(
 
         playlistRepository.addItem(item = Item.Loading(id = id, location = location)).getOrThrow()
 
-        val duration = playbackService.getDuration(location = location).getOrThrow()
+        val probe = playbackService.getProbe(location = location).getOrThrow()
 
-        runCatching {
-            checkNotNull(duration) { "Unsupported media" }
+        probe.runCatching {
+            checkNotNull(this) { "Unsupported media" }
 
-            rendererService.add(id = id, location = location).getOrThrow()
+            with(probe) {
+                rendererService.add(id = id, location = location, width = width, height = height).getOrThrow()
 
-            rendererService.reset(id = id).getOrThrow()
+                rendererService.reset(id = id).getOrThrow()
 
-            playlistRepository.updateItem(
-                updatedItem = Item.Loaded(id = id, location = location, duration = duration)
-            ).getOrThrow()
+                playlistRepository.updateItem(
+                    updatedItem = Item.Loaded(
+                        id = id, location = location, width = width, height = height, duration = duration
+                    )
+                ).getOrThrow()
+            }
         }.recoverCatching { throwable ->
             playlistRepository.updateItem(
                 updatedItem = Item.Failed(id = id, location = location, throwable = throwable)

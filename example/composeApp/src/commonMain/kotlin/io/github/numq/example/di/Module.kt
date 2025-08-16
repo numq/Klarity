@@ -106,7 +106,7 @@ private val hub = module {
 
         scoped { StopHubPlayback(get(), get(), get()) }
 
-        scoped { StopHubPreview(get(), get(), get()) }
+        scoped { StopHubPreview(get(), get()) }
 
         scoped { HubInteractionReducer() }
 
@@ -166,7 +166,7 @@ private val playlist = module {
 
         scoped { NextPlaylistItem(get()) }
 
-        scoped { ControlPlaylistPlayback(get(), get()) }
+        scoped { ControlPlaylistPlayback(get()) }
 
         scoped { GetTimelinePreview(get()) }
 

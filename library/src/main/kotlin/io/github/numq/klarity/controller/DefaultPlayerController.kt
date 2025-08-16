@@ -66,10 +66,14 @@ internal class DefaultPlayerController(
     @Volatile
     private var renderer: Renderer? = null
 
-    private suspend fun renderFirstFrame(pipeline: Pipeline) = when (pipeline) {
-        is Pipeline.Audio -> Unit
+    private suspend fun renderFirstFrame(pipeline: Pipeline) = with(pipeline) {
+        when (this) {
+            is Pipeline.Audio -> null
 
-        is Pipeline.Video -> with(pipeline) {
+            is Pipeline.Video -> pool to decoder
+
+            is Pipeline.AudioVideo -> videoPool to videoDecoder
+        }?.let { (pool, decoder) ->
             val data = pool.acquire().getOrThrow()
 
             try {
@@ -80,20 +84,6 @@ internal class DefaultPlayerController(
                 }
             } finally {
                 pool.release(item = data).getOrThrow()
-            }
-        }
-
-        is Pipeline.AudioVideo -> with(pipeline) {
-            val data = videoPool.acquire().getOrThrow()
-
-            try {
-                val frame = videoDecoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
-
-                if (frame != null) {
-                    renderer?.render(frame)?.getOrThrow()
-                }
-            } finally {
-                videoPool.release(item = data).getOrThrow()
             }
         }
     }
@@ -826,7 +816,7 @@ internal class DefaultPlayerController(
                         is InternalPlayerState.Ready.Playing,
                         is InternalPlayerState.Ready.Paused,
                         is InternalPlayerState.Ready.Stopped,
-                        is InternalPlayerState.Ready.Completed,
+                        is InternalPlayerState.Ready.Completed
                             -> with(state) {
                             if (!media.isContinuous()) {
                                 return@runCatching

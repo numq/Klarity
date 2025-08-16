@@ -2,13 +2,11 @@ package io.github.numq.example.playlist
 
 import io.github.numq.example.playback.PlaybackService
 import io.github.numq.example.playback.PlaybackState
-import io.github.numq.example.renderer.RendererRegistry
 import io.github.numq.example.usecase.UseCase
 import kotlin.time.Duration
 
 class ControlPlaylistPlayback(
-    private val playbackService: PlaybackService,
-    private val rendererRegistry: RendererRegistry,
+    private val playbackService: PlaybackService
 ) : UseCase<ControlPlaylistPlayback.PlaybackCommand, Unit> {
     sealed interface PlaybackCommand {
         data object Play : PlaybackCommand
@@ -30,17 +28,9 @@ class ControlPlaylistPlayback(
 
             is PlaybackCommand.Resume -> playbackService.resume()
 
-            is PlaybackCommand.Stop -> playbackService.stop().mapCatching {
-                rendererRegistry.reset(id = "playback").getOrThrow()
-            }
+            is PlaybackCommand.Stop -> playbackService.stop()
 
-            is PlaybackCommand.SeekTo -> {
-                playbackService.seekTo(timestamp = timestamp).mapCatching {
-                    if (playbackState is PlaybackState.Ready.Playing) {
-                        playbackService.resume().getOrThrow()
-                    }
-                }
-            }
+            is PlaybackCommand.SeekTo -> playbackService.seekTo(timestamp = timestamp)
         }
     }
 }

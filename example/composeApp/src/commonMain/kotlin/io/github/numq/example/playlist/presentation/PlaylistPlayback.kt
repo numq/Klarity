@@ -194,16 +194,16 @@ fun PlaylistPlayback(
                         onPreviewTimestamp = onPreviewTimestamp
                     )
                 }
-                if (previewTimestamp != null) {
-                    previewRenderer?.takeIf { !it.drawsNothing() }?.let {
-                        TimelinePreview(
-                            width = 128f,
-                            height = 128f,
-                            bottomPadding = 24f,
-                            previewTimestamp = previewTimestamp,
-                            renderer = previewRenderer,
-                        )
-                    }
+            }
+            if (previewTimestamp != null) {
+                previewRenderer?.takeIf { !it.drawsNothing() }?.let {
+                    TimelinePreview(
+                        width = 128f,
+                        height = 128f,
+                        bottomPadding = 24f,
+                        previewTimestamp = previewTimestamp,
+                        renderer = previewRenderer,
+                    )
                 }
             }
         }

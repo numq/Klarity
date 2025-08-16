@@ -42,15 +42,23 @@ class GetPlaylist(
 
                         playbackService.prepare(location = selectedPlaylistItem.item.location).getOrThrow()
 
-                        rendererService.add(id = "playback", location = selectedPlaylistItem.item.location).getOrThrow()
-
-                        rendererService.reset(id = "playback").getOrThrow()
+                        rendererService.add(
+                            id = "playback",
+                            location = selectedPlaylistItem.item.location,
+                            width = selectedPlaylistItem.item.width,
+                            height = selectedPlaylistItem.item.height
+                        ).getOrThrow()
 
                         playbackService.attachRenderer(id = "playback").getOrThrow()
 
                         timelinePreviewService.prepare(item = selectedPlaylistItem.item).getOrThrow()
 
-                        rendererService.add(id = "preview", location = selectedPlaylistItem.item.location).getOrThrow()
+                        rendererService.add(
+                            id = "preview",
+                            location = selectedPlaylistItem.item.location,
+                            width = selectedPlaylistItem.item.width,
+                            height = selectedPlaylistItem.item.height
+                        ).getOrThrow()
 
                         playbackService.prepare(location = selectedPlaylistItem.item.location).getOrThrow()
 

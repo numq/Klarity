@@ -20,6 +20,7 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.DragData
 import androidx.compose.ui.draganddrop.dragData
+import androidx.compose.ui.unit.dp
 import io.github.numq.example.item.Item
 import io.github.numq.example.notification.NotificationError
 import io.github.numq.example.notification.queue.rememberNotificationQueue
@@ -189,8 +190,8 @@ fun PlaylistView(
                     content = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             (state.playlist.selectedPlaylistItem as? SelectedPlaylistItem.Present)?.item?.let { item ->
-                                (state.playlist.playbackState as? PlaybackState.Ready)?.let { playbackState ->
-                                    PlaylistPlayback(
+                                when (val playbackState = state.playlist.playbackState) {
+                                    is PlaybackState.Ready -> PlaylistPlayback(
                                         playbackState = playbackState,
                                         playbackRenderer = playbackRenderer,
                                         previewRenderer = previewRenderer,
@@ -291,6 +292,20 @@ fun PlaylistView(
                                                 feature.execute(PlaylistCommand.Preview.GetTimestamp(previewTimestamp = previewTimestamp))
                                             }
                                         })
+
+                                    is PlaybackState.Error -> Column(
+                                        modifier = Modifier.padding(8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(
+                                            space = 8.dp,
+                                            alignment = Alignment.CenterVertically
+                                        )
+                                    ) {
+                                        Text("Playback error occurred")
+                                        Text(playbackState.exception.localizedMessage)
+                                    }
+
+                                    else -> Unit
                                 }
                             }
                         }

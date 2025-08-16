@@ -32,6 +32,17 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
+## [1.0.4](https://github.com/numq/Klarity/releases/tag/1.0.4)
+
+### Changed
+
+- Renderer no longer depends on video format - uses width and height instead
+
+___
+
+<details>
+<summary>📦 Previous versions</summary>
+
 ## [1.0.3](https://github.com/numq/Klarity/releases/tag/1.0.3)
 
 ### Fixed
@@ -44,11 +55,6 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 - Extended external state machine
 - Changed rendering behavior - renders first video frame during: preparation, playback stop, seeking
 - Performance and stability enhancements
-
-___
-
-<details>
-<summary>📦 Previous versions</summary>
 
 ## [1.0.2](https://github.com/numq/Klarity/releases/tag/1.0.2)
 

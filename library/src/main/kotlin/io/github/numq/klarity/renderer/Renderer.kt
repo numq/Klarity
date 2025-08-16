@@ -1,6 +1,5 @@
 package io.github.numq.klarity.renderer
 
-import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.frame.Frame
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.Surface
@@ -10,9 +9,14 @@ import org.jetbrains.skia.Surface
  */
 sealed interface Renderer {
     /**
-     * A video format used by the renderer.
+     * Width of the rendering content in pixels.
      */
-    val format: VideoFormat
+    val width: Int
+
+    /**
+     * Height of the rendering content in pixels.
+     */
+    val height: Int
 
     /**
      * A state flow that emits the current generation ID of the [Surface].
@@ -59,12 +63,13 @@ sealed interface Renderer {
         /**
          * Factory method to create a [Renderer] for a given video format.
          *
-         * @param format the target video format
+         * @param width the width of the rendering content in pixels
+         * @param height the height of the rendering content in pixels
          *
          * @return [Result] containing either a new renderer instance or an error if creation fails
          */
-        fun create(format: VideoFormat): Result<Renderer> = runCatching {
-            SkiaRenderer(format = format)
+        fun create(width: Int, height: Int): Result<Renderer> = runCatching {
+            SkiaRenderer(width = width, height = height)
         }
     }
 }

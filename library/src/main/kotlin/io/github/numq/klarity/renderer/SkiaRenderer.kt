@@ -1,6 +1,5 @@
 package io.github.numq.klarity.renderer
 
-import io.github.numq.klarity.format.VideoFormat
 import io.github.numq.klarity.frame.Frame
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,15 +10,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.nanoseconds
 
 internal class SkiaRenderer(
-    override val format: VideoFormat,
+    override val width: Int,
+    override val height: Int,
 ) : Renderer {
     private companion object {
         const val DRAWS_NOTHING_ID = 0
     }
 
     init {
-        require(format.width > 0 && format.height > 0) {
-            "Invalid image dimensions"
+        require(width > 0 && height > 0) {
+            "Width and height must be positive"
         }
     }
 
@@ -32,10 +32,7 @@ internal class SkiaRenderer(
     private val isValid = AtomicBoolean(true)
 
     private val imageInfo = ImageInfo(
-        width = format.width,
-        height = format.height,
-        colorType = ColorType.BGRA_8888,
-        alphaType = ColorAlphaType.UNPREMUL
+        width = width, height = height, colorType = ColorType.BGRA_8888, alphaType = ColorAlphaType.UNPREMUL
     )
 
     private val surface: Surface by lazy { Surface.makeRaster(imageInfo) }
@@ -56,7 +53,7 @@ internal class SkiaRenderer(
         if (checkValid()) {
             try {
                 callback(surface)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 markInvalid()
             }
         }
@@ -64,6 +61,8 @@ internal class SkiaRenderer(
 
     override suspend fun render(frame: Frame.Content.Video) = renderMutex.withLock {
         runCatching {
+            require(frame.width == width && frame.height == height) { "Invalid frame dimensions" }
+
             if (isClosed.get() || frame.data.isClosed || frame.data.size < minByteSize) {
                 return@runCatching
             }
@@ -87,7 +86,7 @@ internal class SkiaRenderer(
                     frame.onRenderComplete?.invoke(renderTime)
 
                     _generationId.value = surface.generationId
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     markInvalid()
                 }
             }
@@ -107,7 +106,7 @@ internal class SkiaRenderer(
                     surface.flush()
 
                     _generationId.value = DRAWS_NOTHING_ID
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     markInvalid()
                 }
             }
@@ -132,7 +131,7 @@ internal class SkiaRenderer(
                     }
 
                     _generationId.value = DRAWS_NOTHING_ID
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     try {
                         surface.close()
                     } catch (_: Exception) {

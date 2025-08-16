@@ -1,6 +1,5 @@
 package io.github.numq.example.renderer
 
-import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.snapshot.SnapshotManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +10,7 @@ import kotlinx.coroutines.flow.update
 interface RendererRegistry {
     val renderers: StateFlow<Map<String, RegisteredRenderer>>
 
-    suspend fun add(id: String, location: String): Result<Unit>
+    suspend fun add(id: String, location: String, width: Int, height: Int): Result<Unit>
 
     suspend fun get(id: String): Result<Renderer?>
 
@@ -26,38 +25,34 @@ interface RendererRegistry {
 
         override val renderers = _renderers.asStateFlow()
 
-        override suspend fun add(id: String, location: String) = runCatching {
+        override suspend fun add(id: String, location: String, width: Int, height: Int) = runCatching {
             check(_renderers.value.keys.contains(id).not()) { "Renderer is already registered" }
 
-            val media = ProbeManager.probe(location = location).getOrThrow()
+            val renderer = Renderer.create(width = width, height = height).getOrNull()
 
-            val format = media.videoFormat
-
-            if (format != null) {
-                val renderer = Renderer.create(format = format).getOrThrow()
-
+            if (renderer != null) {
                 _renderers.update { registeredRenderers ->
                     registeredRenderers.toMutableMap().apply {
-                        set(id, RegisteredRenderer(location = location, renderer = renderer))
+                        set(id, RegisteredRenderer(id = id, location = location, renderer = renderer))
                     }
                 }
             }
-        }
-
-        override suspend fun get(id: String) = runCatching {
-            _renderers.value[id]?.renderer
         }
 
         override suspend fun reset(id: String) = runCatching {
             val registeredRenderer = _renderers.value[id]
 
             if (registeredRenderer != null) {
-                val (location, renderer) = registeredRenderer
+                val (_, location, renderer) = registeredRenderer
 
                 snapshotManager.snapshot(location = location).getOrThrow()?.use { snapshot ->
                     renderer.render(frame = snapshot.frame).getOrThrow()
                 }
             }
+        }
+
+        override suspend fun get(id: String) = runCatching {
+            _renderers.value[id]?.renderer
         }
 
         override suspend fun remove(id: String) = runCatching {

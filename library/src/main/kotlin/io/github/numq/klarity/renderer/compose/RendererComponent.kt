@@ -30,15 +30,15 @@ fun RendererComponent(
 
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val boxSize = Size(maxWidth.value, maxHeight.value)
+            val boxSize = Size(width = maxWidth.value, height = maxHeight.value)
 
             val foregroundSize by remember(
-                foreground.renderer.format.width, foreground.renderer.format.height, foreground.imageScale, boxSize
+                foreground.renderer.width, foreground.renderer.height, foreground.imageScale, boxSize
             ) {
                 derivedStateOf {
                     foreground.imageScale.scale(
                         srcSize = Size(
-                            foreground.renderer.format.width.toFloat(), foreground.renderer.format.height.toFloat()
+                            width = foreground.renderer.width.toFloat(), height = foreground.renderer.height.toFloat()
                         ), dstSize = boxSize
                     )
                 }

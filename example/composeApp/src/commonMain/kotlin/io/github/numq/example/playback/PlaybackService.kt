@@ -4,16 +4,15 @@ import io.github.numq.example.renderer.RendererRegistry
 import io.github.numq.klarity.player.KlarityPlayer
 import io.github.numq.klarity.probe.ProbeManager
 import io.github.numq.klarity.state.PlayerState
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 interface PlaybackService {
     val state: StateFlow<PlaybackState>
 
-    suspend fun getDuration(location: String): Result<Duration?>
+    suspend fun getProbe(location: String): Result<PlaybackProbe?>
 
     suspend fun attachRenderer(id: String): Result<Unit>
 
@@ -51,6 +50,8 @@ interface PlaybackService {
         private val rendererRegistry: RendererRegistry,
     ) : PlaybackService {
         private val coroutineScope = CoroutineScope(Dispatchers.Default)
+
+        private var seekJob: Job? = null
 
         override val state = combine(
             player.state,
@@ -140,8 +141,14 @@ interface PlaybackService {
             }
         }.stateIn(scope = coroutineScope, started = SharingStarted.Eagerly, initialValue = PlaybackState.Empty)
 
-        override suspend fun getDuration(location: String) = runCatching {
-            probeManager.probe(location = location).getOrNull()?.duration
+        override suspend fun getProbe(location: String) = runCatching {
+            probeManager.probe(location = location).getOrNull()?.run {
+                PlaybackProbe(
+                    width = videoFormat?.width ?: 0,
+                    height = videoFormat?.height ?: 0,
+                    duration = duration
+                )
+            }
         }
 
         override suspend fun attachRenderer(id: String) = rendererRegistry.get(id = id).mapCatching { renderer ->
@@ -183,7 +190,17 @@ interface PlaybackService {
 
         override suspend fun stop() = player.stop()
 
-        override suspend fun seekTo(timestamp: Duration) = player.seekTo(timestamp = timestamp)
+        override suspend fun seekTo(timestamp: Duration) = runCatching {
+            seekJob?.cancel()
+
+            seekJob = coroutineScope.launch {
+                delay(100.milliseconds)
+
+                player.seekTo(timestamp = timestamp).getOrThrow()
+
+                player.resume().getOrThrow()
+            }
+        }
 
         override suspend fun release() = player.release()
 
