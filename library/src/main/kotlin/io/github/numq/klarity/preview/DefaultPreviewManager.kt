@@ -18,11 +18,11 @@ internal class DefaultPreviewManager(
     override suspend fun preview(
         renderer: Renderer,
         timestamp: Duration,
-        keyframesOnly: Boolean,
+        keyFramesOnly: Boolean,
     ) = runCatching {
         check(timestamp in Duration.ZERO..decoder.media.duration) { "Preview timestamp is out of range" }
 
-        decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
+        decoder.seekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly).getOrThrow()
 
         val data = pool.acquire().getOrThrow()
 

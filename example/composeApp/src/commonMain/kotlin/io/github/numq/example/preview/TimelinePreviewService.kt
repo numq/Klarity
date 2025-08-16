@@ -34,7 +34,7 @@ interface TimelinePreviewService {
             runCatching {
                 check(job == null) { "Could not prepare preview" }
 
-                previewManager = PreviewManager.create(location = item.location).getOrThrow()
+                previewManager = PreviewManager.create(location = item.location).getOrNull()
 
                 timestamps = Channel<Pair<Duration, String>>(Channel.CONFLATED).apply {
                     job = coroutineScope.launch {

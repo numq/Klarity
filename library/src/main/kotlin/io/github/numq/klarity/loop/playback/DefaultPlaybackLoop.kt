@@ -13,18 +13,14 @@ import org.jetbrains.skia.Data
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
-import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
+    private val syncThreshold: Duration,
     private val getVolume: () -> Float,
     private val getPlaybackSpeedFactor: () -> Float,
     private val getRenderer: suspend () -> Renderer?,
 ) : PlaybackLoop {
-    private companion object {
-        val SYNC_THRESHOLD = 20.milliseconds
-    }
-
     private val mutex = Mutex()
 
     private var job: Job? = null
@@ -41,15 +37,17 @@ internal class DefaultPlaybackLoop(
         val latency = sampler.getLatency().getOrThrow().microseconds
 
         while (currentCoroutineContext().isActive) {
-            when (val frame = buffer.take().getOrThrow()) {
-                is Frame.Content.Audio -> {
-                    currentCoroutineContext().ensureActive()
+            val frame = buffer.take().getOrThrow()
 
+            currentCoroutineContext().ensureActive()
+
+            when (frame) {
+                is Frame.Content.Audio -> {
                     val frameTime = frame.timestamp - latency
 
-                    onTimestamp(frameTime)
-
                     audioClock.set(frameTime)
+
+                    onTimestamp(frameTime)
 
                     sampler.write(
                         frame = frame, volume = getVolume(), playbackSpeedFactor = getPlaybackSpeedFactor()
@@ -57,8 +55,6 @@ internal class DefaultPlaybackLoop(
                 }
 
                 is Frame.EndOfStream -> {
-                    currentCoroutineContext().ensureActive()
-
                     sampler.drain(volume = getVolume(), playbackSpeedFactor = getPlaybackSpeedFactor()).getOrThrow()
 
                     audioClock.set(Duration.INFINITE)
@@ -81,10 +77,10 @@ internal class DefaultPlaybackLoop(
             val frame = buffer.take().getOrThrow()
 
             try {
+                currentCoroutineContext().ensureActive()
+
                 when (frame) {
                     is Frame.Content.Video -> {
-                        currentCoroutineContext().ensureActive()
-
                         val audioClockTime = audioClock.get()
 
                         val videoClockTime = videoClock.get()
@@ -105,24 +101,22 @@ internal class DefaultPlaybackLoop(
                             val deltaTime = frameTime - masterClockTime
 
                             when {
-                                deltaTime < -SYNC_THRESHOLD -> continue
+                                deltaTime < -syncThreshold -> continue
 
-                                deltaTime > SYNC_THRESHOLD -> delay(deltaTime / playbackSpeedFactor.toDouble())
+                                deltaTime > syncThreshold -> delay((deltaTime / playbackSpeedFactor.toDouble()))
                             }
                         }
 
                         currentCoroutineContext().ensureActive()
 
+                        videoClock.set(frame.timestamp)
+
                         onTimestamp(frameTime)
 
                         getRenderer()?.render(frame)?.getOrThrow()
-
-                        videoClock.set(frame.timestamp)
                     }
 
                     is Frame.EndOfStream -> {
-                        currentCoroutineContext().ensureActive()
-
                         val videoClockTime = videoClock.get()
 
                         if (videoClockTime.isFinite()) {
@@ -201,13 +195,13 @@ internal class DefaultPlaybackLoop(
                             joinAll(audioJob, videoJob)
                         }
                     }
+
+                    ensureActive()
+
+                    onTimestamp(media.duration)
+
+                    onEndOfMedia()
                 }
-
-                ensureActive()
-
-                onTimestamp(pipeline.media.duration)
-
-                onEndOfMedia()
             }
         }
     }

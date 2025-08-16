@@ -20,12 +20,14 @@ internal interface PlaybackLoop {
     companion object {
         fun create(
             pipeline: Pipeline,
+            syncThreshold: Duration,
             getVolume: () -> Float,
             getPlaybackSpeedFactor: () -> Float,
             getRenderer: suspend () -> Renderer?,
         ): Result<PlaybackLoop> = runCatching {
             DefaultPlaybackLoop(
                 pipeline = pipeline,
+                syncThreshold = syncThreshold,
                 getVolume = getVolume,
                 getPlaybackSpeedFactor = getPlaybackSpeedFactor,
                 getRenderer = getRenderer

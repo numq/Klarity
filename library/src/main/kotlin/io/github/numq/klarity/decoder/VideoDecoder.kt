@@ -35,8 +35,8 @@ internal class VideoDecoder(
         }
     }
 
-    override suspend fun seekTo(timestamp: Duration, keyframesOnly: Boolean) = mutex.withLock {
-        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyframesOnly)
+    override suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean) = mutex.withLock {
+        nativeDecoder.seekTo(timestamp.inWholeMicroseconds, keyFramesOnly)
     }
 
     override suspend fun reset() = mutex.withLock {

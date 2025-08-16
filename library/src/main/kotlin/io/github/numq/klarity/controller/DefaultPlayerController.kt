@@ -31,6 +31,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class DefaultPlayerController(
     private val initialSettings: PlayerSettings?,
@@ -42,6 +43,10 @@ internal class DefaultPlayerController(
     private val playbackLoopFactory: PlaybackLoopFactory,
     private val samplerFactory: SamplerFactory,
 ) : PlayerController {
+    private companion object {
+        val SYNC_THRESHOLD = 20.milliseconds
+    }
+
     /**
      * Coroutines
      */
@@ -60,6 +65,38 @@ internal class DefaultPlayerController(
 
     @Volatile
     private var renderer: Renderer? = null
+
+    private suspend fun renderFirstFrame(pipeline: Pipeline) = when (pipeline) {
+        is Pipeline.Audio -> Unit
+
+        is Pipeline.Video -> with(pipeline) {
+            val data = pool.acquire().getOrThrow()
+
+            try {
+                val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
+
+                if (frame != null) {
+                    renderer?.render(frame)?.getOrThrow()
+                }
+            } finally {
+                pool.release(item = data).getOrThrow()
+            }
+        }
+
+        is Pipeline.AudioVideo -> with(pipeline) {
+            val data = videoPool.acquire().getOrThrow()
+
+            try {
+                val frame = videoDecoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
+
+                if (frame != null) {
+                    renderer?.render(frame)?.getOrThrow()
+                }
+            } finally {
+                videoPool.release(item = data).getOrThrow()
+            }
+        }
+    }
 
     /**
      * Settings
@@ -123,22 +160,20 @@ internal class DefaultPlayerController(
         updateState(updatedState)
     }
 
-    private suspend fun <T> InternalPlayerState.Ready.withTransition(
+    private suspend fun InternalPlayerState.Ready.withTransition(
         destination: Destination,
-        block: suspend () -> T,
-    ): T {
+        block: suspend () -> Unit = {},
+    ) {
         val transition = startTransition(destination = destination)
 
         updateInternalState(transition)
 
         return try {
-            val result = block()
-
             val updatedState = completeTransition(transition)
 
-            updateInternalState(updatedState)
+            block.invoke()
 
-            result
+            updateInternalState(updatedState)
         } catch (e: Exception) {
             updateInternalState(this)
 
@@ -183,10 +218,14 @@ internal class DefaultPlayerController(
         bufferLoop.stop().getOrThrow()
 
         _events.send(PlayerEvent.Buffer.Complete)
+
+        println("completed buffer")
     }
 
     private suspend fun InternalPlayerState.Ready.handlePlaybackCompletion() {
         withTransition(Destination.COMPLETED) {
+            playbackLoop.stop().getOrThrow()
+
             when (val pipeline = pipeline) {
                 is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
 
@@ -370,6 +409,7 @@ internal class DefaultPlayerController(
         val playbackLoop = playbackLoopFactory.create(
             parameters = PlaybackLoopFactory.Parameters(
                 pipeline = pipeline,
+                syncThreshold = SYNC_THRESHOLD,
                 getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
                 getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
                 getRenderer = { renderer })
@@ -380,6 +420,8 @@ internal class DefaultPlayerController(
 
             throw it
         }.getOrThrow()
+
+        renderFirstFrame(pipeline = pipeline)
 
         return Triple(pipeline, bufferLoop, playbackLoop)
     }
@@ -397,13 +439,17 @@ internal class DefaultPlayerController(
             coroutineScope = playbackScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
+            onEndOfMedia = {
+                handlePlaybackCompletion()
+            }).getOrThrow()
 
         bufferLoop.start(
             coroutineScope = bufferScope,
             onException = ::handleException,
             onTimestamp = ::handleBufferTimestamp,
-            onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
+            onEndOfMedia = {
+                handleBufferCompletion()
+            }).getOrThrow()
     }
 
     private suspend fun InternalPlayerState.Ready.handlePause() {
@@ -431,7 +477,9 @@ internal class DefaultPlayerController(
             coroutineScope = playbackScope,
             onException = ::handleException,
             onTimestamp = ::handlePlaybackTimestamp,
-            onEndOfMedia = { handlePlaybackCompletion() }).getOrThrow()
+            onEndOfMedia = {
+                handlePlaybackCompletion()
+            }).getOrThrow()
     }
 
     private suspend fun InternalPlayerState.Ready.handleStop() {
@@ -477,6 +525,8 @@ internal class DefaultPlayerController(
             }
         }
 
+        renderFirstFrame(pipeline = pipeline)
+
         bufferTimestamp.emit(Duration.ZERO)
 
         playbackTimestamp.emit(Duration.ZERO)
@@ -484,11 +534,10 @@ internal class DefaultPlayerController(
 
     private suspend fun InternalPlayerState.Ready.handleSeekTo(
         timestamp: Duration,
-        keyFramesOnly: Boolean,
-        onStartOfSeek: suspend (suspend () -> Unit) -> Unit,
-        onEndOfSeek: suspend (suspend () -> Unit) -> Unit,
+        onSeekStart: suspend (suspend () -> Unit) -> Unit,
+        onSeekEnd: suspend (suspend () -> Unit) -> Unit,
     ) {
-        onStartOfSeek {
+        onSeekStart {
             playbackLoop.stop().getOrThrow()
 
             bufferLoop.stop().getOrThrow()
@@ -498,12 +547,16 @@ internal class DefaultPlayerController(
                     sampler.flush().getOrThrow()
 
                     buffer.clear().getOrThrow()
+
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                 }
 
                 is Pipeline.Video -> with(pipeline) {
                     buffer.clear().getOrThrow()
 
                     pool.reset().getOrThrow()
+
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                 }
 
                 is Pipeline.AudioVideo -> with(pipeline) {
@@ -511,12 +564,16 @@ internal class DefaultPlayerController(
                         sampler.flush().getOrThrow()
 
                         audioBuffer.clear().getOrThrow()
+
+                        audioDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                     }
 
                     val videoJob = controllerScope.launch {
                         videoBuffer.clear().getOrThrow()
 
                         videoPool.reset().getOrThrow()
+
+                        videoDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                     }
 
                     joinAll(audioJob, videoJob)
@@ -527,7 +584,7 @@ internal class DefaultPlayerController(
 
             when (val pipeline = pipeline) {
                 is Pipeline.Audio -> with(pipeline) {
-                    decoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
 
                     val frame = decoder.decodeAudio().getOrThrow()
 
@@ -539,45 +596,69 @@ internal class DefaultPlayerController(
                 }
 
                 is Pipeline.Video -> with(pipeline) {
-                    decoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
 
                     val data = pool.acquire().getOrThrow()
 
-                    val frame = decoder.decodeVideo(data = data).getOrThrow()
+                    try {
+                        val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
 
-                    buffer.put(item = frame).getOrThrow()
+                        if (frame != null) {
+                            renderer?.render(frame)?.getOrThrow()
 
-                    (frame as? Frame.Content.Audio)?.timestamp?.let { timestamp ->
-                        timestampAfterSeek = timestamp
+                            timestampAfterSeek = frame.timestamp
+                        }
+                    } finally {
+                        pool.release(item = data).getOrThrow()
                     }
                 }
 
                 is Pipeline.AudioVideo -> with(pipeline) {
-                    val seekAudioDeferred = controllerScope.async {
-                        audioDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
-
-                        val frame = audioDecoder.decodeAudio().getOrThrow()
-
-                        audioBuffer.put(item = frame).getOrThrow()
-
-                        (frame as? Frame.Content.Audio)?.timestamp
+                    val seekAudioJob = controllerScope.launch {
+                        audioDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                     }
 
-                    val seekVideoDeferred = controllerScope.async {
-                        videoDecoder.seekTo(timestamp = timestamp, keyframesOnly = keyFramesOnly).getOrThrow()
+                    val seekVideoJob = controllerScope.launch {
+                        videoDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
+                    }
 
-                        val data = videoPool.acquire().getOrThrow()
+                    joinAll(seekAudioJob, seekVideoJob)
 
-                        try {
-                            val frame = videoDecoder.decodeVideo(data = data).getOrThrow()
+                    val audioFrame = audioDecoder.decodeAudio().getOrThrow()
 
-                            (frame as? Frame.Content.Audio)?.timestamp
-                        } finally {
-                            videoPool.release(item = data).getOrThrow()
+                    audioBuffer.put(item = audioFrame).getOrThrow()
+
+                    val audioTimestamp = (audioFrame as? Frame.Content.Audio)?.timestamp
+
+                    var videoTimestamp: Duration? = null
+
+                    controllerScope.launch {
+                        while (isActive) {
+                            val data = videoPool.acquire().getOrThrow()
+
+                            try {
+                                val videoFrame = videoDecoder.decodeVideo(
+                                    data = data
+                                ).getOrThrow() as? Frame.Content.Video ?: break
+
+                                videoTimestamp = videoFrame.timestamp
+
+                                when {
+                                    audioTimestamp == null -> break
+
+                                    videoFrame.timestamp - audioTimestamp < -SYNC_THRESHOLD -> continue
+                                }
+
+                                renderer?.render(videoFrame)?.getOrThrow()
+
+                                break
+                            } finally {
+                                videoPool.release(item = data).getOrThrow()
+                            }
                         }
-                    }
+                    }.join()
 
-                    timestampAfterSeek = awaitAll(seekAudioDeferred, seekVideoDeferred).filterNotNull().max()
+                    timestampAfterSeek = listOfNotNull(audioTimestamp, videoTimestamp).max()
                 }
             }
 
@@ -586,12 +667,14 @@ internal class DefaultPlayerController(
             playbackTimestamp.emit(timestampAfterSeek)
         }
 
-        onEndOfSeek {
+        onSeekEnd {
             bufferLoop.start(
                 coroutineScope = bufferScope,
                 onException = ::handleException,
                 onTimestamp = ::handleBufferTimestamp,
-                onEndOfMedia = { handleBufferCompletion() }).getOrThrow()
+                onEndOfMedia = {
+                    handleBufferCompletion()
+                }).getOrThrow()
         }
     }
 
@@ -745,25 +828,24 @@ internal class DefaultPlayerController(
                         is InternalPlayerState.Ready.Paused,
                         is InternalPlayerState.Ready.Stopped,
                         is InternalPlayerState.Ready.Completed,
-                        is InternalPlayerState.Ready.Seeking,
                             -> with(state) {
                             if (!media.isContinuous()) {
                                 return@runCatching
                             }
 
-                            handleSeekTo(
-                                timestamp = command.timestamp,
-                                keyFramesOnly = command.keyFramesOnly,
-                                onStartOfSeek = { block ->
-                                    withTransition(Destination.SEEKING) {
-                                        block()
-                                    }
-                                },
-                                onEndOfSeek = { block ->
-                                    (internalState.value as? InternalPlayerState.Ready)?.withTransition(Destination.PAUSED) {
-                                        block()
-                                    }
-                                })
+                            handleSeekTo(timestamp = command.timestamp, onSeekStart = { block ->
+                                withTransition(Destination.SEEKING) {
+                                    block()
+                                }
+                            }, onSeekEnd = { block ->
+                                val stateAfterSeek = internalState.value
+
+                                check(stateAfterSeek is InternalPlayerState.Ready) { "Invalid state after seek" }
+
+                                stateAfterSeek.withTransition(Destination.PAUSED) {
+                                    block()
+                                }
+                            })
                         }
 
                         else -> return@runCatching

@@ -130,11 +130,10 @@ interface KlarityPlayer {
      * Seeks to the specified position in the media.
      *
      * @param timestamp The seeking timestamp
-     * @param keyFramesOnly Use less precise but faster keyframe seeking
      *
      * @return [Result] indicating success
      */
-    suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean = false): Result<Unit>
+    suspend fun seekTo(timestamp: Duration): Result<Unit>
 
     /**
      * Releases any resources held by the player.

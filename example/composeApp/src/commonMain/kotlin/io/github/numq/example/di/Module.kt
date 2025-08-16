@@ -41,7 +41,7 @@ private val application = module {
     scope(HUB_SCOPE) {
         scoped { KlarityPlayer.create().getOrThrow() } bind KlarityPlayer::class onClose {
             runBlocking {
-                it?.close()?.getOrThrow()
+                it?.close()?.getOrNull()
             }
         }
     }
@@ -49,7 +49,7 @@ private val application = module {
     scope(PLAYLIST_SCOPE) {
         scoped { KlarityPlayer.create().getOrThrow() } bind KlarityPlayer::class onClose {
             runBlocking {
-                it?.close()?.getOrThrow()
+                it?.close()?.getOrNull()
             }
         }
 
@@ -61,7 +61,7 @@ private val preview = module {
     scope(HUB_SCOPE) {
         scoped { LoopPreviewService.Implementation(get()) } bind LoopPreviewService::class onClose {
             runBlocking {
-                it?.close()?.getOrThrow()
+                it?.close()?.getOrNull()
             }
         }
     }
@@ -69,7 +69,7 @@ private val preview = module {
     scope(PLAYLIST_SCOPE) {
         scoped { TimelinePreviewService.Implementation(get()) } bind TimelinePreviewService::class onClose {
             runBlocking {
-                it?.close()?.getOrThrow()
+                it?.close()?.getOrNull()
             }
         }
     }
@@ -81,7 +81,7 @@ private val renderer = module {
         scope(scope.getScopeName()) {
             scoped { RendererRegistry.Implementation(get()) } bind RendererRegistry::class onClose {
                 runBlocking {
-                    it?.close()?.getOrThrow()
+                    it?.close()?.getOrNull()
                 }
             }
 
@@ -131,7 +131,7 @@ private val playback = module {
         scope(scope.getScopeName()) {
             scoped { PlaybackService.Implementation(get(), get(), get()) } bind PlaybackService::class onClose {
                 runBlocking {
-                    it?.close()?.getOrThrow()
+                    it?.close()?.getOrNull()
                 }
             }
 

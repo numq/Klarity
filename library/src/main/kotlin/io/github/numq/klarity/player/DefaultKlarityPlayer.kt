@@ -81,8 +81,8 @@ internal class DefaultKlarityPlayer(
         }
     }
 
-    override suspend fun seekTo(timestamp: Duration, keyFramesOnly: Boolean) = playerController.execute(
-        Command.SeekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly)
+    override suspend fun seekTo(timestamp: Duration) = playerController.execute(
+        Command.SeekTo(timestamp = timestamp)
     ).recoverCatching { t ->
         if (t !is CancellationException) {
             throw KlarityPlayerException(t)

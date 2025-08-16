@@ -14,7 +14,7 @@ internal sealed interface Command {
         val location: String,
         val audioBufferSize: Int,
         val videoBufferSize: Int,
-        val hardwareAccelerationCandidates: List<HardwareAcceleration>?
+        val hardwareAccelerationCandidates: List<HardwareAcceleration>?,
     ) : Command {
         override val descriptor = Descriptor.PREPARE
     }
@@ -35,7 +35,7 @@ internal sealed interface Command {
         override val descriptor = Descriptor.STOP
     }
 
-    data class SeekTo(val timestamp: Duration, val keyFramesOnly: Boolean) : Command {
+    data class SeekTo(val timestamp: Duration) : Command {
         override val descriptor = Descriptor.SEEK_TO
     }
 

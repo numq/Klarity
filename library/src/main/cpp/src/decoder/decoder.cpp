@@ -687,7 +687,7 @@ std::optional<VideoFrame> Decoder::decodeVideo(uint8_t *buffer, int capacity) {
     return std::nullopt;
 }
 
-void Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
+void Decoder::seekTo(const long timestampMicros, const bool keyFramesOnly) {
     std::unique_lock<std::shared_mutex> lock(mutex);
 
     if (!_isValid()) {
@@ -752,7 +752,7 @@ void Decoder::seekTo(const long timestampMicros, const bool keyframesOnly) {
 
     audioBuffer.clear();
 
-    if (!keyframesOnly && codecContext) {
+    if (!keyFramesOnly && codecContext) {
         const int64_t thresholdMicros = (videoStream) ? 20'000 : 50'000;
 
         const int64_t thresholdPts = av_rescale_q(

@@ -32,9 +32,30 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
+## [1.0.3](https://github.com/numq/Klarity/releases/tag/1.0.3)
+
+### Fixed
+
+- Fixed incorrect argument names
+
+### Changed
+
+- Changed seeking behavior - now always seeks to exact position
+- Changed rendering behavior:
+    - Renders first video frame during:
+        - Preparation
+        - Playback stop
+        - Seeking operations
+- Performance and stability enhancements
+
+___
+
+<details>
+<summary>📦 Previous versions</summary>
+
 ## [1.0.2](https://github.com/numq/Klarity/releases/tag/1.0.2)
 
-### Fixed:
+### Fixed
 
 - Fixed delayed external state updates after command execution
 - Fixed incorrect first frame display after seeking
@@ -42,12 +63,9 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 - Fixed improper loop stopping
 - Fixed buffer cleanup errors during channel closure
 
-<details>
-<summary>📦 Previous versions</summary>
-
 ## [1.0.1](https://github.com/numq/Klarity/releases/tag/1.0.1)
 
-### Changed:
+### Changed
 
 - Improved internal state machine
 - Improved playback synchronization

@@ -38,8 +38,6 @@ class ControlPlaylistPlayback(
                 playbackService.seekTo(timestamp = timestamp).mapCatching {
                     if (playbackState is PlaybackState.Ready.Playing) {
                         playbackService.resume().getOrThrow()
-                    } else {
-                        rendererRegistry.update(id = "playback", timestamp = timestamp).getOrThrow()
                     }
                 }
             }

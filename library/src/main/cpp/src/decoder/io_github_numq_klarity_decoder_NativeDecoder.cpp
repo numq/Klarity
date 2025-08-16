@@ -168,12 +168,12 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Na
         jclass thisClass,
         jlong decoderHandle,
         jlong timestampMicros,
-        jboolean keyframesOnly
+        jboolean keyFramesOnly
 ) {
     return handleException(env, [&] {
         auto decoder = getDecoderPointer(decoderHandle);
 
-        decoder->seekTo(static_cast<long>(timestampMicros), keyframesOnly);
+        decoder->seekTo(static_cast<long>(timestampMicros), keyFramesOnly);
     });
 }
 

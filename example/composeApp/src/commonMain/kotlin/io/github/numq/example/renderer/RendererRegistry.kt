@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlin.time.Duration
 
 interface RendererRegistry {
     val renderers: StateFlow<Map<String, RegisteredRenderer>>
@@ -15,8 +14,6 @@ interface RendererRegistry {
     suspend fun add(id: String, location: String): Result<Unit>
 
     suspend fun get(id: String): Result<Renderer?>
-
-    suspend fun update(id: String, timestamp: Duration): Result<Unit>
 
     suspend fun reset(id: String): Result<Unit>
 
@@ -49,20 +46,6 @@ interface RendererRegistry {
 
         override suspend fun get(id: String) = runCatching {
             _renderers.value[id]?.renderer
-        }
-
-        override suspend fun update(id: String, timestamp: Duration) = runCatching {
-            val registeredRenderer = _renderers.value[id]
-
-            if (registeredRenderer != null) {
-                val (location, renderer) = registeredRenderer
-
-                snapshotManager.snapshot(location = location, keyframesOnly = false) {
-                    timestamp
-                }.getOrThrow()?.use { snapshot ->
-                    renderer.render(frame = snapshot.frame).getOrThrow()
-                }
-            }
         }
 
         override suspend fun reset(id: String) = runCatching {

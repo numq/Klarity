@@ -22,14 +22,14 @@ interface PreviewManager {
      *
      * @param renderer the renderer to display frame
      * @param timestamp desired timestamp
-     * @param keyframesOnly if true, seeks only to keyframes (faster but less precise)
+     * @param keyFramesOnly if true, seeks only to keyframes (faster but less precise)
      *
      * @return [Result] indicating success
      */
     suspend fun preview(
         renderer: Renderer,
         timestamp: Duration,
-        keyframesOnly: Boolean = false,
+        keyFramesOnly: Boolean = false,
     ): Result<Unit>
 
     /**

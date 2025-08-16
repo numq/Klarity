@@ -135,9 +135,7 @@ fun PlaylistView(
                         }
                     }, content = {
                         Icon(
-                            Icons.AutoMirrored.Filled.FormatListBulleted,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary
+                            Icons.AutoMirrored.Filled.FormatListBulleted, null, tint = MaterialTheme.colorScheme.primary
                         )
                     })
                 }
@@ -193,7 +191,6 @@ fun PlaylistView(
                             (state.playlist.playbackState as? PlaybackState.Ready)?.let { playbackState ->
                                 PlaylistPlayback(
                                     playbackState = playbackState,
-                                    thumbnailRenderer = thumbnailRenderers[item.id],
                                     playbackRenderer = playbackRenderer,
                                     previewRenderer = previewRenderer,
                                     previewTimestamp = state.previewTimestamp,

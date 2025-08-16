@@ -119,9 +119,9 @@ class PlayerControllerStateTest {
         videoDecoder = mockk(relaxed = true)
         coEvery { audioDecoder.decodeAudio() } returns Result.success(frame)
         coEvery { videoDecoder.decodeVideo(data = any()) } returns Result.success(frame)
-        coEvery { videoDecoder.seekTo(timestamp = any(), keyframesOnly = any()) } returns Result.success(Unit)
-        coEvery { audioDecoder.seekTo(timestamp = any(), keyframesOnly = any()) } returns Result.success(Unit)
-        coEvery { videoDecoder.seekTo(timestamp = any(), keyframesOnly = any()) } returns Result.success(Unit)
+        coEvery { videoDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
+        coEvery { audioDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
+        coEvery { videoDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
         coEvery { audioDecoder.close() } returns Result.success(Unit)
         coEvery { videoDecoder.close() } returns Result.success(Unit)
         audioDecoderFactory = mockk()
@@ -333,7 +333,7 @@ class PlayerControllerStateTest {
             Command.Play,
             Command.Pause,
             Command.Resume,
-            Command.SeekTo(Duration.ZERO, false),
+            Command.SeekTo(Duration.ZERO),
             Command.Stop,
             Command.Release
         ).map { command ->

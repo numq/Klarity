@@ -15,7 +15,7 @@ object SnapshotManager {
      *
      * @param location media file path or URI
      * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
-     * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
+     * @param keyFramesOnly if `true`, seeks only to keyframes (faster but less precise)
      * @param timestamps a function that provides a media duration that can be used to construct desired timestamps
      *
      * @return [Result] containing a list of [Snapshot]. Each [Snapshot] must be closed by the caller
@@ -25,7 +25,7 @@ object SnapshotManager {
     suspend fun snapshots(
         location: String,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
-        keyframesOnly: Boolean = true,
+        keyFramesOnly: Boolean = true,
         timestamps: (duration: Duration) -> (List<Duration>) = { listOf(Duration.ZERO) },
     ): Result<List<Snapshot>> = VideoDecoderFactory().create(
         parameters = VideoDecoderFactory.Parameters(
@@ -40,7 +40,7 @@ object SnapshotManager {
             timestamps(decoder.media.duration).filter {
                 it in Duration.ZERO..decoder.media.duration
             }.forEach { timestamp ->
-                decoder.seekTo(timestamp = timestamp, keyframesOnly = keyframesOnly).getOrThrow()
+                decoder.seekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly).getOrThrow()
 
                 var frame: Frame.Content.Video? = null
 
@@ -61,7 +61,7 @@ object SnapshotManager {
 
             throw t
         } finally {
-            decoder.close()
+            decoder.close().getOrThrow()
         }
 
         frames.map { frame ->
@@ -76,7 +76,7 @@ object SnapshotManager {
      *
      * @param location media file path or URI
      * @param hardwareAccelerationCandidates preferred hardware acceleration methods in order of priority
-     * @param keyframesOnly if `true`, seeks only to keyframes (faster but less precise)
+     * @param keyFramesOnly if `true`, seeks only to keyframes (faster but less precise)
      * @param timestamp a function that provides a media duration that can be used to construct desired timestamp
      *
      * @return [Result] containing a [Snapshot] or null. [Snapshot] must be closed by the caller
@@ -86,11 +86,11 @@ object SnapshotManager {
     suspend fun snapshot(
         location: String,
         hardwareAccelerationCandidates: List<HardwareAcceleration>? = null,
-        keyframesOnly: Boolean = true,
+        keyFramesOnly: Boolean = true,
         timestamp: (duration: Duration) -> (Duration) = { Duration.ZERO },
     ): Result<Snapshot?> = snapshots(
         location = location,
-        keyframesOnly = keyframesOnly,
+        keyFramesOnly = keyFramesOnly,
         hardwareAccelerationCandidates = hardwareAccelerationCandidates,
         timestamps = { duration ->
             listOf(timestamp(duration))

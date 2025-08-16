@@ -123,4 +123,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.triplet }}
-          path: ${{ github.workspace }}/library/build/libs/library-1.0.2.jar
+          path: ${{ github.workspace }}/library/build/libs/library-1.0.3.jar

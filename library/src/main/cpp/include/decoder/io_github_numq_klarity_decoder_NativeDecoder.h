@@ -54,7 +54,7 @@ JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Na
         jclass thisClass,
         jlong decoderHandle,
         jlong timestampMicros,
-        jboolean keyframesOnly
+        jboolean keyFramesOnly
 );
 
 JNIEXPORT void JNICALL Java_io_github_numq_klarity_decoder_NativeDecoder_00024Native_reset(

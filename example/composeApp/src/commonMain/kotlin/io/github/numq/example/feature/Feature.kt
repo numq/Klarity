@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.withLock
 abstract class Feature<in Command, State, Event>(
     val initialState: State,
     private val coroutineScope: CoroutineScope,
-    private val reducer: Reducer<Command, State, Event>
+    private val reducer: Reducer<Command, State, Event>,
 ) {
     private val mutex = Mutex()
 
@@ -29,7 +29,7 @@ abstract class Feature<in Command, State, Event>(
 
         _state.emit(newState)
 
-        newEvents.forEach { event -> _events.send(event) }
+        newEvents.forEach { event -> _events.trySend(event) }
     }
 
     suspend fun execute(command: Command) = mutex.withLock {

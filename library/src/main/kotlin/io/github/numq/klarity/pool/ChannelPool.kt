@@ -42,19 +42,29 @@ internal class ChannelPool<Item : Managed>(poolCapacity: Int, private val create
         availableItems.send(item)
     }
 
-    override suspend fun reset() = runCatching {
-        availableItems.close()
+    override suspend fun reset() = mutex.withLock {
+        runCatching {
+            availableItems.close()
 
-        initializePool()
+            initializePool()
+        }
     }
 
     override suspend fun close() = mutex.withLock {
         runCatching {
-            if (isClosed.compareAndSet(false, true)) {
+            try {
                 availableItems.close()
+            } finally {
+                items.forEach { item ->
+                    if (!item.isClosed) {
+                        item.close()
+                    }
+                }
 
-                items.forEach(Managed::close)
+                isClosed.set(true)
             }
+
+            Unit
         }
     }
 }

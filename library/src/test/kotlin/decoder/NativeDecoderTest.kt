@@ -74,7 +74,7 @@ class NativeDecoderTest : JNITest() {
             decodeVideoStream = true
         )
 
-        val seekResult = decoder.seekTo(1_000_000, keyframesOnly = true)
+        val seekResult = decoder.seekTo(1_000_000, keyFramesOnly = true)
         assertTrue(seekResult.isSuccess)
 
         val resetResult = decoder.reset()

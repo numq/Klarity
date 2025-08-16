@@ -32,7 +32,6 @@ import kotlin.time.Duration
 @Composable
 fun PlaylistPlayback(
     playbackState: PlaybackState.Ready,
-    thumbnailRenderer: Renderer?,
     playbackRenderer: Renderer?,
     previewRenderer: Renderer?,
     previewTimestamp: PreviewTimestamp?,
@@ -99,26 +98,18 @@ fun PlaylistPlayback(
                 }, contentAlignment = Alignment.Center
             ) {
                 when {
-                    playbackRenderer == null && thumbnailRenderer == null -> Icon(
+                    playbackRenderer == null -> Icon(
                         Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary
                     )
 
-                    playbackRenderer != null && !playbackRenderer.drawsNothing() -> RendererComponent(
+                    !playbackRenderer.drawsNothing() -> RendererComponent(
                         modifier = Modifier.fillMaxSize(),
                         foreground = Foreground(renderer = playbackRenderer),
                         background = Background.Blur()
                     )
 
-                    thumbnailRenderer != null && !thumbnailRenderer.drawsNothing() -> RendererComponent(
-                        modifier = Modifier.fillMaxSize(),
-                        foreground = Foreground(renderer = thumbnailRenderer),
-                        background = Background.Blur()
-                    )
-
                     else -> Icon(
-                        Icons.Default.BrokenImage,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary
+                        Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
