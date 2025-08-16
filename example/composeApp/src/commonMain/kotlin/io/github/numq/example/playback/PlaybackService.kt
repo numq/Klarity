@@ -61,10 +61,16 @@ interface PlaybackService {
             when (state) {
                 is PlayerState.Empty -> PlaybackState.Empty
 
+                is PlayerState.Preparing -> PlaybackState.Preparing
+
+                is PlayerState.Releasing -> PlaybackState.Releasing
+
                 is PlayerState.Ready -> {
                     val location = state.media.location
 
                     val duration = state.media.duration
+
+                    val hasVideo = state.media.videoFormat != null
 
                     val isMuted = settings.isMuted
 
@@ -76,6 +82,7 @@ interface PlaybackService {
                         is PlayerState.Ready.Playing -> PlaybackState.Ready.Playing(
                             location = location,
                             duration = duration,
+                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -86,6 +93,7 @@ interface PlaybackService {
                         is PlayerState.Ready.Paused -> PlaybackState.Ready.Paused(
                             location = location,
                             duration = duration,
+                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -96,6 +104,7 @@ interface PlaybackService {
                         is PlayerState.Ready.Stopped -> PlaybackState.Ready.Stopped(
                             location = location,
                             duration = duration,
+                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -106,6 +115,7 @@ interface PlaybackService {
                         is PlayerState.Ready.Completed -> PlaybackState.Ready.Completed(
                             location = location,
                             duration = duration,
+                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -116,6 +126,7 @@ interface PlaybackService {
                         is PlayerState.Ready.Seeking -> PlaybackState.Ready.Seeking(
                             location = location,
                             duration = duration,
+                            hasVideo = state.media.videoFormat != null,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,

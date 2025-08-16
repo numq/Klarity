@@ -7,9 +7,24 @@ import io.github.numq.klarity.media.Media
  */
 sealed interface PlayerState {
     /**
-     * Represents the state when no media is loaded or playing.
+     * Represents the state when no media is loaded.
      */
     data object Empty : PlayerState
+
+    /**
+     * Represents the state when media is preparing.
+     */
+    data object Preparing : PlayerState
+
+    /**
+     * Represents the state when media is releasing.
+     */
+    data class Releasing(val previousState: PlayerState) : PlayerState
+
+    /**
+     * Represents the state when a fatal error occurred.
+     */
+    data class Error(val exception: Exception, val previousState: PlayerState) : PlayerState
 
     /**
      * Sealed interface representing the player states when media is ready.
@@ -45,9 +60,4 @@ sealed interface PlayerState {
          */
         data class Seeking(override val media: Media) : Ready
     }
-
-    /**
-     * Represents the state when a fatal error occurred.
-     */
-    data class Error(val exception: Exception) : PlayerState
 }

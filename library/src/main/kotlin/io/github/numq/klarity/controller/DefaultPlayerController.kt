@@ -122,16 +122,13 @@ internal class DefaultPlayerController(
         val updatedState = when (internalState) {
             is InternalPlayerState.Empty -> PlayerState.Empty
 
-            is InternalPlayerState.Preparing -> null
+            is InternalPlayerState.Preparing -> PlayerState.Preparing
 
-            is InternalPlayerState.Releasing -> null
+            is InternalPlayerState.Releasing -> PlayerState.Releasing(previousState = state.value)
 
             is InternalPlayerState.Error -> PlayerState.Error(
-                exception = when (val throwable = internalState.cause) {
-                    is Exception -> throwable
-
-                    else -> Exception(throwable)
-                }
+                exception = internalState.cause as? Exception ?: Exception(internalState.cause),
+                previousState = state.value
             )
 
             is InternalPlayerState.Ready -> when (internalState) {
@@ -208,7 +205,7 @@ internal class DefaultPlayerController(
      */
 
     private suspend fun handleException(throwable: Throwable) =
-        _events.send(PlayerEvent.Error(if (throwable is Exception) throwable else Exception(throwable)))
+        _events.send(PlayerEvent.Error(throwable as? Exception ?: Exception(throwable)))
 
     /**
      * Completion
@@ -218,8 +215,6 @@ internal class DefaultPlayerController(
         bufferLoop.stop().getOrThrow()
 
         _events.send(PlayerEvent.Buffer.Complete)
-
-        println("completed buffer")
     }
 
     private suspend fun InternalPlayerState.Ready.handlePlaybackCompletion() {
@@ -422,6 +417,10 @@ internal class DefaultPlayerController(
         }.getOrThrow()
 
         renderFirstFrame(pipeline = pipeline)
+
+        bufferTimestamp.emit(Duration.ZERO)
+
+        playbackTimestamp.emit(Duration.ZERO)
 
         return Triple(pipeline, bufferLoop, playbackLoop)
     }

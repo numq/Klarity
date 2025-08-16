@@ -41,6 +41,7 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 ### Changed
 
 - Enhanced seeking precision
+- Extended external state machine
 - Changed rendering behavior - renders first video frame during: preparation, playback stop, seeking
 - Performance and stability enhancements
 
@@ -138,52 +139,54 @@ graph TD
 stateDiagram-v2
     state PlayerState {
         [*] --> Empty
-        Empty --> Preparing: Prepare Media
-        Preparing --> Ready: Media Ready
-        Preparing --> Error: Error Occurred
+        Empty --> Preparing: Prepare
+        Preparing --> Ready: Success
+        Preparing --> Error: Error
         Preparing --> Empty: Release
-
+        
         state Ready {
             [*] --> Stopped
             Stopped --> Playing: Play
             Playing --> Paused: Pause
             Playing --> Stopped: Stop
             Playing --> Seeking: SeekTo
-            Playing --> Error: Error Occurred
+            Playing --> Error: Error
             Paused --> Playing: Resume
             Paused --> Stopped: Stop
             Paused --> Seeking: SeekTo
-            Paused --> Error: Error Occurred
-            Stopped --> Completed: Playback Completed
+            Paused --> Error: Error
+            Stopped --> Completed: Playback Complete
             Stopped --> Seeking: SeekTo
-            Stopped --> Error: Error Occurred
+            Stopped --> Error: Error
             Completed --> Stopped: Stop
             Completed --> Seeking: SeekTo
-            Completed --> Error: Error Occurred
-            Seeking --> Paused: Seek Completed
+            Completed --> Error: Error
+            Seeking --> Paused: Seek Complete
             Seeking --> Stopped: Stop
             Seeking --> Seeking: SeekTo
-            Seeking --> Error: Error Occurred
+            Seeking --> Error: Error
         }
-
-        Ready --> Empty: Release
-        Ready --> Error: Error Occurred
+        
+        Ready --> Releasing: Release
+        Releasing --> Empty: Success
+        Releasing --> Error: Error
         Error --> Empty: Reset
     }
 ```
 
 ### Transition table
 
-| Current State \ Target State | Empty    | Preparing | Ready (Stopped) | Ready (Playing) | Ready (Paused)  | Ready (Completed)   | Ready (Seeking) | Error          |
-|------------------------------|----------|-----------|-----------------|-----------------|-----------------|---------------------|-----------------|----------------|
-| **Empty**	                   | N/A	     | Prepare   | 	N/A            | 	N/A            | 	N/A	           | N/A	                | N/A             | 	N/A           |
-| **Preparing**	               | Release	 | N/A	      | Media Ready     | 	N/A	           | N/A	            | N/A	                | N/A	            | Error Occurred |
-| **Ready (Stopped)**	         | Release	 | N/A	      | N/A	            | Play	           | N/A	            | Playback Completed	 | SeekTo	         | Error Occurred |
-| **Ready (Playing)**	         | N/A	     | N/A	      | Stop	           | N/A	            | Pause	          | N/A	                | SeekTo	         | Error Occurred |
-| **Ready (Paused)**	          | N/A	     | N/A	      | Stop	           | Resume	         | N/A	            | N/A	                | SeekTo	         | Error Occurred |
-| **Ready (Completed)**	       | N/A	     | N/A	      | Stop	           | N/A	            | N/A	            | N/A	                | SeekTo	         | Error Occurred |
-| **Ready (Seeking)**	         | N/A	     | N/A	      | Stop	           | N/A	            | Seek Completed	 | N/A	                | SeekTo	         | Error Occurred |
-| **Error**	                   | Reset	   | N/A	      | N/A	            | N/A	            | N/A	            | N/A	                | N/A	            | N/A            |
+| Current State \ Action | Empty   | Preparing | Releasing | Ready.Stopped | Ready.Playing | Ready.Paused  | Ready.Completed   | Ready.Seeking | Error |
+|------------------------|---------|-----------|-----------|---------------|---------------|---------------|-------------------|---------------|-------|
+| Empty                  | -       | Prepare   | -         | -             | -             | -             | -                 | -             | -     |
+| Preparing              | Release | -         | -         | Success       | -             | -             | -                 | -             | Error |
+| Releasing              | Success | -         | -         | -             | -             | -             | -                 | -             | Error |
+| Error                  | Reset   | -         | -         | -             | -             | -             | -                 | -             | -     |
+| Ready.Stopped          | -       | -         | Release   | -             | Play          | -             | Playback Complete | SeekTo        | Error |
+| Ready.Playing          | -       | -         | Release   | Stop          | -             | Pause         | -                 | SeekTo        | Error |
+| Ready.Paused           | -       | -         | Release   | Stop          | Resume        | -             | -                 | SeekTo        | Error |
+| Ready.Completed        | -       | -         | Release   | Stop          | -             | -             | -                 | SeekTo        | Error |
+| Ready.Seeking          | -       | -         | Release   | Stop          | -             | Seek Complete | -                 | SeekTo        | Error |
 
 ## Installation
 

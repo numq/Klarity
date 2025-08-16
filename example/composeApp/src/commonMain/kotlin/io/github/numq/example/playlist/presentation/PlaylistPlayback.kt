@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,35 +99,37 @@ fun PlaylistPlayback(
                 }, contentAlignment = Alignment.Center
             ) {
                 when {
-                    playbackRenderer == null -> Icon(
+                    !playbackState.hasVideo -> Icon(
                         Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary
                     )
 
-                    !playbackRenderer.drawsNothing() -> RendererComponent(
-                        modifier = Modifier.fillMaxSize(),
-                        foreground = Foreground(renderer = playbackRenderer),
-                        background = Background.Blur()
-                    )
+                    playbackRenderer != null && !playbackRenderer.drawsNothing() -> when {
+                        playbackRenderer.drawsNothing() -> Icon(
+                            Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
+                        )
 
-                    else -> Icon(
-                        Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                if (playbackState.playbackSpeedFactor != 1f) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Playing on ${
-                                playbackState.playbackSpeedFactor.toString().replace(".0", "")
-                            }x speed", modifier = Modifier.drawBehind {
-                                drawRoundRect(
-                                    color = Color.Black.copy(alpha = .5f), cornerRadius = CornerRadius(16f, 16f)
-                                )
-                            }.padding(8.dp), color = MaterialTheme.colorScheme.primary
+                        else -> RendererComponent(
+                            modifier = Modifier.fillMaxSize(),
+                            foreground = Foreground(renderer = playbackRenderer),
+                            background = Background.Blur()
                         )
                     }
+
+                    else -> CircularProgressIndicator()
+                }
+
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Playing on ${
+                            playbackState.playbackSpeedFactor.toString().replace(".0", "")
+                        }x speed", modifier = Modifier.drawBehind {
+                            drawRoundRect(
+                                color = Color.Black.copy(alpha = .5f), cornerRadius = CornerRadius(16f, 16f)
+                            )
+                        }.padding(8.dp), color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
             this@Column.AnimatedVisibility(
@@ -189,16 +192,16 @@ fun PlaylistPlayback(
                         onPreviewTimestamp = onPreviewTimestamp
                     )
                 }
-            }
-            if (previewTimestamp != null) {
-                previewRenderer?.takeIf { !it.drawsNothing() }?.let {
-                    TimelinePreview(
-                        width = 128f,
-                        height = 128f,
-                        bottomPadding = 24f,
-                        previewTimestamp = previewTimestamp,
-                        renderer = previewRenderer,
-                    )
+                if (previewTimestamp != null) {
+                    previewRenderer?.takeIf { !it.drawsNothing() }?.let {
+                        TimelinePreview(
+                            width = 128f,
+                            height = 128f,
+                            bottomPadding = 24f,
+                            previewTimestamp = previewTimestamp,
+                            renderer = previewRenderer,
+                        )
+                    }
                 }
             }
         }

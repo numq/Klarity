@@ -187,109 +187,111 @@ fun PlaylistView(
                         }
                     },
                     content = {
-                        (state.playlist.selectedPlaylistItem as? SelectedPlaylistItem.Present)?.item?.let { item ->
-                            (state.playlist.playbackState as? PlaybackState.Ready)?.let { playbackState ->
-                                PlaylistPlayback(
-                                    playbackState = playbackState,
-                                    playbackRenderer = playbackRenderer,
-                                    previewRenderer = previewRenderer,
-                                    previewTimestamp = state.previewTimestamp,
-                                    isOverlayVisible = state.isOverlayVisible,
-                                    showOverlay = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Interaction.ShowOverlay)
-                                        }
-                                    },
-                                    hideOverlay = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Interaction.HideOverlay)
-                                        }
-                                    },
-                                    isShuffled = state.playlist.isShuffled,
-                                    mode = state.playlist.mode,
-                                    hasPrevious = state.playlist.hasPrevious,
-                                    hasNext = state.playlist.hasNext,
-                                    shuffle = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Shuffle)
-                                        }
-                                    },
-                                    setMode = { mode ->
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.SetMode(mode = mode))
-                                        }
-                                    },
-                                    previous = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Previous)
-                                        }
-                                    },
-                                    next = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Next)
-                                        }
-                                    },
-                                    play = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.Play(item = item))
-                                        }
-                                    },
-                                    pause = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.Pause(item = item))
-                                        }
-                                    },
-                                    resume = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.Resume(item = item))
-                                        }
-                                    },
-                                    stop = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.Stop(item = item))
-                                        }
-                                    },
-                                    seekTo = { timestamp ->
-                                        coroutineScope.launch {
-                                            feature.execute(
-                                                PlaylistCommand.Playback.SeekTo(
-                                                    item = item, timestamp = timestamp
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            (state.playlist.selectedPlaylistItem as? SelectedPlaylistItem.Present)?.item?.let { item ->
+                                (state.playlist.playbackState as? PlaybackState.Ready)?.let { playbackState ->
+                                    PlaylistPlayback(
+                                        playbackState = playbackState,
+                                        playbackRenderer = playbackRenderer,
+                                        previewRenderer = previewRenderer,
+                                        previewTimestamp = state.previewTimestamp,
+                                        isOverlayVisible = state.isOverlayVisible,
+                                        showOverlay = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Interaction.ShowOverlay)
+                                            }
+                                        },
+                                        hideOverlay = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Interaction.HideOverlay)
+                                            }
+                                        },
+                                        isShuffled = state.playlist.isShuffled,
+                                        mode = state.playlist.mode,
+                                        hasPrevious = state.playlist.hasPrevious,
+                                        hasNext = state.playlist.hasNext,
+                                        shuffle = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Shuffle)
+                                            }
+                                        },
+                                        setMode = { mode ->
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.SetMode(mode = mode))
+                                            }
+                                        },
+                                        previous = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Previous)
+                                            }
+                                        },
+                                        next = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Next)
+                                            }
+                                        },
+                                        play = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.Play(item = item))
+                                            }
+                                        },
+                                        pause = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.Pause(item = item))
+                                            }
+                                        },
+                                        resume = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.Resume(item = item))
+                                            }
+                                        },
+                                        stop = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.Stop(item = item))
+                                            }
+                                        },
+                                        seekTo = { timestamp ->
+                                            coroutineScope.launch {
+                                                feature.execute(
+                                                    PlaylistCommand.Playback.SeekTo(
+                                                        item = item, timestamp = timestamp
+                                                    )
                                                 )
-                                            )
 
-                                            feature.execute(PlaylistCommand.Playback.Play(item = item))
-                                        }
-                                    },
-                                    toggleMute = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.ToggleMute)
-                                        }
-                                    },
-                                    changeVolume = { updatedVolume ->
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.ChangeVolume(volume = updatedVolume))
-                                        }
-                                    },
-                                    decreasePlaybackSpeed = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.DecreaseSpeed)
-                                        }
-                                    },
-                                    increasePlaybackSpeed = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.IncreaseSpeed)
-                                        }
-                                    },
-                                    resetPlaybackSpeed = {
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Playback.ResetSpeed)
-                                        }
-                                    },
-                                    onPreviewTimestamp = { previewTimestamp ->
-                                        coroutineScope.launch {
-                                            feature.execute(PlaylistCommand.Preview.GetTimestamp(previewTimestamp = previewTimestamp))
-                                        }
-                                    })
+                                                feature.execute(PlaylistCommand.Playback.Play(item = item))
+                                            }
+                                        },
+                                        toggleMute = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.ToggleMute)
+                                            }
+                                        },
+                                        changeVolume = { updatedVolume ->
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.ChangeVolume(volume = updatedVolume))
+                                            }
+                                        },
+                                        decreasePlaybackSpeed = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.DecreaseSpeed)
+                                            }
+                                        },
+                                        increasePlaybackSpeed = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.IncreaseSpeed)
+                                            }
+                                        },
+                                        resetPlaybackSpeed = {
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Playback.ResetSpeed)
+                                            }
+                                        },
+                                        onPreviewTimestamp = { previewTimestamp ->
+                                            coroutineScope.launch {
+                                                feature.execute(PlaylistCommand.Preview.GetTimestamp(previewTimestamp = previewTimestamp))
+                                            }
+                                        })
+                                }
                             }
                         }
 
