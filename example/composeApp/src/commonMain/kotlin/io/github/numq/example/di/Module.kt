@@ -177,7 +177,9 @@ private val playlist = module {
         scoped { PlaylistPreviewReducer(get()) }
 
         scoped {
-            PlaylistReducer(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
+            PlaylistReducer(
+                get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()
+            )
         }
 
         scoped { PlaylistFeature(get()) } onClose { it?.close() }
