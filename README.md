@@ -229,10 +229,14 @@ val media = ProbeManager.probe("path/to/media").onFailure { t -> }.getOrThrow()
 val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.onFailure { t -> ... }.getOrThrow()
 
 snapshots.forEach { snapshot ->
+    renderer.render(snapshot.frame).getOrThrow()
+    
     snapshot.close().onFailure { t -> }.getOrThrow()
 }
 
 val snapshot = SnapshotManager.snapshot("path/to/media") { timestamp }.onFailure { t -> ... }.getOrThrow()
+
+renderer.render(snapshot.frame).getOrThrow()
 
 snapshot.close().onFailure { t -> }.getOrThrow()
 ```
@@ -263,7 +267,7 @@ val playback = KlarityPlayer.create().onFailure { t -> }.getOrThrow()
 
 val format = checkNotNull(playback.state.media.videoFormat)
 
-val renderer = Renderer.create(format).onFailure { t -> }.getOrThrow()
+val renderer = Renderer.create(width = format.width, height = format.height).onFailure { t -> }.getOrThrow()
 
 playback.attach(renderer).getOrThrow()
 
