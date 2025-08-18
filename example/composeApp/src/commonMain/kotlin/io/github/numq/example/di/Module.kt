@@ -106,7 +106,7 @@ private val hub = module {
 
         scoped { StopHubPlayback(get(), get(), get()) }
 
-        scoped { StopHubPreview(get(), get()) }
+        scoped { StopHubPreview(get(), get(), get()) }
 
         scoped { HubInteractionReducer() }
 

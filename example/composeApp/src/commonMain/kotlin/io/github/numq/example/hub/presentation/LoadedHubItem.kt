@@ -15,7 +15,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -54,22 +56,16 @@ fun LoadedHubItem(
 
     val interactionSource = remember { MutableInteractionSource() }
 
-    var isHovered by remember { mutableStateOf(false) }
-
     LaunchedEffect(interactionSource) {
         interactionSource.interactions.collect { interaction ->
             when (interaction) {
                 is HoverInteraction.Enter -> {
-                    isHovered = true
-
                     if (!isPlaying) {
                         startPreview()
                     }
                 }
 
                 is HoverInteraction.Exit -> {
-                    isHovered = false
-
                     if (!isPlaying) {
                         stopPreview()
                     }
