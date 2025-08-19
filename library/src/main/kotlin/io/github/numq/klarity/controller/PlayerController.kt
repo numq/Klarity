@@ -9,6 +9,7 @@ import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
+import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration
 
 internal interface PlayerController {
+    val renderer: StateFlow<Renderer?>
+
     val settings: StateFlow<PlayerSettings>
 
     val state: StateFlow<PlayerState>
@@ -26,10 +29,6 @@ internal interface PlayerController {
     val playbackTimestamp: StateFlow<Duration>
 
     val events: Flow<PlayerEvent>
-
-    suspend fun attachRenderer(renderer: Renderer): Result<Unit>
-
-    suspend fun detachRenderer(): Result<Renderer?>
 
     suspend fun changeSettings(newSettings: PlayerSettings): Result<Unit>
 
@@ -55,6 +54,7 @@ internal interface PlayerController {
             bufferLoopFactory: BufferLoopFactory,
             playbackLoopFactory: PlaybackLoopFactory,
             samplerFactory: SamplerFactory,
+            rendererFactory: RendererFactory,
         ): Result<PlayerController> = runCatching {
             DefaultPlayerController(
                 initialSettings = initialSettings,
@@ -64,7 +64,8 @@ internal interface PlayerController {
                 bufferFactory = bufferFactory,
                 bufferLoopFactory = bufferLoopFactory,
                 playbackLoopFactory = playbackLoopFactory,
-                samplerFactory = samplerFactory
+                samplerFactory = samplerFactory,
+                rendererFactory = rendererFactory
             )
         }
     }

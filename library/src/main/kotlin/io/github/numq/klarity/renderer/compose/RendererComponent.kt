@@ -28,6 +28,8 @@ fun RendererComponent(
 ) {
     val generationId by foreground.renderer.generationId.collectAsState()
 
+    val drawsNothing by foreground.renderer.drawsNothing.collectAsState()
+
     Surface(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val boxSize = Size(width = maxWidth.value, height = maxHeight.value)
@@ -62,8 +64,8 @@ fun RendererComponent(
                 }
             }
 
-            key(generationId) {
-                if (foreground.renderer.drawsNothing()) {
+            key(generationId, drawsNothing) {
+                if (drawsNothing) {
                     placeholder()
                 } else {
                     Canvas(modifier = modifier.fillMaxSize()) {

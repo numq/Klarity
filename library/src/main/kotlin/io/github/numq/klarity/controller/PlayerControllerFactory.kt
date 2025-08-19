@@ -7,6 +7,7 @@ import io.github.numq.klarity.factory.Factory
 import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
+import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 
@@ -19,7 +20,8 @@ internal class PlayerControllerFactory : Factory<PlayerControllerFactory.Paramet
         val bufferFactory: BufferFactory,
         val bufferLoopFactory: BufferLoopFactory,
         val playbackLoopFactory: PlaybackLoopFactory,
-        val samplerFactory: SamplerFactory
+        val samplerFactory: SamplerFactory,
+        val rendererFactory: RendererFactory,
     )
 
     override fun create(parameters: Parameters) = with(parameters) {
@@ -31,7 +33,8 @@ internal class PlayerControllerFactory : Factory<PlayerControllerFactory.Paramet
             bufferFactory = bufferFactory,
             bufferLoopFactory = bufferLoopFactory,
             playbackLoopFactory = playbackLoopFactory,
-            samplerFactory = samplerFactory
+            samplerFactory = samplerFactory,
+            rendererFactory = rendererFactory
         )
     }
 }

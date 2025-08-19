@@ -1,8 +1,8 @@
 package io.github.numq.klarity.preview
 
 import io.github.numq.klarity.decoder.Decoder
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
-import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pool.Pool
 import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.CancellationException
@@ -10,17 +10,17 @@ import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
 internal class DefaultPreviewManager(
-    private val decoder: Decoder<Media.Video>,
+    private val decoder: Decoder<Format.Video>,
     private val pool: Pool<Data>,
 ) : PreviewManager {
-    override val format = decoder.media.videoFormat
+    override val format = decoder.format
 
     override suspend fun preview(
         renderer: Renderer,
         timestamp: Duration,
         keyFramesOnly: Boolean,
     ) = runCatching {
-        check(timestamp in Duration.ZERO..decoder.media.duration) { "Preview timestamp is out of range" }
+        check(timestamp in Duration.ZERO..decoder.duration) { "Preview timestamp is out of range" }
 
         decoder.seekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly).getOrThrow()
 

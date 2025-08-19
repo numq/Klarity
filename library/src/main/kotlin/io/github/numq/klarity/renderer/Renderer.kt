@@ -25,11 +25,11 @@ sealed interface Renderer {
     val generationId: StateFlow<Int>
 
     /**
-     * Indicates whether the renderer currently draws nothing (e.g. after a flush or before rendering).
+     * A state flow that indicates whether the renderer currently draws nothing (e.g. after a flush or before rendering).
      *
      * @return `true` if no frame is currently rendered, `false` otherwise
      */
-    fun drawsNothing(): Boolean
+    val drawsNothing: StateFlow<Boolean>
 
     /**
      * Draws directly to the Skia [Surface] using the provided callback.

@@ -45,9 +45,25 @@ internal class SkiaRenderer(
 
     override val generationId = _generationId.asStateFlow()
 
+    private val _drawsNothing = MutableStateFlow(true)
+
+    override val drawsNothing = _drawsNothing.asStateFlow()
+
+    private fun updateState(id: Int) {
+        if (isClosed.get()) return
+
+        _generationId.value = id
+
+        _drawsNothing.value = id == DRAWS_NOTHING_ID
+    }
+
     private fun checkValid(): Boolean = !isClosed.get() && isValid.get() && !surface.isClosed && !pixmap.isClosed
 
-    override fun drawsNothing() = _generationId.value == DRAWS_NOTHING_ID
+    private fun markInvalid() {
+        isValid.set(false)
+
+        updateState(DRAWS_NOTHING_ID)
+    }
 
     override fun draw(callback: (Surface) -> Unit) = synchronized(operationLock) {
         if (checkValid()) {
@@ -85,7 +101,7 @@ internal class SkiaRenderer(
 
                     frame.onRenderComplete?.invoke(renderTime)
 
-                    _generationId.value = surface.generationId
+                    updateState(surface.generationId)
                 } catch (_: Exception) {
                     markInvalid()
                 }
@@ -105,7 +121,7 @@ internal class SkiaRenderer(
 
                     surface.flush()
 
-                    _generationId.value = DRAWS_NOTHING_ID
+                    updateState(DRAWS_NOTHING_ID)
                 } catch (_: Exception) {
                     markInvalid()
                 }
@@ -129,8 +145,6 @@ internal class SkiaRenderer(
                     if (!pixmap.isClosed) {
                         pixmap.close()
                     }
-
-                    _generationId.value = DRAWS_NOTHING_ID
                 } catch (_: Exception) {
                     try {
                         surface.close()
@@ -141,14 +155,10 @@ internal class SkiaRenderer(
                         pixmap.close()
                     } catch (_: Exception) {
                     }
+                } finally {
+                    updateState(DRAWS_NOTHING_ID)
                 }
             }
         }
-    }
-
-    private fun markInvalid() {
-        isValid.set(false)
-
-        _generationId.value = DRAWS_NOTHING_ID
     }
 }

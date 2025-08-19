@@ -1,7 +1,6 @@
 package io.github.numq.klarity.decoder
 
-import io.github.numq.klarity.format.AudioFormat
-import io.github.numq.klarity.format.VideoFormat
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.media.Media
@@ -9,8 +8,12 @@ import org.jetbrains.skia.Data
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.microseconds
 
-internal interface Decoder<Media> {
-    val media: Media
+internal interface Decoder<Format> {
+    val location: String
+
+    val duration: Duration
+
+    val format: Format
 
     suspend fun decodeAudio(): Result<Frame>
 
@@ -35,18 +38,20 @@ internal interface Decoder<Media> {
                 decodeAudioStream = false,
                 decodeVideoStream = false
             ).use { decoder ->
-                val format = decoder.format.getOrThrow()
+                val nativeFormat = decoder.format.getOrThrow()
 
-                val audioFormat = format.takeIf { fmt ->
+                val duration = nativeFormat.durationMicros.microseconds
+
+                val audioFormat = nativeFormat.takeIf { fmt ->
                     fmt.sampleRate > 0 && fmt.channels > 0
                 }?.let { fmt ->
-                    AudioFormat(sampleRate = fmt.sampleRate, channels = fmt.channels)
+                    Format.Audio(sampleRate = fmt.sampleRate, channels = fmt.channels)
                 }
 
-                val videoFormat = format.takeIf { fmt ->
+                val videoFormat = nativeFormat.takeIf { fmt ->
                     fmt.width > 0 && fmt.height > 0 && fmt.videoBufferCapacity > 0
                 }?.let { fmt ->
-                    VideoFormat(
+                    Format.Video(
                         width = fmt.width,
                         height = fmt.height,
                         frameRate = fmt.frameRate,
@@ -55,35 +60,19 @@ internal interface Decoder<Media> {
                     )
                 }
 
-                when {
-                    audioFormat != null && videoFormat != null -> Media.AudioVideo(
-                        id = decoder.getNativeHandle(),
-                        location = location,
-                        duration = format.durationMicros.microseconds,
-                        audioFormat = audioFormat,
-                        videoFormat = videoFormat
-                    )
+                check(audioFormat != null || videoFormat != null) { "Unsupported format" }
 
-                    audioFormat != null -> Media.Audio(
-                        id = decoder.getNativeHandle(),
-                        location = location,
-                        duration = format.durationMicros.microseconds,
-                        format = audioFormat
-                    )
-
-                    videoFormat != null -> Media.Video(
-                        id = decoder.getNativeHandle(),
-                        location = location,
-                        duration = format.durationMicros.microseconds,
-                        format = videoFormat
-                    )
-
-                    else -> error("Unsupported format")
-                }
+                Media(
+                    id = decoder.getNativeHandle(),
+                    location = location,
+                    duration = duration,
+                    audioFormat = audioFormat,
+                    videoFormat = videoFormat
+                )
             }
         }
 
-        fun createAudioDecoder(location: String): Result<Decoder<Media.Audio>> = runCatching {
+        fun createAudioDecoder(location: String): Result<Decoder<Format.Audio>> = runCatching {
             val nativeDecoder = NativeDecoder(
                 location = location,
                 findAudioStream = true,
@@ -93,28 +82,23 @@ internal interface Decoder<Media> {
             )
 
             try {
-                val format = nativeDecoder.format.getOrThrow()
+                val nativeFormat = nativeDecoder.format.getOrThrow()
 
-                val audioFormat = format.takeIf { fmt ->
+                val duration = nativeFormat.durationMicros.microseconds
+
+                val format = nativeFormat.takeIf { fmt ->
                     fmt.sampleRate > 0 && fmt.channels > 0
                 }?.let { fmt ->
-                    AudioFormat(
+                    Format.Audio(
                         sampleRate = fmt.sampleRate, channels = fmt.channels
                     )
                 }
 
-                requireNotNull(audioFormat) { "Could not create audio decoder for $location" }
+                requireNotNull(format) { "Could not create audio decoder for $location" }
 
-                val media = with(nativeDecoder) {
-                    Media.Audio(
-                        id = getNativeHandle(),
-                        location = location,
-                        duration = format.durationMicros.microseconds,
-                        format = audioFormat
-                    )
-                }
-
-                AudioDecoder(nativeDecoder = nativeDecoder, media = media)
+                AudioDecoder(
+                    nativeDecoder = nativeDecoder, location = location, duration = duration, format = format
+                )
             } catch (t: Throwable) {
                 nativeDecoder.close()
 
@@ -125,7 +109,7 @@ internal interface Decoder<Media> {
         fun createVideoDecoder(
             location: String,
             hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-        ): Result<Decoder<Media.Video>> = runCatching {
+        ): Result<Decoder<Format.Video>> = runCatching {
             val nativeDecoder = NativeDecoder(
                 location = location,
                 findAudioStream = false,
@@ -138,12 +122,14 @@ internal interface Decoder<Media> {
             )
 
             try {
-                val format = nativeDecoder.format.getOrThrow()
+                val nativeFormat = nativeDecoder.format.getOrThrow()
 
-                val videoFormat = format.takeIf { fmt ->
+                val duration = nativeFormat.durationMicros.microseconds
+
+                val videoFormat = nativeFormat.takeIf { fmt ->
                     fmt.width > 0 && fmt.height > 0 && fmt.videoBufferCapacity > 0
                 }?.let { fmt ->
-                    VideoFormat(
+                    Format.Video(
                         width = fmt.width,
                         height = fmt.height,
                         frameRate = fmt.frameRate,
@@ -154,16 +140,9 @@ internal interface Decoder<Media> {
 
                 requireNotNull(videoFormat) { "Could not create video decoder for $location" }
 
-                val media = with(nativeDecoder) {
-                    Media.Video(
-                        id = getNativeHandle(),
-                        location = location,
-                        duration = format.durationMicros.microseconds,
-                        format = videoFormat
-                    )
-                }
-
-                VideoDecoder(nativeDecoder = nativeDecoder, media = media)
+                VideoDecoder(
+                    nativeDecoder = nativeDecoder, location = location, duration = duration, format = videoFormat
+                )
             } catch (t: Throwable) {
                 nativeDecoder.close()
 

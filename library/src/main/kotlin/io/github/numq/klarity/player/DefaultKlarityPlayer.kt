@@ -3,7 +3,6 @@ package io.github.numq.klarity.player
 import io.github.numq.klarity.command.Command
 import io.github.numq.klarity.controller.PlayerController
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
-import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.settings.PlayerSettings
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
@@ -11,6 +10,8 @@ import kotlin.time.Duration
 internal class DefaultKlarityPlayer(
     private val playerController: PlayerController,
 ) : KlarityPlayer {
+    override val renderer = playerController.renderer
+
     override val settings = playerController.settings
 
     override val state = playerController.state
@@ -20,10 +21,6 @@ internal class DefaultKlarityPlayer(
     override val playbackTimestamp = playerController.playbackTimestamp
 
     override val events = playerController.events
-
-    override suspend fun attachRenderer(renderer: Renderer) = playerController.attachRenderer(renderer = renderer)
-
-    override suspend fun detachRenderer() = playerController.detachRenderer()
 
     override suspend fun changeSettings(
         settings: PlayerSettings,

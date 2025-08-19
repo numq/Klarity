@@ -8,16 +8,15 @@ import io.github.numq.klarity.decoder.AudioDecoderFactory
 import io.github.numq.klarity.decoder.Decoder
 import io.github.numq.klarity.decoder.VideoDecoderFactory
 import io.github.numq.klarity.event.PlayerEvent
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
-import io.github.numq.klarity.loop.buffer.BufferLoop
 import io.github.numq.klarity.loop.buffer.BufferLoopFactory
-import io.github.numq.klarity.loop.playback.PlaybackLoop
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
-import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pipeline.Pipeline
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
+import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.Destination
@@ -26,6 +25,7 @@ import io.github.numq.klarity.state.PlayerState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +42,7 @@ internal class DefaultPlayerController(
     private val bufferLoopFactory: BufferLoopFactory,
     private val playbackLoopFactory: PlaybackLoopFactory,
     private val samplerFactory: SamplerFactory,
+    private val rendererFactory: RendererFactory
 ) : PlayerController {
     private companion object {
         val SYNC_THRESHOLD = 20.milliseconds
@@ -63,24 +64,19 @@ internal class DefaultPlayerController(
      * Renderer
      */
 
-    @Volatile
-    private var renderer: Renderer? = null
+    private val _renderer = MutableStateFlow<Renderer?>(null)
+
+    override val renderer = _renderer.asStateFlow()
 
     private suspend fun renderFirstFrame(pipeline: Pipeline) = with(pipeline) {
-        when (this) {
-            is Pipeline.Audio -> null
-
-            is Pipeline.Video -> pool to decoder
-
-            is Pipeline.AudioVideo -> videoPool to videoDecoder
-        }?.let { (pool, decoder) ->
+        pipeline.videoPipeline?.run { ->
             val data = pool.acquire().getOrThrow()
 
             try {
                 val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
 
                 if (frame != null) {
-                    renderer?.render(frame)?.getOrThrow()
+                    renderer.render(frame).getOrThrow()
                 }
             } finally {
                 pool.release(item = data).getOrThrow()
@@ -100,6 +96,7 @@ internal class DefaultPlayerController(
      * State
      */
 
+    @Volatile
     internal var onInternalPlayerState: ((InternalPlayerState) -> Unit)? = null
 
     private val internalState = MutableStateFlow<InternalPlayerState>(InternalPlayerState.Empty)
@@ -211,13 +208,7 @@ internal class DefaultPlayerController(
         withTransition(Destination.COMPLETED) {
             playbackLoop.stop().getOrThrow()
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
-
-                is Pipeline.Video -> Unit
-
-                is Pipeline.AudioVideo -> pipeline.sampler.stop().getOrThrow()
-            }
+            pipeline.audioPipeline?.sampler?.stop()?.getOrThrow()
         }
     }
 
@@ -227,161 +218,129 @@ internal class DefaultPlayerController(
 
     private val commandMutex = Mutex()
 
+    private suspend fun createAudioPipeline(
+        location: String, audioBufferSize: Int, format: Format.Audio
+    ): Pipeline.AudioPipeline {
+        val decoder = audioDecoderFactory.create(
+            parameters = AudioDecoderFactory.Parameters(location = location)
+        ).getOrThrow()
+
+        val buffer = bufferFactory.create(
+            parameters = BufferFactory.Parameters(capacity = audioBufferSize)
+        ).onFailure {
+            decoder.close().getOrThrow()
+
+            throw it
+        }.getOrThrow()
+
+        val sampler = samplerFactory.create(
+            parameters = SamplerFactory.Parameters(
+                sampleRate = format.sampleRate, channels = format.channels
+            )
+        ).onFailure {
+            buffer.close().getOrThrow()
+
+            decoder.close().getOrThrow()
+
+            throw it
+        }.getOrThrow()
+
+        return Pipeline.AudioPipeline(
+            decoder = decoder, buffer = buffer, sampler = sampler
+        )
+    }
+
+    private suspend fun createVideoPipeline(
+        location: String,
+        videoBufferSize: Int,
+        hardwareAccelerationCandidates: List<HardwareAcceleration>?,
+        format: Format.Video
+    ): Pipeline.VideoPipeline {
+        val pool = poolFactory.create(
+            parameters = PoolFactory.Parameters(poolCapacity = videoBufferSize, createData = {
+                Data.makeUninitialized(format.bufferCapacity)
+            })
+        ).getOrThrow()
+
+        val decoder = videoDecoderFactory.create(
+            parameters = VideoDecoderFactory.Parameters(
+                location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
+            )
+        ).onFailure {
+            pool.close().getOrThrow()
+
+            throw it
+        }.getOrThrow()
+
+        val buffer = bufferFactory.create(
+            parameters = BufferFactory.Parameters(capacity = videoBufferSize)
+        ).onFailure {
+            decoder.close().getOrThrow()
+
+            pool.close().getOrThrow()
+
+            throw it
+        }.getOrThrow()
+
+        val renderer = rendererFactory.create(
+            parameters = RendererFactory.Parameters(width = format.width, height = format.height),
+        ).onFailure {
+            buffer.close().getOrThrow()
+
+            decoder.close().getOrThrow()
+
+            pool.close().getOrThrow()
+
+            throw it
+        }.getOrThrow()
+
+        return Pipeline.VideoPipeline(decoder = decoder, pool = pool, buffer = buffer, renderer = renderer)
+    }
+
     private suspend fun handlePrepare(
         location: String,
         audioBufferSize: Int,
         videoBufferSize: Int,
         hardwareAccelerationCandidates: List<HardwareAcceleration>?,
-    ): Triple<Pipeline, BufferLoop, PlaybackLoop> {
+    ) = coroutineScope {
         val media = Decoder.probe(
             location = location, findAudioStream = audioBufferSize > 0, findVideoStream = videoBufferSize > 0
         ).getOrThrow()
 
         check(!media.duration.isNegative()) { "Media does not support playback" }
 
-        val pipeline = when (media) {
-            is Media.Audio -> with(media) {
-                val decoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(location = location)
-                ).getOrThrow()
-
-                val buffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = audioBufferSize)
-                ).onFailure {
-                    decoder.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val sampler = samplerFactory.create(
-                    parameters = SamplerFactory.Parameters(
-                        sampleRate = format.sampleRate, channels = format.channels
-                    )
-                ).onFailure {
-                    buffer.close().getOrThrow()
-
-                    decoder.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                Pipeline.Audio(
-                    media = media, decoder = decoder, buffer = buffer, sampler = sampler
-                )
-            }
-
-            is Media.Video -> with(media) {
-                val pool = poolFactory.create(
-                    parameters = PoolFactory.Parameters(poolCapacity = videoBufferSize, createData = {
-                        Data.makeUninitialized(videoFormat.bufferCapacity)
-                    })
-                ).getOrThrow()
-
-                val decoder = videoDecoderFactory.create(
-                    parameters = VideoDecoderFactory.Parameters(
-                        location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
-                    )
-                ).onFailure {
-                    pool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val buffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = videoBufferSize)
-                ).onFailure {
-                    decoder.close().getOrThrow()
-
-                    pool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                Pipeline.Video(media = media, decoder = decoder, pool = pool, buffer = buffer)
-            }
-
-            is Media.AudioVideo -> with(media) {
-                val videoPool = poolFactory.create(
-                    parameters = PoolFactory.Parameters(poolCapacity = videoBufferSize, createData = {
-                        Data.makeUninitialized(videoFormat.bufferCapacity)
-                    })
-                ).getOrThrow()
-
-                val audioDecoder = audioDecoderFactory.create(
-                    parameters = AudioDecoderFactory.Parameters(location = location)
-                ).onFailure {
-                    videoPool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val videoDecoder = videoDecoderFactory.create(
-                    parameters = VideoDecoderFactory.Parameters(
-                        location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
-                    )
-                ).onFailure {
-                    videoPool.close().getOrThrow()
-
-                    audioDecoder.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val audioBuffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = audioBufferSize)
-                ).onFailure {
-                    videoDecoder.close().getOrThrow()
-
-                    audioDecoder.close().getOrThrow()
-
-                    videoPool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val videoBuffer = bufferFactory.create(
-                    parameters = BufferFactory.Parameters(capacity = videoBufferSize)
-                ).onFailure {
-                    audioBuffer.clear().getOrThrow()
-
-                    videoDecoder.close().getOrThrow()
-
-                    audioDecoder.close().getOrThrow()
-
-                    videoPool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                val sampler = samplerFactory.create(
-                    parameters = SamplerFactory.Parameters(
-                        sampleRate = audioFormat.sampleRate, channels = audioFormat.channels
-                    )
-                ).onFailure {
-                    videoBuffer.clear().getOrThrow()
-
-                    audioBuffer.clear().getOrThrow()
-
-                    videoDecoder.close().getOrThrow()
-
-                    audioDecoder.close().getOrThrow()
-
-                    videoPool.close().getOrThrow()
-
-                    throw it
-                }.getOrThrow()
-
-                Pipeline.AudioVideo(
-                    media = media,
-                    audioDecoder = audioDecoder,
-                    videoDecoder = videoDecoder,
-                    videoPool = videoPool,
-                    audioBuffer = audioBuffer,
-                    videoBuffer = videoBuffer,
-                    sampler = sampler
+        val deferredAudio = async {
+            media.audioFormat?.let { format ->
+                createAudioPipeline(
+                    location = location, audioBufferSize = audioBufferSize, format = format
                 )
             }
         }
+
+        val deferredVideo = async {
+            media.videoFormat?.let { format ->
+                createVideoPipeline(
+                    location = location,
+                    videoBufferSize = videoBufferSize,
+                    hardwareAccelerationCandidates = hardwareAccelerationCandidates,
+                    format = format
+                )
+            }
+        }
+
+        val (audioPipeline, videoPipeline) = awaitAll(deferredAudio, deferredVideo)
+
+        val pipeline = Pipeline(
+            media = media,
+            audioPipeline = audioPipeline as? Pipeline.AudioPipeline,
+            videoPipeline = videoPipeline as? Pipeline.VideoPipeline
+        )
+
+        val renderJob = launch {
+            renderFirstFrame(pipeline = pipeline)
+        }
+
+        _renderer.emit(pipeline.videoPipeline?.renderer)
 
         val bufferLoop = bufferLoopFactory.create(
             parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
@@ -393,11 +352,11 @@ internal class DefaultPlayerController(
 
         val playbackLoop = playbackLoopFactory.create(
             parameters = PlaybackLoopFactory.Parameters(
+                media = media,
                 pipeline = pipeline,
                 syncThreshold = SYNC_THRESHOLD,
                 getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
-                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
-                getRenderer = { renderer })
+                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor })
         ).onFailure {
             bufferLoop.close().getOrThrow()
 
@@ -406,23 +365,13 @@ internal class DefaultPlayerController(
             throw it
         }.getOrThrow()
 
-        renderFirstFrame(pipeline = pipeline)
+        renderJob.join()
 
-        bufferTimestamp.emit(Duration.ZERO)
-
-        playbackTimestamp.emit(Duration.ZERO)
-
-        return Triple(pipeline, bufferLoop, playbackLoop)
+        Triple(pipeline, bufferLoop, playbackLoop)
     }
 
     private suspend fun InternalPlayerState.Ready.handlePlay() {
-        when (val pipeline = pipeline) {
-            is Pipeline.Audio -> pipeline.sampler.start().getOrThrow()
-
-            is Pipeline.Video -> Unit
-
-            is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
-        }
+        pipeline.audioPipeline?.sampler?.start()?.getOrThrow()
 
         playbackLoop.start(
             coroutineScope = playbackScope,
@@ -444,23 +393,11 @@ internal class DefaultPlayerController(
     private suspend fun InternalPlayerState.Ready.handlePause() {
         playbackLoop.stop().getOrThrow()
 
-        when (val pipeline = pipeline) {
-            is Pipeline.Audio -> pipeline.sampler.stop().getOrThrow()
-
-            is Pipeline.Video -> Unit
-
-            is Pipeline.AudioVideo -> pipeline.sampler.stop().getOrThrow()
-        }
+        pipeline.audioPipeline?.sampler?.stop()?.getOrThrow()
     }
 
     private suspend fun InternalPlayerState.Ready.handleResume() {
-        when (val pipeline = pipeline) {
-            is Pipeline.Audio -> pipeline.sampler.start().getOrThrow()
-
-            is Pipeline.Video -> Unit
-
-            is Pipeline.AudioVideo -> pipeline.sampler.start().getOrThrow()
-        }
+        pipeline.audioPipeline?.sampler?.start()?.getOrThrow()
 
         playbackLoop.start(
             coroutineScope = playbackScope,
@@ -476,43 +413,27 @@ internal class DefaultPlayerController(
 
         bufferLoop.stop().getOrThrow()
 
-        when (val pipeline = pipeline) {
-            is Pipeline.Audio -> with(pipeline) {
+        val audioJob = pipeline.audioPipeline?.run {
+            controllerScope.launch {
                 sampler.flush().getOrThrow()
 
                 buffer.clear().getOrThrow()
 
                 decoder.reset().getOrThrow()
             }
+        }
 
-            is Pipeline.Video -> with(pipeline) {
+        val videoJob = pipeline.videoPipeline?.run {
+            controllerScope.launch {
                 buffer.clear().getOrThrow()
 
                 pool.reset().getOrThrow()
 
                 decoder.reset().getOrThrow()
             }
-
-            is Pipeline.AudioVideo -> with(pipeline) {
-                val audioJob = controllerScope.launch {
-                    sampler.flush().getOrThrow()
-
-                    audioBuffer.clear().getOrThrow()
-
-                    audioDecoder.reset().getOrThrow()
-                }
-
-                val videoJob = controllerScope.launch {
-                    videoBuffer.clear().getOrThrow()
-
-                    videoPool.reset().getOrThrow()
-
-                    videoDecoder.reset().getOrThrow()
-                }
-
-                joinAll(audioJob, videoJob)
-            }
         }
+
+        listOfNotNull(audioJob, videoJob).joinAll()
 
         renderFirstFrame(pipeline = pipeline)
 
@@ -531,78 +452,46 @@ internal class DefaultPlayerController(
 
             bufferLoop.stop().getOrThrow()
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Audio -> with(pipeline) {
+            val audioJob = pipeline.audioPipeline?.run {
+                controllerScope.launch {
                     sampler.flush().getOrThrow()
 
                     buffer.clear().getOrThrow()
 
                     decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                 }
+            }
 
-                is Pipeline.Video -> with(pipeline) {
+            val videoJob = pipeline.videoPipeline?.run {
+                controllerScope.launch {
                     buffer.clear().getOrThrow()
 
                     pool.reset().getOrThrow()
 
                     decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                 }
-
-                is Pipeline.AudioVideo -> with(pipeline) {
-                    val audioJob = controllerScope.launch {
-                        sampler.flush().getOrThrow()
-
-                        audioBuffer.clear().getOrThrow()
-
-                        audioDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
-                    }
-
-                    val videoJob = controllerScope.launch {
-                        videoBuffer.clear().getOrThrow()
-
-                        videoPool.reset().getOrThrow()
-
-                        videoDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
-                    }
-
-                    joinAll(audioJob, videoJob)
-                }
             }
+
+            listOfNotNull(audioJob, videoJob).joinAll()
 
             var timestampAfterSeek = timestamp
 
-            when (val pipeline = pipeline) {
-                is Pipeline.Audio -> with(pipeline) {
-                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
+            when {
+                pipeline.audioPipeline != null && pipeline.videoPipeline != null -> {
+                    val audioPipeline = pipeline.audioPipeline as Pipeline.AudioPipeline
 
-                    val frame = decoder.decodeAudio().getOrThrow()
+                    val videoPipeline = pipeline.videoPipeline as Pipeline.VideoPipeline
 
-                    buffer.put(item = frame).getOrThrow()
+                    val audioDecoder = audioPipeline.decoder
 
-                    (frame as? Frame.Content.Audio)?.timestamp?.let { timestamp ->
-                        timestampAfterSeek = timestamp
-                    }
-                }
+                    val audioBuffer = audioPipeline.buffer
 
-                is Pipeline.Video -> with(pipeline) {
-                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
+                    val videoDecoder = videoPipeline.decoder
 
-                    val data = pool.acquire().getOrThrow()
+                    val videoPool = videoPipeline.pool
 
-                    try {
-                        val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
+                    val renderer = videoPipeline.renderer
 
-                        if (frame != null) {
-                            renderer?.render(frame)?.getOrThrow()
-
-                            timestampAfterSeek = frame.timestamp
-                        }
-                    } finally {
-                        pool.release(item = data).getOrThrow()
-                    }
-                }
-
-                is Pipeline.AudioVideo -> with(pipeline) {
                     val seekAudioJob = controllerScope.launch {
                         audioDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                     }
@@ -626,9 +515,8 @@ internal class DefaultPlayerController(
                             val data = videoPool.acquire().getOrThrow()
 
                             try {
-                                val videoFrame = videoDecoder.decodeVideo(
-                                    data = data
-                                ).getOrThrow() as? Frame.Content.Video ?: break
+                                val videoFrame =
+                                    videoDecoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video ?: break
 
                                 videoTimestamp = videoFrame.timestamp
 
@@ -638,7 +526,7 @@ internal class DefaultPlayerController(
                                     videoFrame.timestamp - audioTimestamp < -SYNC_THRESHOLD -> continue
                                 }
 
-                                renderer?.render(videoFrame)?.getOrThrow()
+                                renderer.render(videoFrame).getOrThrow()
 
                                 break
                             } finally {
@@ -648,6 +536,36 @@ internal class DefaultPlayerController(
                     }.join()
 
                     timestampAfterSeek = listOfNotNull(audioTimestamp, videoTimestamp).max()
+                }
+
+                pipeline.audioPipeline != null -> (pipeline.audioPipeline)?.run {
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
+
+                    val frame = decoder.decodeAudio().getOrThrow()
+
+                    buffer.put(item = frame).getOrThrow()
+
+                    (frame as? Frame.Content.Audio)?.timestamp?.let { timestamp ->
+                        timestampAfterSeek = timestamp
+                    }
+                }
+
+                pipeline.videoPipeline != null -> pipeline.videoPipeline?.run {
+                    decoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
+
+                    val data = pool.acquire().getOrThrow()
+
+                    try {
+                        val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
+
+                        if (frame != null) {
+                            renderer.render(frame).getOrThrow()
+
+                            timestampAfterSeek = frame.timestamp
+                        }
+                    } finally {
+                        pool.release(item = data).getOrThrow()
+                    }
                 }
             }
 
@@ -673,29 +591,11 @@ internal class DefaultPlayerController(
         bufferLoop.close().getOrThrow()
 
         pipeline.close().getOrThrow()
-
-        bufferTimestamp.emit(Duration.ZERO)
-
-        playbackTimestamp.emit(Duration.ZERO)
     }
 
     private val _events = Channel<PlayerEvent>(Channel.BUFFERED)
 
     override val events = _events.receiveAsFlow()
-
-    override suspend fun attachRenderer(renderer: Renderer) = runCatching {
-        check(this.renderer == null) { "Detach the renderer before attaching a new one" }
-
-        this.renderer = renderer
-    }
-
-    override suspend fun detachRenderer() = runCatching {
-        val previousRenderer = renderer
-
-        renderer = null
-
-        previousRenderer
-    }
 
     override suspend fun changeSettings(newSettings: PlayerSettings) = commandMutex.withLock {
         runCatching {
@@ -741,6 +641,12 @@ internal class DefaultPlayerController(
                             )
                         } catch (t: Throwable) {
                             updateInternalState(InternalPlayerState.Error(cause = t, previous = state))
+
+                            _renderer.emit(null)
+                        } finally {
+                            bufferTimestamp.emit(Duration.ZERO)
+
+                            playbackTimestamp.emit(Duration.ZERO)
                         }
                     }
 
@@ -813,11 +719,9 @@ internal class DefaultPlayerController(
 
                 is Command.SeekTo -> when (val state = internalState.value) {
                     is InternalPlayerState.Ready -> when (state) {
-                        is InternalPlayerState.Ready.Playing,
-                        is InternalPlayerState.Ready.Paused,
-                        is InternalPlayerState.Ready.Stopped,
-                        is InternalPlayerState.Ready.Completed
-                            -> with(state) {
+                        is InternalPlayerState.Ready.Playing, is InternalPlayerState.Ready.Paused, is InternalPlayerState.Ready.Stopped, is InternalPlayerState.Ready.Completed -> with(
+                            state
+                        ) {
                             if (!media.isContinuous()) {
                                 return@runCatching
                             }
@@ -847,9 +751,19 @@ internal class DefaultPlayerController(
                     is InternalPlayerState.Ready -> {
                         updateInternalState(InternalPlayerState.Releasing(previousState = state))
 
-                        state.handleRelease()
+                        _renderer.emit(null)
 
-                        updateInternalState(InternalPlayerState.Empty)
+                        try {
+                            state.handleRelease()
+
+                            updateInternalState(InternalPlayerState.Empty)
+                        } catch (t: Throwable) {
+                            updateInternalState(InternalPlayerState.Error(cause = t, previous = state))
+                        } finally {
+                            bufferTimestamp.emit(Duration.ZERO)
+
+                            playbackTimestamp.emit(Duration.ZERO)
+                        }
                     }
 
                     else -> return@runCatching
@@ -862,20 +776,16 @@ internal class DefaultPlayerController(
         runCatching {
             controllerScope.cancel()
 
-            when (val currentState = internalState.value) {
-                is InternalPlayerState.Empty,
-                is InternalPlayerState.Preparing,
-                is InternalPlayerState.Releasing,
-                is InternalPlayerState.Error,
-                    -> Unit
-
-                is InternalPlayerState.Ready -> with(currentState) {
+            when (val state = internalState.value) {
+                is InternalPlayerState.Ready -> with(state) {
                     playbackLoop.close().getOrThrow()
 
                     bufferLoop.close().getOrThrow()
 
                     pipeline.close().getOrThrow()
                 }
+
+                else -> return@runCatching
             }
         }
     }

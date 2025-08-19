@@ -2,80 +2,49 @@ package io.github.numq.klarity.pipeline
 
 import io.github.numq.klarity.buffer.Buffer
 import io.github.numq.klarity.decoder.Decoder
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pool.Pool
+import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.Sampler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jetbrains.skia.Data
 
-internal sealed interface Pipeline {
-    val media: Media
-
-    suspend fun close(): Result<Unit>
-
-    data class Audio(
-        override val media: Media.Audio,
-        val decoder: Decoder<Media.Audio>,
-        val buffer: Buffer<Frame>,
-        val sampler: Sampler,
-    ) : Pipeline {
-        override suspend fun close() = runCatching {
-            sampler.close().getOrThrow()
-
-            buffer.close().getOrThrow()
-
-            decoder.close().getOrThrow()
+internal data class Pipeline(
+    val media: Media, val audioPipeline: AudioPipeline?, val videoPipeline: VideoPipeline?
+) : CloseablePipeline {
+    internal data class AudioPipeline(
+        val decoder: Decoder<Format.Audio>, val buffer: Buffer<Frame>, val sampler: Sampler
+    ) : CloseablePipeline {
+        override suspend fun close() = listOf(
+            suspend { sampler.close() },
+            suspend { buffer.close() },
+            suspend { decoder.close() }).fold(Result.success(Unit)) { acc, op ->
+            acc.fold(onSuccess = { op() }, onFailure = { acc })
         }
     }
 
-    data class Video(
-        override val media: Media.Video,
-        val decoder: Decoder<Media.Video>,
-        val pool: Pool<Data>,
-        val buffer: Buffer<Frame>
-    ) : Pipeline {
-        override suspend fun close() = runCatching {
-            buffer.close().getOrThrow()
-
-            decoder.close().getOrThrow()
-
-            pool.close().getOrThrow()
+    internal data class VideoPipeline(
+        val decoder: Decoder<Format.Video>, val pool: Pool<Data>, val buffer: Buffer<Frame>, val renderer: Renderer
+    ) : CloseablePipeline {
+        override suspend fun close() = listOf(
+            suspend { renderer.close() },
+            suspend { buffer.close() },
+            suspend { decoder.close() },
+            suspend { pool.close() }).fold(Result.success(Unit)) { acc, op ->
+            acc.fold(onSuccess = { op() }, onFailure = { acc })
         }
     }
 
-    data class AudioVideo(
-        override val media: Media.AudioVideo,
-        val audioDecoder: Decoder<Media.Audio>,
-        val videoDecoder: Decoder<Media.Video>,
-        val videoPool: Pool<Data>,
-        val audioBuffer: Buffer<Frame>,
-        val videoBuffer: Buffer<Frame>,
-        val sampler: Sampler
-    ) : Pipeline {
-        override suspend fun close() = runCatching {
-            coroutineScope {
-                val audioJob = async {
-                    sampler.close()
-
-                    audioBuffer.close()
-
-                    audioDecoder.close()
-                }
-
-                val videoJob = async {
-                    videoBuffer.close()
-
-                    videoDecoder.close()
-
-                    videoPool.close()
-                }
-
-                awaitAll(audioJob, videoJob).fold(Result.success(Unit)) { acc, result ->
-                    acc.fold(onSuccess = { result }, onFailure = { acc })
-                }.getOrThrow()
+    override suspend fun close() = runCatching {
+        coroutineScope {
+            listOfNotNull(
+                audioPipeline?.let { pipeline -> async { pipeline.close() } },
+                videoPipeline?.let { pipeline -> async { pipeline.close() } }).awaitAll().forEach { result ->
+                result.getOrThrow()
             }
         }
     }

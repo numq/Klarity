@@ -1,7 +1,7 @@
 package io.github.numq.klarity.decoder
 
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
-import io.github.numq.klarity.media.Media
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
@@ -10,8 +10,10 @@ import kotlin.time.Duration.Companion.microseconds
 
 internal class VideoDecoder(
     private val nativeDecoder: NativeDecoder,
-    override val media: Media.Video,
-) : Decoder<Media.Video> {
+    override val location: String,
+    override val duration: Duration,
+    override val format: Format.Video
+) : Decoder<Format.Video> {
     private val mutex = Mutex()
 
     override suspend fun decodeAudio() = error("Decoder does not support audio")

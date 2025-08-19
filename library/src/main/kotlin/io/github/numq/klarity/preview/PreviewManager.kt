@@ -1,7 +1,7 @@
 package io.github.numq.klarity.preview
 
 import io.github.numq.klarity.decoder.VideoDecoderFactory
-import io.github.numq.klarity.format.VideoFormat
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
@@ -15,7 +15,7 @@ interface PreviewManager {
     /**
      * Video format of the media used.
      */
-    val format: VideoFormat
+    val format: Format.Video
 
     /**
      * Seeks to the specified timestamp and renders the corresponding frame.
@@ -62,7 +62,7 @@ interface PreviewManager {
             PoolFactory().create(
                 parameters = PoolFactory.Parameters(
                     poolCapacity = POOL_CAPACITY, createData = {
-                        Data.makeUninitialized(decoder.media.videoFormat.bufferCapacity)
+                        Data.makeUninitialized(decoder.format.bufferCapacity)
                     })
             ).mapCatching { pool ->
                 DefaultPreviewManager(decoder = decoder, pool = pool)

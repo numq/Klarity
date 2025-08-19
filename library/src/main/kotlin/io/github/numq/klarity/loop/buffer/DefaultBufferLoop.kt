@@ -1,27 +1,19 @@
 package io.github.numq.klarity.loop.buffer
 
-import io.github.numq.klarity.buffer.Buffer
-import io.github.numq.klarity.decoder.AudioDecoder
-import io.github.numq.klarity.decoder.VideoDecoder
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.pipeline.Pipeline
-import io.github.numq.klarity.pool.Pool
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.jetbrains.skia.Data
 import kotlin.time.Duration
 
 internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     private val mutex = Mutex()
 
+    @Volatile
     private var job: Job? = null
 
-    private suspend fun handleAudioBuffer(
-        decoder: AudioDecoder,
-        buffer: Buffer<Frame>,
-        onTimestamp: suspend (Duration) -> Unit,
-    ) {
+    private suspend fun Pipeline.AudioPipeline.handleAudioBuffer(onTimestamp: suspend (Duration) -> Unit) {
         while (currentCoroutineContext().isActive) {
             when (val frame = decoder.decodeAudio().getOrThrow()) {
                 is Frame.Content.Audio -> {
@@ -47,12 +39,7 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
         }
     }
 
-    private suspend fun handleVideoBuffer(
-        decoder: VideoDecoder,
-        pool: Pool<Data>,
-        buffer: Buffer<Frame>,
-        onTimestamp: suspend (Duration) -> Unit,
-    ) {
+    private suspend fun Pipeline.VideoPipeline.handleVideoBuffer(onTimestamp: suspend (Duration) -> Unit) {
         while (currentCoroutineContext().isActive) {
             val data = pool.acquire().getOrThrow()
 
@@ -105,48 +92,29 @@ internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
 
             job = coroutineScope.launch(context = coroutineExceptionHandler) {
                 with(pipeline) {
-                    when (this) {
-                        is Pipeline.Audio -> handleAudioBuffer(
-                            decoder = decoder as AudioDecoder, buffer = buffer, onTimestamp = onTimestamp
-                        )
+                    var lastFrameTimestamp = Duration.ZERO
 
-                        is Pipeline.Video -> handleVideoBuffer(
-                            decoder = decoder as VideoDecoder, pool = pool, buffer = buffer, onTimestamp = onTimestamp
-                        )
+                    val audioJob = launch {
+                        audioPipeline?.handleAudioBuffer(onTimestamp = { frameTimestamp ->
+                            if (frameTimestamp > lastFrameTimestamp) {
+                                onTimestamp(frameTimestamp)
 
-                        is Pipeline.AudioVideo -> {
-                            var lastFrameTimestamp = Duration.ZERO
-
-                            val audioJob = launch {
-                                handleAudioBuffer(
-                                    decoder = audioDecoder as AudioDecoder,
-                                    buffer = audioBuffer,
-                                    onTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
-
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    })
+                                lastFrameTimestamp = frameTimestamp
                             }
-
-                            val videoJob = launch {
-                                handleVideoBuffer(
-                                    decoder = videoDecoder as VideoDecoder,
-                                    pool = videoPool,
-                                    buffer = videoBuffer,
-                                    onTimestamp = { frameTimestamp ->
-                                        if (frameTimestamp > lastFrameTimestamp) {
-                                            onTimestamp(frameTimestamp)
-
-                                            lastFrameTimestamp = frameTimestamp
-                                        }
-                                    })
-                            }
-
-                            joinAll(audioJob, videoJob)
-                        }
+                        })
                     }
+
+                    val videoJob = launch {
+                        videoPipeline?.handleVideoBuffer(onTimestamp = { frameTimestamp ->
+                            if (frameTimestamp > lastFrameTimestamp) {
+                                onTimestamp(frameTimestamp)
+
+                                lastFrameTimestamp = frameTimestamp
+                            }
+                        })
+                    }
+
+                    joinAll(audioJob, videoJob)
 
                     ensureActive()
 

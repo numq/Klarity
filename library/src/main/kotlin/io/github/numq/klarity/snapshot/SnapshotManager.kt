@@ -32,13 +32,13 @@ object SnapshotManager {
             location = location, hardwareAccelerationCandidates = hardwareAccelerationCandidates
         )
     ).mapCatching { decoder ->
-        val format = decoder.media.videoFormat
+        val format = decoder.format
 
         val frames = mutableListOf<Frame.Content.Video>()
 
         try {
-            timestamps(decoder.media.duration).filter {
-                it in Duration.ZERO..decoder.media.duration
+            timestamps(decoder.duration).filter {
+                it in Duration.ZERO..decoder.duration
             }.forEach { timestamp ->
                 decoder.seekTo(timestamp = timestamp, keyFramesOnly = keyFramesOnly).getOrThrow()
 
