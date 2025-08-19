@@ -340,8 +340,6 @@ internal class DefaultPlayerController(
             renderFirstFrame(pipeline = pipeline)
         }
 
-        _renderer.emit(pipeline.videoPipeline?.renderer)
-
         val bufferLoop = bufferLoopFactory.create(
             parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
         ).onFailure {
@@ -366,6 +364,8 @@ internal class DefaultPlayerController(
         }.getOrThrow()
 
         renderJob.join()
+
+        _renderer.emit(pipeline.videoPipeline?.renderer)
 
         Triple(pipeline, bufferLoop, playbackLoop)
     }
