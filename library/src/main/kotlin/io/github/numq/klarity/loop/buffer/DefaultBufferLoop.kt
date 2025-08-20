@@ -10,7 +10,6 @@ import kotlin.time.Duration
 internal class DefaultBufferLoop(private val pipeline: Pipeline) : BufferLoop {
     private val mutex = Mutex()
 
-    @Volatile
     private var job: Job? = null
 
     private suspend fun Pipeline.AudioPipeline.handleAudioBuffer(onTimestamp: suspend (Duration) -> Unit) {

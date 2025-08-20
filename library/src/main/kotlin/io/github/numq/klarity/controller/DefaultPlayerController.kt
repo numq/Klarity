@@ -16,7 +16,6 @@ import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pipeline.Pipeline
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
-import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.Destination
@@ -25,11 +24,11 @@ import io.github.numq.klarity.state.PlayerState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jetbrains.skia.Data
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -41,8 +40,7 @@ internal class DefaultPlayerController(
     private val bufferFactory: BufferFactory,
     private val bufferLoopFactory: BufferLoopFactory,
     private val playbackLoopFactory: PlaybackLoopFactory,
-    private val samplerFactory: SamplerFactory,
-    private val rendererFactory: RendererFactory
+    private val samplerFactory: SamplerFactory
 ) : PlayerController {
     private companion object {
         val SYNC_THRESHOLD = 20.milliseconds
@@ -61,30 +59,6 @@ internal class DefaultPlayerController(
     private val controllerScope = CoroutineScope(Dispatchers.Default + supervisorJob + CoroutineName("ControllerScope"))
 
     /**
-     * Renderer
-     */
-
-    private val _renderer = MutableStateFlow<Renderer?>(null)
-
-    override val renderer = _renderer.asStateFlow()
-
-    private suspend fun renderFirstFrame(pipeline: Pipeline) = with(pipeline) {
-        pipeline.videoPipeline?.run { ->
-            val data = pool.acquire().getOrThrow()
-
-            try {
-                val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
-
-                if (frame != null) {
-                    renderer.render(frame).getOrThrow()
-                }
-            } finally {
-                pool.release(item = data).getOrThrow()
-            }
-        }
-    }
-
-    /**
      * Settings
      */
 
@@ -96,7 +70,6 @@ internal class DefaultPlayerController(
      * State
      */
 
-    @Volatile
     internal var onInternalPlayerState: ((InternalPlayerState) -> Unit)? = null
 
     private val internalState = MutableStateFlow<InternalPlayerState>(InternalPlayerState.Empty)
@@ -213,6 +186,40 @@ internal class DefaultPlayerController(
     }
 
     /**
+     * Renderer
+     */
+
+    private val rendererRef = AtomicReference<Renderer?>(null)
+
+    private fun getRenderer() = rendererRef.get()
+
+    private suspend fun renderNextFrame(videoPipeline: Pipeline.VideoPipeline) {
+        val renderer = getRenderer() ?: return
+
+        with(videoPipeline) {
+            val data = pool.acquire().getOrThrow()
+
+            try {
+                val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
+
+                if (frame != null) {
+                    renderer.render(frame).getOrThrow()
+                }
+            } finally {
+                pool.release(item = data).getOrThrow()
+            }
+        }
+    }
+
+    override suspend fun attachRenderer(renderer: Renderer) = runCatching {
+        rendererRef.set(renderer)
+    }
+
+    override suspend fun detachRenderer() = runCatching {
+        rendererRef.getAndSet(null)
+    }
+
+    /**
      * Command
      */
 
@@ -282,19 +289,7 @@ internal class DefaultPlayerController(
             throw it
         }.getOrThrow()
 
-        val renderer = rendererFactory.create(
-            parameters = RendererFactory.Parameters(width = format.width, height = format.height),
-        ).onFailure {
-            buffer.close().getOrThrow()
-
-            decoder.close().getOrThrow()
-
-            pool.close().getOrThrow()
-
-            throw it
-        }.getOrThrow()
-
-        return Pipeline.VideoPipeline(decoder = decoder, pool = pool, buffer = buffer, renderer = renderer)
+        return Pipeline.VideoPipeline(decoder = decoder, pool = pool, buffer = buffer)
     }
 
     private suspend fun handlePrepare(
@@ -328,17 +323,23 @@ internal class DefaultPlayerController(
             }
         }
 
-        val (audioPipeline, videoPipeline) = awaitAll(deferredAudio, deferredVideo)
+        val (closeableAudioPipeline, closeableVideoPipeline) = awaitAll(deferredAudio, deferredVideo)
+
+        val audioPipeline = closeableAudioPipeline as? Pipeline.AudioPipeline
+
+        val videoPipeline = closeableVideoPipeline as? Pipeline.VideoPipeline
+
+        var renderJob: Job? = null
+
+        if (videoPipeline != null) {
+            renderJob = launch {
+                renderNextFrame(videoPipeline = videoPipeline)
+            }
+        }
 
         val pipeline = Pipeline(
-            media = media,
-            audioPipeline = audioPipeline as? Pipeline.AudioPipeline,
-            videoPipeline = videoPipeline as? Pipeline.VideoPipeline
+            media = media, audioPipeline = audioPipeline, videoPipeline = videoPipeline
         )
-
-        val renderJob = launch {
-            renderFirstFrame(pipeline = pipeline)
-        }
 
         val bufferLoop = bufferLoopFactory.create(
             parameters = BufferLoopFactory.Parameters(pipeline = pipeline)
@@ -354,7 +355,9 @@ internal class DefaultPlayerController(
                 pipeline = pipeline,
                 syncThreshold = SYNC_THRESHOLD,
                 getVolume = { if (settings.value.isMuted) 0f else settings.value.volume },
-                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor })
+                getPlaybackSpeedFactor = { settings.value.playbackSpeedFactor },
+                getRenderer = ::getRenderer
+            )
         ).onFailure {
             bufferLoop.close().getOrThrow()
 
@@ -363,9 +366,7 @@ internal class DefaultPlayerController(
             throw it
         }.getOrThrow()
 
-        renderJob.join()
-
-        _renderer.emit(pipeline.videoPipeline?.renderer)
+        renderJob?.join()
 
         Triple(pipeline, bufferLoop, playbackLoop)
     }
@@ -423,19 +424,19 @@ internal class DefaultPlayerController(
             }
         }
 
-        val videoJob = pipeline.videoPipeline?.run {
+        val videoJob = pipeline.videoPipeline?.run videoPipeline@{
             controllerScope.launch {
                 buffer.clear().getOrThrow()
 
                 pool.reset().getOrThrow()
 
                 decoder.reset().getOrThrow()
+
+                renderNextFrame(videoPipeline = this@videoPipeline)
             }
         }
 
         listOfNotNull(audioJob, videoJob).joinAll()
-
-        renderFirstFrame(pipeline = pipeline)
 
         bufferTimestamp.emit(Duration.ZERO)
 
@@ -490,8 +491,6 @@ internal class DefaultPlayerController(
 
                     val videoPool = videoPipeline.pool
 
-                    val renderer = videoPipeline.renderer
-
                     val seekAudioJob = controllerScope.launch {
                         audioDecoder.seekTo(timestamp = timestamp, keyFramesOnly = true).getOrThrow()
                     }
@@ -526,7 +525,7 @@ internal class DefaultPlayerController(
                                     videoFrame.timestamp - audioTimestamp < -SYNC_THRESHOLD -> continue
                                 }
 
-                                renderer.render(videoFrame).getOrThrow()
+                                rendererRef.get()?.render(videoFrame)?.getOrThrow()
 
                                 break
                             } finally {
@@ -559,7 +558,7 @@ internal class DefaultPlayerController(
                         val frame = decoder.decodeVideo(data = data).getOrThrow() as? Frame.Content.Video
 
                         if (frame != null) {
-                            renderer.render(frame).getOrThrow()
+                            rendererRef.get()?.render(frame)?.getOrThrow()
 
                             timestampAfterSeek = frame.timestamp
                         }
@@ -641,8 +640,6 @@ internal class DefaultPlayerController(
                             )
                         } catch (t: Throwable) {
                             updateInternalState(InternalPlayerState.Error(cause = t, previous = state))
-
-                            _renderer.emit(null)
                         } finally {
                             bufferTimestamp.emit(Duration.ZERO)
 
@@ -750,8 +747,6 @@ internal class DefaultPlayerController(
                 is Command.Release -> when (val state = internalState.value) {
                     is InternalPlayerState.Ready -> {
                         updateInternalState(InternalPlayerState.Releasing(previousState = state))
-
-                        _renderer.emit(null)
 
                         try {
                             state.handleRelease()

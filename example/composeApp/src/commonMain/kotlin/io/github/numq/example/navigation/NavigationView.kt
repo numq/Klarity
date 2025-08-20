@@ -32,7 +32,6 @@ import io.github.numq.example.playlist.presentation.PlaylistFeature
 import io.github.numq.example.playlist.presentation.PlaylistView
 import io.github.numq.example.renderer.RendererRegistry
 import io.github.numq.example.splash.SplashView
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
@@ -57,27 +56,7 @@ fun NavigationView(feature: NavigationFeature) {
 
     val hubFeature = koinInject<HubFeature>(scope = hubScope)
 
-    val hubRendererRegistry = koinInject<RendererRegistry>(scope = hubScope)
-
     val playlistFeature = koinInject<PlaylistFeature>(scope = playlistScope)
-
-    val rendererRegistry = koinInject<RendererRegistry>(scope = playlistScope)
-
-    val thumbnailRenderers by rendererRegistry.renderers.map { renderers ->
-        renderers.filterNot { (id, _) ->
-            id == "playback" || id == "preview"
-        }.map { (id, registeredRenderer) ->
-            id to registeredRenderer.renderer
-        }.toMap()
-    }.collectAsState(emptyMap())
-
-    val playbackRenderer by rendererRegistry.renderers.map { renderers ->
-        renderers["playback"]?.renderer
-    }.collectAsState(null)
-
-    val previewRenderer by rendererRegistry.renderers.map { renderers ->
-        renderers["preview"]?.renderer
-    }.collectAsState(null)
 
     DisposableEffect(Unit) {
         onDispose {
@@ -115,7 +94,11 @@ fun NavigationView(feature: NavigationFeature) {
 
                         isAnimationFinished = true
                     }) {
-                    HubView(feature = hubFeature, gridState = hubGridState, rendererRegistry = hubRendererRegistry)
+                    HubView(
+                        feature = hubFeature,
+                        gridState = hubGridState,
+                        rendererRegistry = koinInject<RendererRegistry>(scope = hubScope)
+                    )
                 }
                 NavigationAnimation(
                     isActive = state is NavigationState.Playlist,
@@ -131,10 +114,8 @@ fun NavigationView(feature: NavigationFeature) {
                     PlaylistView(
                         feature = playlistFeature,
                         listState = playlistListState,
-                        thumbnailRenderers = thumbnailRenderers,
-                        playbackRenderer = playbackRenderer,
-                        previewRenderer = previewRenderer,
-                        isAnimationFinished = isAnimationFinished
+                        isAnimationFinished = isAnimationFinished,
+                        rendererRegistry = koinInject<RendererRegistry>(scope = playlistScope)
                     )
                 }
             }

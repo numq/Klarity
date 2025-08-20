@@ -36,11 +36,11 @@ interface HubRepository {
         }
 
         override suspend fun updatePreviewItem(item: Item.Loaded?) = runCatching {
-            previewItem.value = item
+            previewItem.emit(item)
         }
 
         override suspend fun updatePlaybackItem(item: Item.Loaded?) = runCatching {
-            playbackItem.value = item
+            playbackItem.emit(item)
         }
 
         override suspend fun addItem(item: Item.Loading) = runCatching {

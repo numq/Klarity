@@ -47,13 +47,13 @@ fun HubView(feature: HubFeature, gridState: LazyGridState, rendererRegistry: Ren
 
     val state by feature.state.collectAsState()
 
-    val error by feature.events.filterIsInstance(HubEvent.Error::class).collectAsState(null)
-
-    val renderers by rendererRegistry.renderers.map { registeredRenderers ->
-        registeredRenderers.map { (id, registeredRenderer) ->
+    val thumbnailRenderers by rendererRegistry.renderers.map { renderers ->
+        renderers.map { (id, registeredRenderer) ->
             id to registeredRenderer.renderer
         }.toMap()
     }.collectAsState(emptyMap())
+
+    val error by feature.events.filterIsInstance(HubEvent.Error::class).collectAsState(null)
 
     LaunchedEffect(error) {
         error?.run {
@@ -163,9 +163,7 @@ fun HubView(feature: HubFeature, gridState: LazyGridState, rendererRegistry: Ren
                         Box(modifier = Modifier.fillMaxSize().aspectRatio(1f), contentAlignment = Alignment.Center) {
                             when (item) {
                                 is Item.Loading -> LoadingItem(
-                                    modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                                    item = item,
-                                    remove = {
+                                    modifier = Modifier.fillMaxSize().aspectRatio(1f), item = item, remove = {
                                         coroutineScope.launch {
                                             feature.execute(HubCommand.RemoveFromHub(item))
                                         }
@@ -175,7 +173,7 @@ fun HubView(feature: HubFeature, gridState: LazyGridState, rendererRegistry: Ren
                                     item = item,
                                     playbackItem = state.hub.playbackItem,
                                     playbackState = state.hub.playbackState,
-                                    renderer = renderers[item.id],
+                                    renderer = thumbnailRenderers[item.id],
                                     startPreview = {
                                         coroutineScope.launch {
                                             feature.execute(HubCommand.Preview.StartPreview(item = item))
@@ -218,9 +216,7 @@ fun HubView(feature: HubFeature, gridState: LazyGridState, rendererRegistry: Ren
                                     })
 
                                 is Item.Failed -> FailedItem(
-                                    modifier = Modifier.fillMaxSize().aspectRatio(1f),
-                                    item = item,
-                                    remove = {
+                                    modifier = Modifier.fillMaxSize().aspectRatio(1f), item = item, remove = {
                                         coroutineScope.launch {
                                             feature.execute(HubCommand.RemoveFromHub(item))
                                         }

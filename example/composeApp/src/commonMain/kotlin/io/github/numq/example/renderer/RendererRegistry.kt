@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 interface RendererRegistry {
     val renderers: StateFlow<Map<String, RegisteredRenderer>>
 
-    suspend fun add(id: String, location: String, width: Int, height: Int): Result<Unit>
+    suspend fun create(id: String, location: String, width: Int, height: Int): Result<Unit>
 
     suspend fun get(id: String): Result<Renderer?>
 
@@ -25,8 +25,8 @@ interface RendererRegistry {
 
         override val renderers = _renderers.asStateFlow()
 
-        override suspend fun add(id: String, location: String, width: Int, height: Int) = runCatching {
-            check(_renderers.value.keys.contains(id).not()) { "Renderer is already registered" }
+        override suspend fun create(id: String, location: String, width: Int, height: Int) = runCatching {
+            check(renderers.value.keys.contains(id).not()) { "Renderer is already registered" }
 
             val renderer = Renderer.create(width = width, height = height).getOrNull()
 
@@ -40,7 +40,7 @@ interface RendererRegistry {
         }
 
         override suspend fun reset(id: String) = runCatching {
-            val registeredRenderer = _renderers.value[id]
+            val registeredRenderer = renderers.value[id]
 
             if (registeredRenderer != null) {
                 val (_, location, renderer) = registeredRenderer
@@ -52,7 +52,7 @@ interface RendererRegistry {
         }
 
         override suspend fun get(id: String) = runCatching {
-            _renderers.value[id]?.renderer
+            renderers.value[id]?.renderer
         }
 
         override suspend fun remove(id: String) = runCatching {
@@ -64,7 +64,7 @@ interface RendererRegistry {
         }
 
         override suspend fun close() = runCatching {
-            _renderers.value.values.forEach { registeredRenderer ->
+            renderers.value.values.forEach { registeredRenderer ->
                 registeredRenderer.renderer.close().getOrThrow()
             }
         }

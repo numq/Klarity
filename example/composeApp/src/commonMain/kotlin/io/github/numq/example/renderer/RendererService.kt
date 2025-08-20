@@ -1,14 +1,14 @@
 package io.github.numq.example.renderer
 
 interface RendererService {
-    suspend fun add(id: String, location: String, width: Int, height: Int): Result<Unit>
+    suspend fun create(id: String, location: String, width: Int, height: Int): Result<Unit>
 
     suspend fun reset(id: String): Result<Unit>
 
     suspend fun remove(id: String): Result<Unit>
 
     class Implementation(private val rendererRegistry: RendererRegistry) : RendererService {
-        override suspend fun add(id: String, location: String, width: Int, height: Int) = rendererRegistry.add(
+        override suspend fun create(id: String, location: String, width: Int, height: Int) = rendererRegistry.create(
             id = id, location = location, width = width, height = height
         )
 

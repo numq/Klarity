@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import io.github.numq.example.item.Item
 import io.github.numq.example.playback.PlaybackState
 import io.github.numq.example.playlist.PlaylistMode
 import io.github.numq.example.timestamp.formatTimestamp
@@ -32,8 +33,9 @@ import kotlin.time.Duration
 
 @Composable
 fun PlaylistPlayback(
+    item: Item.Loaded,
     playbackState: PlaybackState.Ready,
-    playbackRenderer: Renderer?,
+    renderer: Renderer?,
     previewRenderer: Renderer?,
     previewTimestamp: PreviewTimestamp?,
     isOverlayVisible: Boolean,
@@ -99,23 +101,21 @@ fun PlaylistPlayback(
                 }, contentAlignment = Alignment.Center
             ) {
                 when {
-                    !playbackState.hasVideo -> Icon(
+                    item.width == 0 || item.height == 0 -> Icon(
                         Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary
                     )
 
-                    playbackRenderer != null && !playbackRenderer.drawsNothing() -> when {
-                        playbackRenderer.drawsNothing() -> Icon(
-                            Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
-                        )
+                    renderer != null -> RendererComponent(
+                        modifier = Modifier.fillMaxSize(),
+                        foreground = Foreground(renderer = renderer),
+                        background = Background.Blur(),
+                        placeholder = {
+                            CircularProgressIndicator()
+                        })
 
-                        else -> RendererComponent(
-                            modifier = Modifier.fillMaxSize(),
-                            foreground = Foreground(renderer = playbackRenderer),
-                            background = Background.Blur()
-                        )
-                    }
-
-                    else -> CircularProgressIndicator()
+                    else -> Icon(
+                        Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
+                    )
                 }
 
                 if (playbackState.playbackSpeedFactor != 1f) {
@@ -196,7 +196,7 @@ fun PlaylistPlayback(
                 }
             }
             if (previewTimestamp != null) {
-                previewRenderer?.takeIf { !it.drawsNothing() }?.let {
+                previewRenderer?.takeIf { !it.drawsNothing.value }?.let {
                     TimelinePreview(
                         width = 128f,
                         height = 128f,

@@ -27,9 +27,10 @@ import io.github.numq.example.notification.queue.rememberNotificationQueue
 import io.github.numq.example.playback.PlaybackState
 import io.github.numq.example.playlist.SelectedPlaylistItem
 import io.github.numq.example.remote.RemoteUploadingDialog
+import io.github.numq.example.renderer.RendererRegistry
 import io.github.numq.example.upload.UploadDialog
-import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URI
@@ -39,16 +40,30 @@ import java.net.URI
 fun PlaylistView(
     feature: PlaylistFeature,
     listState: LazyListState,
-    thumbnailRenderers: Map<String, Renderer>,
-    playbackRenderer: Renderer?,
-    previewRenderer: Renderer?,
     isAnimationFinished: Boolean,
+    rendererRegistry: RendererRegistry,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
     val notificationQueue = rememberNotificationQueue()
 
     val state by feature.state.collectAsState()
+
+    val thumbnailRenderers by rendererRegistry.renderers.map { renderers ->
+        renderers.filterNot { (id, _) ->
+            id == "playback" || id == "preview"
+        }.map { (id, registeredRenderer) ->
+            id to registeredRenderer.renderer
+        }.toMap()
+    }.collectAsState(emptyMap())
+
+    val playbackRenderer by rendererRegistry.renderers.map { renderers ->
+        renderers["playback"]?.renderer
+    }.collectAsState(null)
+
+    val previewRenderer by rendererRegistry.renderers.map { renderers ->
+        renderers["preview"]?.renderer
+    }.collectAsState(null)
 
     val error by feature.events.filterIsInstance(PlaylistEvent.Error::class).collectAsState(null)
 
@@ -192,8 +207,9 @@ fun PlaylistView(
                             (state.playlist.selectedPlaylistItem as? SelectedPlaylistItem.Present)?.item?.let { item ->
                                 when (val playbackState = state.playlist.playbackState) {
                                     is PlaybackState.Ready -> PlaylistPlayback(
+                                        item = item,
                                         playbackState = playbackState,
-                                        playbackRenderer = playbackRenderer,
+                                        renderer = playbackRenderer,
                                         previewRenderer = previewRenderer,
                                         previewTimestamp = state.previewTimestamp,
                                         isOverlayVisible = state.isOverlayVisible,
@@ -289,7 +305,11 @@ fun PlaylistView(
                                         },
                                         onPreviewTimestamp = { previewTimestamp ->
                                             coroutineScope.launch {
-                                                feature.execute(PlaylistCommand.Preview.GetTimestamp(previewTimestamp = previewTimestamp))
+                                                feature.execute(
+                                                    PlaylistCommand.Preview.GetTimestamp(
+                                                        previewTimestamp = previewTimestamp
+                                                    )
+                                                )
                                             }
                                         })
 
@@ -297,8 +317,7 @@ fun PlaylistView(
                                         modifier = Modifier.padding(8.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(
-                                            space = 8.dp,
-                                            alignment = Alignment.CenterVertically
+                                            space = 8.dp, alignment = Alignment.CenterVertically
                                         )
                                     ) {
                                         Text("Playback error occurred")

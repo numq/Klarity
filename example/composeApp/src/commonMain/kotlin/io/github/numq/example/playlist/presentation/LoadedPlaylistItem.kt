@@ -25,7 +25,7 @@ import io.github.numq.klarity.renderer.compose.RendererComponent
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LoadedPlaylistItem(
-    item: Item,
+    item: Item.Loaded,
     renderer: Renderer?,
     isSelected: Boolean,
     select: (Item) -> Unit,
@@ -42,25 +42,22 @@ fun LoadedPlaylistItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.aspectRatio(1f).clip(CircleShape),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.aspectRatio(1f).clip(CircleShape), contentAlignment = Alignment.Center
             ) {
                 when {
-                    renderer == null -> Icon(
-                        Icons.Default.AudioFile,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary
+                    item.width == 0 || item.height == 0 -> Icon(
+                        Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary
                     )
 
-                    renderer.drawsNothing() -> Icon(
-                        Icons.Default.BrokenImage,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-
-                    else -> RendererComponent(
+                    renderer != null -> RendererComponent(
                         modifier = Modifier.fillMaxSize(),
-                        foreground = Foreground(renderer = renderer, imageScale = ImageScale.Crop)
+                        foreground = Foreground(renderer = renderer, imageScale = ImageScale.Crop),
+                        placeholder = {
+                            CircularProgressIndicator()
+                        })
+
+                    else -> Icon(
+                        Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -79,8 +76,7 @@ fun LoadedPlaylistItem(
                     color = MaterialTheme.colorScheme.primary,
                     onTextLayout = { textLayoutResult ->
                         isTooltipVisible = textLayoutResult.hasVisualOverflow
-                    }
-                )
+                    })
             }, modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
             IconButton(onClick = { remove(item) }) {
                 Icon(Icons.Default.Remove, null, tint = MaterialTheme.colorScheme.primary)

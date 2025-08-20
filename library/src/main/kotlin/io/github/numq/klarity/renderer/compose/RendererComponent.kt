@@ -3,10 +3,10 @@ package io.github.numq.klarity.renderer.compose
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -30,58 +30,56 @@ fun RendererComponent(
 
     val drawsNothing by foreground.renderer.drawsNothing.collectAsState()
 
-    Surface(modifier = modifier) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            val boxSize = Size(width = maxWidth.value, height = maxHeight.value)
+    BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
+        val boxSize = Size(width = maxWidth.value, height = maxHeight.value)
 
-            val foregroundSize by remember(
-                foreground.renderer.width, foreground.renderer.height, foreground.imageScale, boxSize
-            ) {
-                derivedStateOf {
-                    foreground.imageScale.scale(
-                        srcSize = Size(
-                            width = foreground.renderer.width.toFloat(), height = foreground.renderer.height.toFloat()
-                        ), dstSize = boxSize
-                    )
-                }
+        val foregroundSize by remember(
+            foreground.renderer.width, foreground.renderer.height, foreground.imageScale, boxSize
+        ) {
+            derivedStateOf {
+                foreground.imageScale.scale(
+                    srcSize = Size(
+                        width = foreground.renderer.width.toFloat(), height = foreground.renderer.height.toFloat()
+                    ), dstSize = boxSize
+                )
             }
+        }
 
-            val foregroundOffset by remember(foregroundSize, boxSize) {
-                derivedStateOf {
-                    calculateOffset(foregroundSize, boxSize)
-                }
+        val foregroundOffset by remember(foregroundSize, boxSize) {
+            derivedStateOf {
+                calculateOffset(foregroundSize, boxSize)
             }
+        }
 
-            val backgroundSize by remember(background, boxSize, foregroundSize) {
-                derivedStateOf {
-                    calculateBackgroundSize(background, boxSize, foregroundSize)
-                }
+        val backgroundSize by remember(background, boxSize, foregroundSize) {
+            derivedStateOf {
+                calculateBackgroundSize(background, boxSize, foregroundSize)
             }
+        }
 
-            val backgroundOffset by remember(backgroundSize, boxSize) {
-                derivedStateOf {
-                    calculateBackgroundOffset(backgroundSize, boxSize)
-                }
+        val backgroundOffset by remember(backgroundSize, boxSize) {
+            derivedStateOf {
+                calculateBackgroundOffset(backgroundSize, boxSize)
             }
+        }
 
-            key(generationId, drawsNothing) {
-                if (drawsNothing) {
-                    placeholder()
-                } else {
-                    Canvas(modifier = modifier.fillMaxSize()) {
-                        foreground.renderer.draw { surface ->
-                            drawBackground(
-                                background = background,
-                                backgroundSize = backgroundSize,
-                                backgroundOffset = backgroundOffset,
-                                surface = surface,
-                            )
-                            drawForeground(
-                                foregroundSize = foregroundSize,
-                                foregroundOffset = foregroundOffset,
-                                surface = surface,
-                            )
-                        }
+        key(generationId, drawsNothing) {
+            when {
+                drawsNothing -> placeholder()
+
+                else -> Canvas(modifier = modifier.fillMaxSize()) {
+                    foreground.renderer.draw { surface ->
+                        drawBackground(
+                            background = background,
+                            backgroundSize = backgroundSize,
+                            backgroundOffset = backgroundOffset,
+                            surface = surface,
+                        )
+                        drawForeground(
+                            foregroundSize = foregroundSize,
+                            foregroundOffset = foregroundOffset,
+                            surface = surface,
+                        )
                     }
                 }
             }

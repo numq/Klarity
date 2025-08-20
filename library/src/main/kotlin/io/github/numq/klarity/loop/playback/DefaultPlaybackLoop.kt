@@ -3,6 +3,7 @@ package io.github.numq.klarity.loop.playback
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pipeline.Pipeline
+import io.github.numq.klarity.renderer.Renderer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,11 +16,11 @@ internal class DefaultPlaybackLoop(
     private val pipeline: Pipeline,
     private val syncThreshold: Duration,
     private val getVolume: () -> Float,
-    private val getPlaybackSpeedFactor: () -> Float
+    private val getPlaybackSpeedFactor: () -> Float,
+    private val getRenderer: () -> Renderer?
 ) : PlaybackLoop {
     private val mutex = Mutex()
 
-    @Volatile
     private var job: Job? = null
 
     private val audioClock = AtomicReference(Duration.INFINITE)
@@ -60,7 +61,9 @@ internal class DefaultPlaybackLoop(
         }
     }
 
-    private suspend fun Pipeline.VideoPipeline.handleVideoPlayback(onTimestamp: suspend (Duration) -> Unit) {
+    private suspend fun Pipeline.VideoPipeline.handleVideoPlayback(
+        getRenderer: () -> Renderer?, onTimestamp: suspend (Duration) -> Unit
+    ) {
         while (currentCoroutineContext().isActive) {
             val frame = buffer.take().getOrThrow()
 
@@ -101,7 +104,7 @@ internal class DefaultPlaybackLoop(
 
                         onTimestamp(frameTime)
 
-                        renderer.render(frame).getOrThrow()
+                        getRenderer()?.render(frame)?.getOrThrow()
                     }
 
                     is Frame.EndOfStream -> {
@@ -156,7 +159,7 @@ internal class DefaultPlaybackLoop(
                     }
 
                     val videoJob = launch {
-                        videoPipeline?.handleVideoPlayback(onTimestamp = { frameTimestamp ->
+                        videoPipeline?.handleVideoPlayback(getRenderer = getRenderer, onTimestamp = { frameTimestamp ->
                             if (frameTimestamp > lastFrameTimestamp) {
                                 onTimestamp(frameTimestamp)
 

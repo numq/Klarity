@@ -47,18 +47,19 @@ interface PlaybackService {
     class Implementation(
         private val probeManager: ProbeManager,
         private val player: KlarityPlayer,
-        private val rendererRegistry: RendererRegistry,
+        private val rendererRegistry: RendererRegistry
     ) : PlaybackService {
         private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
+        @Volatile
         private var seekJob: Job? = null
 
         override val state = combine(
+            player.settings,
             player.state,
             player.bufferTimestamp.map { timestamp -> timestamp.coerceAtLeast(Duration.ZERO) },
             player.playbackTimestamp.map { timestamp -> timestamp.coerceAtLeast(Duration.ZERO) },
-            player.settings
-        ) { state, bufferTimestamp, playbackTimestamp, settings ->
+        ) { settings, state, bufferTimestamp, playbackTimestamp ->
             when (state) {
                 is PlayerState.Empty -> PlaybackState.Empty
 
@@ -71,8 +72,6 @@ interface PlaybackService {
 
                     val duration = state.media.duration
 
-                    val hasVideo = state.media.videoFormat != null
-
                     val isMuted = settings.isMuted
 
                     val volume = settings.volume
@@ -83,7 +82,6 @@ interface PlaybackService {
                         is PlayerState.Ready.Playing -> PlaybackState.Ready.Playing(
                             location = location,
                             duration = duration,
-                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -94,7 +92,6 @@ interface PlaybackService {
                         is PlayerState.Ready.Paused -> PlaybackState.Ready.Paused(
                             location = location,
                             duration = duration,
-                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -105,7 +102,6 @@ interface PlaybackService {
                         is PlayerState.Ready.Stopped -> PlaybackState.Ready.Stopped(
                             location = location,
                             duration = duration,
-                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -116,7 +112,6 @@ interface PlaybackService {
                         is PlayerState.Ready.Completed -> PlaybackState.Ready.Completed(
                             location = location,
                             duration = duration,
-                            hasVideo = hasVideo,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -127,7 +122,6 @@ interface PlaybackService {
                         is PlayerState.Ready.Seeking -> PlaybackState.Ready.Seeking(
                             location = location,
                             duration = duration,
-                            hasVideo = state.media.videoFormat != null,
                             isMuted = isMuted,
                             volume = volume,
                             bufferTimestamp = bufferTimestamp,
@@ -144,9 +138,7 @@ interface PlaybackService {
         override suspend fun getProbe(location: String) = runCatching {
             probeManager.probe(location = location).getOrNull()?.run {
                 PlaybackProbe(
-                    width = videoFormat?.width ?: 0,
-                    height = videoFormat?.height ?: 0,
-                    duration = duration
+                    width = videoFormat?.width ?: 0, height = videoFormat?.height ?: 0, duration = duration
                 )
             }
         }

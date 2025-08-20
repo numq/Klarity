@@ -32,16 +32,27 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
-## [1.0.4](https://github.com/numq/Klarity/releases/tag/1.0.4)
+## [1.0.5](https://github.com/numq/Klarity/releases/tag/1.0.5)
 
 ### Changed
 
-- Renderer no longer depends on video format - uses width and height instead
+- Code refactoring
+- Performance optimizations
+
+### Fixed
+
+- Bug fixes and stability improvements
 
 ___
 
 <details>
 <summary>📦 Previous versions</summary>
+
+## [1.0.4](https://github.com/numq/Klarity/releases/tag/1.0.4)
+
+### Changed
+
+- Renderer no longer depends on video format - uses width and height instead
 
 ## [1.0.3](https://github.com/numq/Klarity/releases/tag/1.0.3)
 
@@ -109,34 +120,44 @@ graph TD
     PlayerController --> PlayerState
     PlayerController --> BufferTimestamp
     PlayerController --> PlaybackTimestamp
-    PlayerController --> Renderer
     PlayerController --> Events
+    PlayerController --> Renderer
+    
     BufferLoop --> Pipeline
     PlaybackLoop --> BufferLoop
     PlaybackLoop --> Pipeline
     PlaybackLoop --> Renderer
     PlaybackLoop --> Settings
+    
     subgraph Pipeline
-        Pipeline.AudioVideo --> Media
-        Pipeline.AudioVideo --> AudioDecoder
-        Pipeline.AudioVideo --> VideoDecoder
-        Pipeline.AudioVideo --> AudioBuffer
-        Pipeline.AudioVideo --> VideoBuffer
-        Pipeline.AudioVideo --> Sampler
-        Pipeline.AudioVideo --> VideoPool
-        Pipeline.Audio --> Media
-        Pipeline.Audio --> AudioDecoder
-        Pipeline.Audio --> AudioBuffer
-        Pipeline.Audio --> Sampler
-        Pipeline.Video --> Media
-        Pipeline.Video --> VideoDecoder
-        Pipeline.Video --> VideoBuffer
-        Pipeline.Video --> VideoPool
+        Pipeline --> Media
+        Pipeline --> AudioPipeline
+        Pipeline --> VideoPipeline
+        
+        AudioPipeline --> AudioDecoder
+        AudioPipeline --> AudioBuffer
+        AudioPipeline --> Sampler
+        
+        VideoPipeline --> VideoDecoder
+        VideoPipeline --> VideoBuffer
+        VideoPipeline --> VideoPool
     end
-    Sampler --> JNI\nNativeSampler --> C++\nSampler
-    AudioDecoder --> JNI\nNativeDecoder
-    VideoDecoder --> JNI\nNativeDecoder
-    JNI\nNativeDecoder --> C++\nDecoder
+    
+    subgraph Native Components
+        Sampler --> NativeSampler[C++/JNI]
+        AudioDecoder --> NativeDecoder[C++/JNI]
+        VideoDecoder --> NativeDecoder[C++/JNI]
+    end
+    
+    subgraph Loops
+        BufferLoop --> BufferHandler
+        PlaybackLoop --> PlaybackHandler
+    end
+    
+    subgraph Media
+        Media --> AudioFormat
+        Media --> VideoFormat
+    end
 ```
 
 ### State diagram
@@ -226,19 +247,19 @@ val media = ProbeManager.probe("path/to/media").onFailure { t -> }.getOrThrow()
 > method.
 
 ```kotlin
-val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.onFailure { t -> ... }.getOrThrow()
+val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.getOrThrow()
 
 snapshots.forEach { snapshot ->
     renderer.render(snapshot.frame).getOrThrow()
-    
-    snapshot.close().onFailure { t -> }.getOrThrow()
+
+    snapshot.close().getOrThrow()
 }
 
-val snapshot = SnapshotManager.snapshot("path/to/media") { timestamp }.onFailure { t -> ... }.getOrThrow()
+val snapshot = SnapshotManager.snapshot("path/to/media") { timestamp }.getOrThrow()
 
 renderer.render(snapshot.frame).getOrThrow()
 
-snapshot.close().onFailure { t -> }.getOrThrow()
+snapshot.close().getOrThrow()
 ```
 
 ## Get preview frames (for example, for the timeline)
@@ -248,11 +269,11 @@ snapshot.close().onFailure { t -> }.getOrThrow()
 `close()` method.
 
 ```kotlin
-val previewManager = PreviewManager.create("path/to/media").onFailure { t -> ... }.getOrThrow()
+val previewManager = PreviewManager.create("path/to/media").getOrThrow()
 
-previewManager.render(renderer, timestamp).onFailure { t -> }.getOrThrow()
+previewManager.render(renderer, timestamp).getOrThrow()
 
-previewManager.close().onFailure { t -> }.getOrThrow()
+previewManager.close().getOrThrow()
 ```
 
 ### Get media file played
@@ -263,23 +284,25 @@ previewManager.close().onFailure { t -> }.getOrThrow()
 `close()` method
 
 ```kotlin
-val playback = KlarityPlayer.create().onFailure { t -> }.getOrThrow()
+val player = KlarityPlayer.create().getOrThrow()
 
-val format = checkNotNull(playback.state.media.videoFormat)
+val probe = ProbeManager.probe("path/to/media").getOrThrow()
 
-val renderer = Renderer.create(width = format.width, height = format.height).onFailure { t -> }.getOrThrow()
+val renderer = probe.videoFormat?.run { Renderer.create(width = width, height = height).getOrThrow() }
 
-playback.attach(renderer).getOrThrow()
+if (renderer != null) {
+    player.attachRenderer(renderer).getOrThrow()
+}
 
-playback.prepare("path/to/media").onFailure { t -> }.getOrThrow()
+player.prepare("path/to/media").getOrThrow()
 
-playback.play().onFailure { t -> }.getOrThrow()
+player.play().getOrThrow()
 
-playback.stop().onFailure { t -> }.getOrThrow()
+player.stop().getOrThrow()
 
-playback.close().onFailure { t -> }.getOrThrow()
+player.detachRenderer().getOrThrow()?.close()?.getOrThrow()
 
-renderer.close().onFailure { t -> }.getOrThrow()
+player.close().getOrThrow()
 ```
 
 ## Used libraries

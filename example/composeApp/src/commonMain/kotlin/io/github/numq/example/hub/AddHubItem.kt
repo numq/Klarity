@@ -18,18 +18,18 @@ class AddHubItem(
 
         hubRepository.addItem(item = Item.Loading(id = id, location = location)).getOrThrow()
 
-        val probe = playbackService.getProbe(location = location).getOrThrow()
+        playbackService.getProbe(location = location).mapCatching { probe ->
+            checkNotNull(probe) { "Unsupported media" }
 
-        probe.runCatching {
-            checkNotNull(this) { "Unsupported media" }
-
-            rendererService.add(id = id, location = location, width = width, height = height).getOrThrow()
+            rendererService.create(
+                id = id, location = location, width = probe.width, height = probe.height
+            ).getOrThrow()
 
             rendererService.reset(id = id).getOrThrow()
 
             hubRepository.updateItem(
                 updatedItem = Item.Loaded(
-                    id = id, location = location, width = width, height = height, duration = duration
+                    id = id, location = location, width = probe.width, height = probe.height, duration = probe.duration
                 )
             ).getOrThrow()
         }.recoverCatching { throwable ->

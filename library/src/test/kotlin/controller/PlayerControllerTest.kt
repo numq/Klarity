@@ -5,8 +5,7 @@ import io.github.numq.klarity.buffer.BufferFactory
 import io.github.numq.klarity.command.Command
 import io.github.numq.klarity.controller.DefaultPlayerController
 import io.github.numq.klarity.decoder.*
-import io.github.numq.klarity.format.AudioFormat
-import io.github.numq.klarity.format.VideoFormat
+import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.hwaccel.HardwareAcceleration
 import io.github.numq.klarity.loop.buffer.BufferLoop
@@ -61,9 +60,9 @@ class PlayerControllerStateTest {
 
     private val mediaDuration = 10L.minutes
 
-    private val audioFormat = AudioFormat(sampleRate = 44100, channels = 2)
+    private val audioFormat = Format.Audio(sampleRate = 44100, channels = 2)
 
-    private val videoFormat = VideoFormat(
+    private val videoFormat = Format.Video(
         width = 100,
         height = 100,
         frameRate = 30.0,
@@ -71,7 +70,7 @@ class PlayerControllerStateTest {
         bufferCapacity = 1
     )
 
-    private lateinit var media: Media.AudioVideo
+    private lateinit var media: Media
 
     private lateinit var pipeline: Pipeline
 
@@ -85,8 +84,12 @@ class PlayerControllerStateTest {
                 location = location, findAudioStream = true, findVideoStream = false
             )
         } returns Result.success(
-            Media.Audio(
-                id = mediaId, location = location, duration = mediaDuration, format = audioFormat
+            Media(
+                id = mediaId,
+                location = location,
+                duration = mediaDuration,
+                audioFormat = audioFormat,
+                videoFormat = null
             )
         )
         every {
@@ -94,8 +97,12 @@ class PlayerControllerStateTest {
                 location = location, findAudioStream = false, findVideoStream = true
             )
         } returns Result.success(
-            Media.Video(
-                id = mediaId, location = location, duration = mediaDuration, format = videoFormat
+            Media(
+                id = mediaId,
+                location = location,
+                duration = mediaDuration,
+                audioFormat = null,
+                videoFormat = videoFormat
             )
         )
         every {
@@ -103,7 +110,7 @@ class PlayerControllerStateTest {
                 location = location, findAudioStream = true, findVideoStream = true
             )
         } returns Result.success(
-            Media.AudioVideo(
+            Media(
                 id = mediaId,
                 location = location,
                 duration = mediaDuration,
@@ -113,38 +120,53 @@ class PlayerControllerStateTest {
         )
 
         data = mockk(relaxed = true)
+
         frame = mockk(relaxed = true)
 
-        audioDecoder = mockk(relaxed = true)
-        videoDecoder = mockk(relaxed = true)
+        audioDecoder = mockk(relaxed = true, relaxUnitFun = true)
         coEvery { audioDecoder.decodeAudio() } returns Result.success(frame)
+        coEvery { audioDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
+        coEvery { audioDecoder.close() } returns Result.success(Unit)
+
+        videoDecoder = mockk(relaxed = true, relaxUnitFun = true)
         coEvery { videoDecoder.decodeVideo(data = any()) } returns Result.success(frame)
         coEvery { videoDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
-        coEvery { audioDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
-        coEvery { videoDecoder.seekTo(timestamp = any(), keyFramesOnly = any()) } returns Result.success(Unit)
-        coEvery { audioDecoder.close() } returns Result.success(Unit)
         coEvery { videoDecoder.close() } returns Result.success(Unit)
-        audioDecoderFactory = mockk()
-        videoDecoderFactory = mockk()
+
+        audioDecoderFactory = mockk(relaxed = true)
         every { audioDecoderFactory.create(any()) } returns Result.success(audioDecoder)
+
+        videoDecoderFactory = mockk(relaxed = true)
         every { videoDecoderFactory.create(any()) } returns Result.success(videoDecoder)
 
         videoPool = mockk(relaxed = true)
         coEvery { videoPool.acquire() } returns Result.success(data)
+        coEvery { videoPool.close() } returns Result.success(Unit)
+
         buffer = mockk(relaxed = true)
-        poolFactory = mockk()
-        bufferFactory = mockk()
+        coEvery { buffer.close() } returns Result.success(Unit)
+
+        poolFactory = mockk(relaxed = true)
         every { poolFactory.create(any()) } returns Result.success(videoPool)
+
+        bufferFactory = mockk(relaxed = true)
         every { bufferFactory.create(any()) } returns Result.success(buffer)
 
         bufferLoop = mockk(relaxed = true)
+        coEvery { bufferLoop.close() } returns Result.success(Unit)
+
         playbackLoop = mockk(relaxed = true)
-        bufferLoopFactory = mockk()
-        playbackLoopFactory = mockk()
+        coEvery { playbackLoop.close() } returns Result.success(Unit)
+
+        bufferLoopFactory = mockk(relaxed = true)
         every { bufferLoopFactory.create(any()) } returns Result.success(bufferLoop)
+
+        playbackLoopFactory = mockk(relaxed = true)
         every { playbackLoopFactory.create(any()) } returns Result.success(playbackLoop)
 
         sampler = mockk(relaxed = true)
+        coEvery { sampler.close() } returns Result.success(Unit)
+
         samplerFactory = mockk()
         every { samplerFactory.create(any()) } returns Result.success(sampler)
 
@@ -159,7 +181,7 @@ class PlayerControllerStateTest {
             samplerFactory = samplerFactory
         )
 
-        media = Media.AudioVideo(
+        media = Media(
             id = mediaId,
             location = location,
             duration = mediaDuration,
@@ -167,14 +189,14 @@ class PlayerControllerStateTest {
             videoFormat = videoFormat
         )
 
-        pipeline = Pipeline.AudioVideo(
-            media = media,
-            audioDecoder = audioDecoder,
-            videoDecoder = videoDecoder,
-            videoPool = videoPool,
-            audioBuffer = buffer,
-            videoBuffer = buffer,
-            sampler = sampler
+        pipeline = Pipeline(
+            media = media, audioPipeline = Pipeline.AudioPipeline(
+                decoder = audioDecoder,
+                buffer = buffer,
+                sampler = sampler,
+            ), videoPipeline = Pipeline.VideoPipeline(
+                decoder = videoDecoder, pool = videoPool, buffer = buffer
+            )
         )
     }
 
@@ -196,8 +218,7 @@ class PlayerControllerStateTest {
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
                     previousState = null
-                ).also { previousState = it }
-            )
+                ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
                     media = media,
@@ -214,7 +235,7 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
@@ -232,7 +253,7 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
@@ -250,7 +271,7 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
@@ -268,7 +289,7 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
@@ -286,7 +307,7 @@ class PlayerControllerStateTest {
                     pipeline = pipeline,
                     bufferLoop = bufferLoop,
                     playbackLoop = playbackLoop,
-                    previousState = previousState!!
+                    previousState = previousState
                 ).also { previousState = it })
             add(
                 InternalPlayerState.Ready.Transition(
@@ -344,8 +365,12 @@ class PlayerControllerStateTest {
             delay(1_000L)
         }
 
-        assertEquals(expectedInternalStates, internalStates)
+        expectedInternalStates.forEachIndexed { index, expectedState ->
+            assertEquals(expectedState, internalStates[index])
+        }
 
-        assertEquals(expectedStates, states)
+        expectedStates.forEachIndexed { index, expectedState ->
+            assertEquals(expectedState, states[index])
+        }
     }
 }

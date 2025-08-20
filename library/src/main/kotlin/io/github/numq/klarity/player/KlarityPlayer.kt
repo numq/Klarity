@@ -11,7 +11,6 @@ import io.github.numq.klarity.loop.buffer.BufferLoopFactory
 import io.github.numq.klarity.loop.playback.PlaybackLoopFactory
 import io.github.numq.klarity.pool.PoolFactory
 import io.github.numq.klarity.renderer.Renderer
-import io.github.numq.klarity.renderer.RendererFactory
 import io.github.numq.klarity.sampler.SamplerFactory
 import io.github.numq.klarity.settings.PlayerSettings
 import io.github.numq.klarity.state.PlayerState
@@ -19,17 +18,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 
 /**
  * Interface representing a media player.
  */
 interface KlarityPlayer {
-    /**
-     * A flow that emits the active renderer or null.
-     */
-    val renderer: StateFlow<Renderer?>
-
     /**
      * A flow that emits the current settings of the player.
      */
@@ -54,6 +49,22 @@ interface KlarityPlayer {
      * A flow that emits events related to the player's state and actions.
      */
     val events: Flow<PlayerEvent>
+
+    /**
+     * Attaches the renderer to the player.
+     *
+     * @param renderer the new renderer to attach
+     *
+     * @return [Result] indicating success
+     */
+    suspend fun attachRenderer(renderer: Renderer): Result<Unit>
+
+    /**
+     * Detaches the renderer from the player.
+     *
+     * @return [Result] containing the detached [Renderer] or null
+     */
+    suspend fun detachRenderer(): Result<Renderer?>
 
     /**
      * Changes the settings of the player.
@@ -140,8 +151,7 @@ interface KlarityPlayer {
     suspend fun close(): Result<Unit>
 
     companion object {
-        @Volatile
-        private var isLoaded = false
+        private var isLoaded = AtomicBoolean(false)
 
         const val MIN_AUDIO_BUFFER_SIZE = 4
 
@@ -165,7 +175,7 @@ interface KlarityPlayer {
         fun load(klarity: String) = runCatching {
             System.load(klarity)
         }.onSuccess {
-            isLoaded = true
+            isLoaded.set(true)
         }
 
         /**
@@ -176,7 +186,7 @@ interface KlarityPlayer {
          * @return [Result] containing a [KlarityPlayer] instance
          */
         fun load() = runCatching {
-            if (isLoaded) {
+            if (isLoaded.get()) {
                 return@runCatching
             }
 
@@ -227,7 +237,7 @@ interface KlarityPlayer {
          * @return [Result] containing a [KlarityPlayer] instance
          */
         fun create(initialSettings: PlayerSettings? = null): Result<KlarityPlayer> = runCatching {
-            check(isLoaded) { "Native binaries were not loaded" }
+            check(isLoaded.get()) { "Native binaries were not loaded" }
 
             PlayerControllerFactory().create(
                 parameters = PlayerControllerFactory.Parameters(
@@ -238,8 +248,7 @@ interface KlarityPlayer {
                     bufferFactory = BufferFactory(),
                     bufferLoopFactory = BufferLoopFactory(),
                     playbackLoopFactory = PlaybackLoopFactory(),
-                    samplerFactory = SamplerFactory(),
-                    rendererFactory = RendererFactory(),
+                    samplerFactory = SamplerFactory()
                 )
             ).mapCatching(::DefaultKlarityPlayer).getOrThrow()
         }

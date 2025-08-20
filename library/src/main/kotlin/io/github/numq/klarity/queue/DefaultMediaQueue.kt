@@ -20,7 +20,7 @@ internal class DefaultMediaQueue<Item, SelectedItem : Item> : MediaQueue<Item, S
 
     override val hasNext = MutableStateFlow(false)
 
-    private var shuffleSeed = MutableStateFlow(Random.nextLong())
+    private val shuffleSeed = MutableStateFlow(Random.nextLong())
 
     @Suppress("UNCHECKED_CAST")
     private fun Item.asSelectedOrNull(): SelectedItem? = this as? SelectedItem

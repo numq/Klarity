@@ -8,7 +8,7 @@ import io.github.numq.example.usecase.UseCase
 class StopHubPlayback(
     private val hubRepository: HubRepository,
     private val playbackService: PlaybackService,
-    private val rendererService: RendererService
+    private val rendererService: RendererService,
 ) : UseCase<StopHubPlayback.Input, Unit> {
     data class Input(val item: Item.Loaded, val playbackItem: Item.Loaded?)
 

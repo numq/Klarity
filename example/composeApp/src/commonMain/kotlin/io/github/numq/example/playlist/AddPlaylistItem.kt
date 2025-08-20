@@ -24,7 +24,7 @@ class AddPlaylistItem(
             checkNotNull(this) { "Unsupported media" }
 
             with(probe) {
-                rendererService.add(id = id, location = location, width = width, height = height).getOrThrow()
+                rendererService.create(id = id, location = location, width = width, height = height).getOrThrow()
 
                 rendererService.reset(id = id).getOrThrow()
 

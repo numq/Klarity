@@ -6,7 +6,6 @@ import io.github.numq.klarity.format.Format
 import io.github.numq.klarity.frame.Frame
 import io.github.numq.klarity.media.Media
 import io.github.numq.klarity.pool.Pool
-import io.github.numq.klarity.renderer.Renderer
 import io.github.numq.klarity.sampler.Sampler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,33 +18,28 @@ internal data class Pipeline(
     internal data class AudioPipeline(
         val decoder: Decoder<Format.Audio>, val buffer: Buffer<Frame>, val sampler: Sampler
     ) : CloseablePipeline {
-        override suspend fun close() = listOf(
-            suspend { sampler.close() },
-            suspend { buffer.close() },
-            suspend { decoder.close() }).fold(Result.success(Unit)) { acc, op ->
-            acc.fold(onSuccess = { op() }, onFailure = { acc })
-        }
+        override suspend fun close() =
+            listOf(sampler.close(), buffer.close(), decoder.close()).fold(Result.success(Unit)) { acc, result ->
+                acc.fold(onSuccess = { result }, onFailure = { acc })
+            }
     }
 
     internal data class VideoPipeline(
-        val decoder: Decoder<Format.Video>, val pool: Pool<Data>, val buffer: Buffer<Frame>, val renderer: Renderer
+        val decoder: Decoder<Format.Video>, val pool: Pool<Data>, val buffer: Buffer<Frame>
     ) : CloseablePipeline {
-        override suspend fun close() = listOf(
-            suspend { renderer.close() },
-            suspend { buffer.close() },
-            suspend { decoder.close() },
-            suspend { pool.close() }).fold(Result.success(Unit)) { acc, op ->
-            acc.fold(onSuccess = { op() }, onFailure = { acc })
-        }
+        override suspend fun close() =
+            listOf(buffer.close(), decoder.close(), pool.close()).fold(Result.success(Unit)) { acc, result ->
+                acc.fold(onSuccess = { result }, onFailure = { acc })
+            }
     }
 
     override suspend fun close() = runCatching {
         coroutineScope {
             listOfNotNull(
-                audioPipeline?.let { pipeline -> async { pipeline.close() } },
-                videoPipeline?.let { pipeline -> async { pipeline.close() } }).awaitAll().forEach { result ->
-                result.getOrThrow()
-            }
+                audioPipeline?.let { async { it.close() } },
+                videoPipeline?.let { async { it.close() } }).awaitAll().fold(Result.success(Unit)) { acc, result ->
+                acc.fold(onSuccess = { result }, onFailure = { acc })
+            }.getOrThrow()
         }
     }
 }

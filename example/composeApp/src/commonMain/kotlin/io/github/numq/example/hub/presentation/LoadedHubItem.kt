@@ -11,13 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -37,7 +32,7 @@ import io.github.numq.klarity.renderer.compose.RendererComponent
 
 @Composable
 fun LoadedHubItem(
-    item: Item,
+    item: Item.Loaded,
     playbackItem: Item.Loaded?,
     playbackState: PlaybackState,
     renderer: Renderer?,
@@ -50,8 +45,10 @@ fun LoadedHubItem(
     resetPlaybackSpeed: () -> Unit,
     remove: () -> Unit,
 ) {
-    val isPlaying = remember(item, playbackState, playbackItem) {
-        playbackState is PlaybackState.Ready.Playing && playbackItem?.id == item.id
+    val isPlaying by remember(playbackState, playbackItem, item) {
+        derivedStateOf {
+            playbackState is PlaybackState.Ready.Playing && playbackItem?.id == item.id
+        }
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -97,17 +94,19 @@ fun LoadedHubItem(
                     }, contentAlignment = Alignment.Center
             ) {
                 when {
-                    renderer == null -> Icon(Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary)
-
-                    renderer.drawsNothing() -> Icon(
-                        Icons.Default.BrokenImage,
-                        null,
-                        tint = MaterialTheme.colorScheme.primary
+                    item.width == 0 || item.height == 0 -> Icon(
+                        Icons.Default.AudioFile, null, tint = MaterialTheme.colorScheme.primary
                     )
 
-                    else -> RendererComponent(
+                    renderer != null -> RendererComponent(
                         modifier = Modifier.fillMaxSize(),
-                        foreground = Foreground(renderer = renderer, imageScale = ImageScale.Crop)
+                        foreground = Foreground(renderer = renderer, imageScale = ImageScale.Crop),
+                        placeholder = {
+                            CircularProgressIndicator()
+                        })
+
+                    else -> Icon(
+                        Icons.Default.BrokenImage, null, tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -138,8 +137,7 @@ fun LoadedHubItem(
                                     drawRoundRect(
                                         color = Color.Black.copy(alpha = .5f), cornerRadius = CornerRadius(16f, 16f)
                                     )
-                                }.padding(8.dp),
-                                color = MaterialTheme.colorScheme.primary
+                                }.padding(8.dp), color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }

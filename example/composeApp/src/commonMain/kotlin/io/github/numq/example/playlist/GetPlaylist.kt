@@ -40,9 +40,7 @@ class GetPlaylist(
                     if (selectedPlaylistItem != playlistRepository.previousSelectedPlaylistItem.value) {
                         release()
 
-                        playbackService.prepare(location = selectedPlaylistItem.item.location).getOrThrow()
-
-                        rendererService.add(
+                        rendererService.create(
                             id = "playback",
                             location = selectedPlaylistItem.item.location,
                             width = selectedPlaylistItem.item.width,
@@ -51,16 +49,16 @@ class GetPlaylist(
 
                         playbackService.attachRenderer(id = "playback").getOrThrow()
 
-                        timelinePreviewService.prepare(item = selectedPlaylistItem.item).getOrThrow()
+                        playbackService.prepare(location = selectedPlaylistItem.item.location).getOrThrow()
 
-                        rendererService.add(
+                        rendererService.create(
                             id = "preview",
                             location = selectedPlaylistItem.item.location,
                             width = selectedPlaylistItem.item.width,
                             height = selectedPlaylistItem.item.height
                         ).getOrThrow()
 
-                        playbackService.prepare(location = selectedPlaylistItem.item.location).getOrThrow()
+                        timelinePreviewService.prepare(item = selectedPlaylistItem.item).getOrThrow()
 
                         playbackService.play().getOrThrow()
 
