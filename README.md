@@ -129,7 +129,7 @@ graph TD
     PlaybackLoop --> Renderer
     PlaybackLoop --> Settings
     
-    subgraph Pipeline
+    subgraph Media Pipeline
         Pipeline --> Media
         Pipeline --> AudioPipeline
         Pipeline --> VideoPipeline
