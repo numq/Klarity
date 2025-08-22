@@ -32,7 +32,21 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
+## [1.0.6](https://github.com/numq/Klarity/releases/tag/1.0.6)
+
+### Fixed
+
+- Video-only media playback synchronization
+
+___
+
+<details>
+<summary>📦 Previous versions</summary>
+
 ## [1.0.5](https://github.com/numq/Klarity/releases/tag/1.0.5)
+
+> [!WARNING]  
+> Video-only media playback synchronization doesn't work
 
 ### Changed
 
@@ -42,11 +56,6 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 ### Fixed
 
 - Bug fixes and stability improvements
-
-___
-
-<details>
-<summary>📦 Previous versions</summary>
 
 ## [1.0.4](https://github.com/numq/Klarity/releases/tag/1.0.4)
 

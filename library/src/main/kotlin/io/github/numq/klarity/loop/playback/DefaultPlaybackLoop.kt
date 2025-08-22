@@ -80,27 +80,27 @@ internal class DefaultPlaybackLoop(
 
                         val playbackSpeedFactor = getPlaybackSpeedFactor()
 
-                        val masterClockTime = when {
-                            audioClockTime.isFinite() -> audioClockTime
+                        when {
+                            audioClockTime.isFinite() -> {
+                                val deltaTime = frameTime - audioClockTime
 
-                            videoClockTime.isFinite() -> videoClockTime
+                                when {
+                                    deltaTime < -syncThreshold -> continue
 
-                            else -> Duration.INFINITE
-                        }
+                                    deltaTime > syncThreshold -> delay((deltaTime / playbackSpeedFactor.toDouble()))
+                                }
+                            }
 
-                        if (masterClockTime.isFinite()) {
-                            val deltaTime = frameTime - masterClockTime
+                            videoClockTime.isFinite() -> {
+                                val deltaTime = frameTime - videoClockTime
 
-                            when {
-                                deltaTime < -syncThreshold -> continue
-
-                                deltaTime > syncThreshold -> delay((deltaTime / playbackSpeedFactor.toDouble()))
+                                delay((deltaTime / playbackSpeedFactor.toDouble()))
                             }
                         }
 
                         currentCoroutineContext().ensureActive()
 
-                        videoClock.set(frame.timestamp)
+                        videoClock.set(frameTime)
 
                         onTimestamp(frameTime)
 
