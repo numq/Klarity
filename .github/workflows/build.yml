@@ -24,9 +24,6 @@ jobs:
           - os: ubuntu-latest
             triplet: x64-linux
             name: linux-x64
-          - os: ubuntu-latest
-            triplet: arm64-linux
-            name: linux-arm64
 
     steps:
       - name: Checkout repository
