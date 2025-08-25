@@ -49,13 +49,24 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Configure project (macOS)
-        if: matrix.os == 'macos-13'
+        if: matrix.triplet == 'x64-osx'
         shell: bash
         run: |
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+
+      - name: Configure project (macOS ARM64)
+        if: matrix.triplet == 'arm64-osx'
+        shell: bash
+        run: |
+          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_APPLE_SILICON_PROCESSOR=arm64
 
       - name: Configure project (Linux)
         if: matrix.os == 'ubuntu-latest'
