@@ -135,9 +135,9 @@ jobs:
         id: rename_jar
         shell: bash
         run: |
-          SRC="${{ github.workspace }}/library/build/libs/library-${{ LIBRARY_VERSION }}.jar"
+          SRC="${{ github.workspace }}/library/build/libs/library-${{ env.LIBRARY_VERSION }}.jar"
           
-          NAME="klarity-${{ matrix.name }}-${{ LIBRARY_VERSION }}.jar"
+          NAME="klarity-${{ matrix.name }}-${{ env.LIBRARY_VERSION }}.jar"
           
           DST="${{ github.workspace }}/library/build/libs/${NAME}"
           
