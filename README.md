@@ -21,14 +21,18 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 * [Changelog](#changelog)
 * [Supported platforms](#supported-platforms)
+* [Custom builds](#custom-builds)
 * [Features](#features)
+* [Roadmap](#roadmap)
 * [Architecture](#architecture)
+    * [Layers](#layers)
+    * [Rendering](#rendering)
     * [Dependency graph](#dependency-graph)
     * [State diagram](#state-diagram)
     * [Transition table](#transition-table)
 * [Installation](#installation)
 * [Usage](#usage)
-* [Used libraries](#used-libraries)
+* [Third-party libraries](#third-party-libraries)
 
 # Changelog
 
@@ -102,12 +106,19 @@ ___
 
 # Supported platforms
 
-| Platform | Architecture |
-|----------|--------------|
-| Windows  | x64          |
-| Linux    | x64          |
-| macOS    | x64          |
-| macOS    | arm64        |
+**The library provides pre-built JARs for the following platforms:**
+
+| Platform | Architecture | JAR                         |
+|----------|--------------|-----------------------------|
+| Windows  | x64          | `klarity-windows-x64-*.jar` |
+| Linux    | x64          | `klarity-linux-x64-*.jar`   |
+| macOS    | x64          | `klarity-macos-x64-*.jar`   |
+| macOS    | arm64        | `klarity-macos-arm64-*.jar` |
+
+# Custom builds
+
+If you need support for other platforms or architectures, you can build the library from source using
+the [CI/CD configuration](.github/workflows/build.yml) as a reference for the complete build process.
 
 # Features
 
@@ -118,7 +129,66 @@ ___
 - Getting frames (snapshots) of a media file
 - Coroutine/Flow API
 
+# Roadmap
+
+## Hardware-Accelerated Rendering
+
+While hardware-accelerated decoding is technically available through FFmpeg, its practical application is currently
+limited:
+
+- Rendering bottleneck: Decoded frames are processed through CPU-bound Skia components
+
+- Latency issues: This creates a pipeline bottleneck that negates the benefits of hardware decoding
+
+- Architectural constraints: DirectX 12 and OpenGL implementations would require compatibility components, eliminating
+  key advantages of the current architecture
+
+Future solution:
+
+- Implement Vulkan-based rendering when stable support becomes available in Skia, provided it maintains
+  the current seamless Compose integration without compatibility layers.
+
 ## Architecture
+
+Klarity implements an event-driven architecture designed for Kotlin developers. It focuses on simplicity and easy
+integration with minimal setup.
+
+### Layers
+
+- **JVM Layer (Kotlin):**
+
+    - Contains all business logic and state management
+
+    - Provides a modern, coroutine-based public API
+
+    - Uses Kotlin Flows for event-driven communication
+
+    - Manages playback control, seeking, and synchronization
+
+- **JNI Layer:**:
+
+    - Bridges Kotlin code with native C++ performance
+
+    - Handles efficient data marshaling between layers
+
+    - Minimizes overhead for data transfer
+
+- **Native Layer (C++):**
+
+    - Uses FFmpeg for video/audio decoding
+
+    - Employs PortAudio for low-latency audio playback
+
+    - Handles audio playback including polyphonic audio time-stretching
+
+### Rendering
+
+The pipeline combines `FFmpeg` and `Skia` to decode video frames directly into native memory. The decoded frame data is
+directly interpreted as a `Pixmap` via pointer reference, then written to a `Skia Surface` and rendered to a
+`Compose Canvas`.
+
+This efficient approach eliminates compatibility layers like `SwingPanel` and enables seamless overlaying of any
+`Composable` on top of video content.
 
 ### Dependency graph
 
@@ -236,7 +306,7 @@ depending on your system.
 
 > [!NOTE]
 > Check out the [example](example/composeApp/src/commonMain/kotlin/io/github/numq/example) to see a full implementation
-> in Clean Architecture using the [Reduce & Conquer](https://github.com/numq/reduce-and-conquer) pattern.
+> in Clean Architecture using the [Reduce & Conquer](https://github.com/numq/reduce-and-conquer) pattern
 
 ### Load library
 
@@ -256,7 +326,7 @@ val media = ProbeManager.probe("path/to/media").onFailure { t -> }.getOrThrow()
 
 > [!IMPORTANT]
 > [Snapshot](library/src/main/kotlin/io/github/numq/klarity/snapshot/Snapshot.kt) must be closed using the `close()`
-> method.
+> method
 
 ```kotlin
 val snapshots = SnapshotManager.snapshots("path/to/media") { timestamps }.getOrThrow()
@@ -278,7 +348,7 @@ snapshot.close().getOrThrow()
 
 > [!IMPORTANT]
 > [PreviewManager](library/src/main/kotlin/io/github/numq/klarity/preview/PreviewManager.kt) must be closed using the
-`close()` method.
+`close()` method
 
 ```kotlin
 val previewManager = PreviewManager.create("path/to/media").getOrThrow()
@@ -317,9 +387,9 @@ player.detachRenderer().getOrThrow()?.close()?.getOrThrow()
 player.close().getOrThrow()
 ```
 
-## Used libraries
+## Third-party libraries
 
-- [FFMPEG](https://ffmpeg.org/)
-- [PortAudio](https://www.portaudio.com/)
-- [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch/)
-- [Skiko](https://github.com/JetBrains/skiko/)
+- **[FFmpeg](https://ffmpeg.org/)** - Licensed under [LGPLv2.1](licenses/FFMPEG_LICENSE)
+- **[PortAudio](https://www.portaudio.com/)** - Licensed under [MIT License](licenses/PORTAUDIO_LICENSE)
+- **[Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch/)** - Licensed
+  under [MIT License](licenses/SIGNALSMITH_STRETCH_LICENSE)
