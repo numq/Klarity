@@ -20,7 +20,7 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 ## Table of Content
 
 * [Changelog](#changelog)
-* [Supported operating systems](#supported-operating-systems)
+* [Supported platforms](#supported-platforms)
 * [Features](#features)
 * [Architecture](#architecture)
     * [Dependency graph](#dependency-graph)
@@ -100,11 +100,14 @@ ___
 
 </details>
 
-# Supported operating systems
+# Supported platforms
 
-- Windows x64
-- Linux x64
-- macOS x64
+| Platform | Architecture |
+|----------|--------------|
+| Windows  | x64          |
+| Linux    | x64          |
+| macOS    | x64          |
+| macOS    | arm64        |
 
 # Features
 
