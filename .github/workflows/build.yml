@@ -97,19 +97,19 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/
+          cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/klarity.dll
 
       - name: Copy binaries (macOS)
         if: matrix.os == 'macos-13'
         shell: bash
         run: |
-          cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/
+          cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/klarity.dylib
 
       - name: Copy binaries (Linux)
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
-          cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/
+          cp library/src/main/cpp/build/libklarity.so library/src/main/resources/bin/klarity.so
 
       - name: Make binaries executable (non-Windows)
         if: matrix.os != 'windows-latest'
