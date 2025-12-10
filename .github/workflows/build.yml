@@ -39,13 +39,9 @@ jobs:
           git clone https://github.com/Microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
           
-          if [ "${{ matrix.triplet }}" = "arm64-osx" ]; then
-          ./vcpkg/vcpkg install ffmpeg[core,avcodec,avformat,avutil,swscale,swresample]:arm64-osx --recurse
-          ./vcpkg/vcpkg install portaudio:arm64-osx
-          else
           ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
+          
           ./vcpkg/vcpkg install portaudio:${{ matrix.triplet }}
-          fi
 
       - name: Configure project (Windows)
         if: matrix.os == 'windows-latest'
