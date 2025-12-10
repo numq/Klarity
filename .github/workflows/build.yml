@@ -15,10 +15,10 @@ jobs:
           - os: windows-latest
             triplet: x64-windows-static
             name: windows-x64
-          - os: macos-13
+          - os: macos-15
             triplet: x64-osx
             name: macos-x64
-          - os: macos-13
+          - os: macos-latest
             triplet: arm64-osx
             name: macos-arm64
           - os: ubuntu-latest
@@ -49,24 +49,19 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Configure project (macOS)
-        if: matrix.triplet == 'x64-osx'
+        if: matrix.os == 'macos-15' || matrix.os == 'macos-latest'
         shell: bash
         run: |
-          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
-
-      - name: Configure project (macOS ARM64)
-        if: matrix.triplet == 'arm64-osx'
-        shell: bash
-        run: |
+          CMAKE_ARGS=""
+          if [ "${{ matrix.triplet }}" = "arm64-osx" ]; then
+            CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm64"
+          fi
+          
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_APPLE_SILICON_PROCESSOR=arm64
+            $CMAKE_ARGS
 
       - name: Configure project (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -100,7 +95,7 @@ jobs:
           cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/klarity.dll
 
       - name: Copy binaries (macOS)
-        if: matrix.os == 'macos-13'
+        if: matrix.os == 'macos-15' || matrix.os == 'macos-latest'
         shell: bash
         run: |
           cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/klarity.dylib
