@@ -45,7 +45,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "Klarity"
-            packageVersion = "1.0.6"
+            packageVersion = "1.1.0"
         }
     }
 }

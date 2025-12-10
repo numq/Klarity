@@ -9,21 +9,14 @@ import org.jetbrains.skia.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.nanoseconds
 
-internal class SkiaRenderer(
-    override val width: Int,
-    override val height: Int,
-) : Renderer {
+internal class SkiaRenderer(override val width: Int, override val height: Int) : Renderer {
     private companion object {
         const val DRAWS_NOTHING_ID = 0
     }
 
     init {
-        require(width > 0 && height > 0) {
-            "Width and height must be positive"
-        }
+        require(width > 0 && height > 0) { "Width and height must be positive" }
     }
-
-    private val operationLock = Any()
 
     private val renderMutex = Mutex()
 
@@ -31,11 +24,15 @@ internal class SkiaRenderer(
 
     private val isValid = AtomicBoolean(true)
 
+    private val isRendering = AtomicBoolean(false)
+
+    private val hasContent = AtomicBoolean(false)
+
     private val imageInfo = ImageInfo(
         width = width, height = height, colorType = ColorType.BGRA_8888, alphaType = ColorAlphaType.UNPREMUL
     )
 
-    private val surface: Surface by lazy { Surface.makeRaster(imageInfo) }
+    private val surface: Surface by lazy { Surface.makeRaster(imageInfo = imageInfo) }
 
     private val pixmap: Pixmap by lazy { Pixmap.make(info = imageInfo, addr = 0L, rowBytes = imageInfo.minRowBytes) }
 
@@ -49,115 +46,128 @@ internal class SkiaRenderer(
 
     override val drawsNothing = _drawsNothing.asStateFlow()
 
-    private fun updateState(id: Int) {
+    private fun withStateLock(block: () -> Unit) {
+        if (isClosed.get() || !isValid.get() || surface.isClosed || pixmap.isClosed) return
+
+        block()
+    }
+
+    private fun updateState(id: Int, markInvalid: Boolean = false) {
         if (isClosed.get()) return
+
+        if (markInvalid) {
+            isValid.set(false)
+        }
 
         _generationId.value = id
 
-        _drawsNothing.value = id == DRAWS_NOTHING_ID
+        val drawsNothingValue = id == DRAWS_NOTHING_ID
+
+        _drawsNothing.value = drawsNothingValue
+
+        hasContent.set(!drawsNothingValue)
     }
 
-    private fun checkValid(): Boolean = !isClosed.get() && isValid.get() && !surface.isClosed && !pixmap.isClosed
+    override fun onRender(
+        canvas: Canvas,
+        backgroundRect: Rect,
+        backgroundColorPaint: Paint?,
+        backgroundBlurPaint: Paint?,
+        foregroundRect: Rect
+    ) {
+        if (isRendering.get() || !hasContent.get()) return
 
-    private fun markInvalid() {
-        isValid.set(false)
+        isRendering.set(true)
 
-        updateState(DRAWS_NOTHING_ID)
-    }
+        try {
+            withStateLock {
+                surface.makeImageSnapshot().use { image ->
+                    if (backgroundColorPaint == null && backgroundBlurPaint == null) {
+                        canvas.drawImageRect(image = image, dst = foregroundRect)
 
-    override fun draw(callback: (Surface) -> Unit) = synchronized(operationLock) {
-        if (checkValid()) {
-            try {
-                callback(surface)
-            } catch (_: Exception) {
-                markInvalid()
+                        return@withStateLock
+                    }
+
+                    backgroundColorPaint?.let { paint ->
+                        canvas.drawPaint(paint = paint)
+                    }
+
+                    backgroundBlurPaint?.let { paint ->
+                        canvas.drawImageRect(image = image, dst = backgroundRect, paint)
+                    }
+
+                    canvas.drawImageRect(image = image, dst = foregroundRect)
+                }
             }
+        } catch (_: Throwable) {
+            markInvalid()
+        } finally {
+            isRendering.set(false)
         }
     }
+
+    private fun markInvalid() = updateState(DRAWS_NOTHING_ID, markInvalid = true)
 
     override suspend fun render(frame: Frame.Content.Video) = renderMutex.withLock {
         runCatching {
-            require(frame.width == width && frame.height == height) { "Invalid frame dimensions" }
+            if (frame.data.isClosed || frame.data.size < minByteSize) return@runCatching
 
-            if (isClosed.get() || frame.data.isClosed || frame.data.size < minByteSize) {
-                return@runCatching
+            require(frame.width == width && frame.height == height) {
+                "Invalid frame dimensions: expected ${width}x$height, got ${frame.width}x${frame.height}"
             }
 
-            synchronized(operationLock) {
-                if (!checkValid()) {
-                    return@synchronized
-                }
+            withStateLock {
+                frame.onRenderStart?.invoke()
 
-                try {
-                    frame.onRenderStart?.invoke()
+                val startTime = System.nanoTime()
 
-                    val startTime = System.nanoTime().nanoseconds
+                pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
 
-                    pixmap.reset(info = imageInfo, buffer = frame.data, rowBytes = imageInfo.minRowBytes)
+                surface.writePixels(pixmap, 0, 0)
 
-                    surface.writePixels(pixmap, 0, 0)
+                val renderTime = (System.nanoTime() - startTime).nanoseconds
 
-                    val renderTime = System.nanoTime().nanoseconds - startTime
+                frame.onRenderComplete?.invoke(renderTime)
 
-                    frame.onRenderComplete?.invoke(renderTime)
-
-                    updateState(surface.generationId)
-                } catch (_: Exception) {
-                    markInvalid()
-                }
+                updateState(surface.generationId)
             }
-        }
+        }.onFailure { markInvalid() }
     }
 
     override suspend fun flush() = renderMutex.withLock {
         runCatching {
-            synchronized(operationLock) {
-                if (!checkValid()) {
-                    return@synchronized
-                }
+            withStateLock {
+                surface.flush()
 
-                try {
-                    pixmap.reset()
-
-                    surface.flush()
-
-                    updateState(DRAWS_NOTHING_ID)
-                } catch (_: Exception) {
-                    markInvalid()
-                }
+                updateState(DRAWS_NOTHING_ID)
             }
-        }
+        }.onFailure { markInvalid() }
     }
 
     override suspend fun close() = renderMutex.withLock {
         runCatching {
-            if (!isClosed.compareAndSet(false, true)) {
-                return@runCatching
-            }
+            if (isClosed.get()) return@runCatching
 
-            synchronized(operationLock) {
-                try {
-                    if (!surface.isClosed) {
-                        surface.flush()
-                        surface.close()
-                    }
+            isClosed.set(true)
 
-                    if (!pixmap.isClosed) {
-                        pixmap.close()
-                    }
-                } catch (_: Exception) {
-                    try {
-                        surface.close()
-                    } catch (_: Exception) {
-                    }
+            try {
+                if (!surface.isClosed) {
+                    surface.flush()
 
-                    try {
-                        pixmap.close()
-                    } catch (_: Exception) {
-                    }
-                } finally {
-                    updateState(DRAWS_NOTHING_ID)
+                    surface.close()
                 }
+
+                if (!pixmap.isClosed) {
+                    pixmap.close()
+                }
+            } catch (t: Throwable) {
+                if (!pixmap.isClosed) {
+                    pixmap.close()
+                }
+
+                throw t
+            } finally {
+                updateState(DRAWS_NOTHING_ID)
             }
         }
     }

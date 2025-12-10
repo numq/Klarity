@@ -44,16 +44,24 @@ Since frames are rendered directly into the `Composable`, this eliminates the ne
 
 # Changelog
 
-## [1.0.6](https://github.com/numq/Klarity/releases/tag/1.0.6)
+## [1.1.0](https://github.com/numq/Klarity/releases/tag/1.1.0)
 
-### Fixed
+### Changed
 
-- Video-only media playback synchronization
+- Rendering pipeline optimization
+- Rendering computation optimization
+- Rendering operations synchronization optimization
 
 ___
 
 <details>
 <summary>📦 Previous versions</summary>
+
+## [1.0.6](https://github.com/numq/Klarity/releases/tag/1.0.6)
+
+### Fixed
+
+- Video-only media playback synchronization
 
 ## [1.0.5](https://github.com/numq/Klarity/releases/tag/1.0.5)
 

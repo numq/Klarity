@@ -1,23 +1,17 @@
 package io.github.numq.klarity.renderer.compose
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.withSave
-import org.jetbrains.skia.FilterTileMode
-import org.jetbrains.skia.ImageFilter
-import org.jetbrains.skia.Surface
-import org.jetbrains.skia.Paint as SkPaint
+import org.jetbrains.skia.*
 
 @Composable
 fun RendererComponent(
@@ -26,130 +20,94 @@ fun RendererComponent(
     background: Background = Background.Transparent,
     placeholder: @Composable () -> Unit = {},
 ) {
-    val generationId by foreground.renderer.generationId.collectAsState()
-
     val drawsNothing by foreground.renderer.drawsNothing.collectAsState()
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
-        val boxSize = Size(width = maxWidth.value, height = maxHeight.value)
+    val generationId by foreground.renderer.generationId.collectAsState()
 
-        val foregroundSize by remember(
-            foreground.renderer.width, foreground.renderer.height, foreground.imageScale, boxSize
-        ) {
-            derivedStateOf {
-                foreground.imageScale.scale(
-                    srcSize = Size(
-                        width = foreground.renderer.width.toFloat(), height = foreground.renderer.height.toFloat()
-                    ), dstSize = boxSize
-                )
+    val backgroundPaint = remember(background) {
+        when (background) {
+            is Background.Transparent -> null
+
+            is Background.Color -> Paint().apply {
+                color = with(background) {
+                    Color.makeARGB(a = alpha, r = red, g = green, b = blue)
+                }
             }
-        }
 
-        val foregroundOffset by remember(foregroundSize, boxSize) {
-            derivedStateOf {
-                calculateOffset(foregroundSize, boxSize)
-            }
-        }
-
-        val backgroundSize by remember(background, boxSize, foregroundSize) {
-            derivedStateOf {
-                calculateBackgroundSize(background, boxSize, foregroundSize)
-            }
-        }
-
-        val backgroundOffset by remember(backgroundSize, boxSize) {
-            derivedStateOf {
-                calculateBackgroundOffset(backgroundSize, boxSize)
-            }
-        }
-
-        key(generationId, drawsNothing) {
-            when {
-                drawsNothing -> placeholder()
-
-                else -> Canvas(modifier = modifier.fillMaxSize()) {
-                    foreground.renderer.draw { surface ->
-                        drawBackground(
-                            background = background,
-                            backgroundSize = backgroundSize,
-                            backgroundOffset = backgroundOffset,
-                            surface = surface,
-                        )
-                        drawForeground(
-                            foregroundSize = foregroundSize,
-                            foregroundOffset = foregroundOffset,
-                            surface = surface,
-                        )
-                    }
+            is Background.Blur -> Paint().apply {
+                imageFilter = with(background) {
+                    ImageFilter.makeBlur(sigmaX = sigmaX, sigmaY = sigmaY, mode = FilterTileMode.CLAMP)
                 }
             }
         }
     }
-}
 
-private fun calculateOffset(scaledSize: Size, size: Size) = Offset(
-    x = (size.width - scaledSize.width) / 2f, y = (size.height - scaledSize.height) / 2f
-)
-
-private fun calculateBackgroundSize(background: Background, size: Size, foregroundSize: Size) = when (background) {
-    is Background.Blur -> background.imageScale.scale(srcSize = foregroundSize, dstSize = size)
-
-    else -> Size.Zero
-}
-
-private fun calculateBackgroundOffset(backgroundSize: Size, size: Size) = if (backgroundSize != Size.Zero) {
-    Offset(x = (size.width - backgroundSize.width) / 2f, y = (size.height - backgroundSize.height) / 2f)
-} else {
-    Offset.Zero
-}
-
-private fun DrawScope.drawBackground(
-    background: Background,
-    backgroundSize: Size,
-    backgroundOffset: Offset,
-    surface: Surface,
-) {
-    when (background) {
-        is Background.Transparent -> Unit
-
-        is Background.Color -> drawRect(color = with(background) { Color(red = r, green = g, blue = b, alpha = a) })
-
-        is Background.Blur -> drawIntoCanvas { canvas ->
-            if (surface.isClosed || canvas.nativeCanvas.isClosed || surface.width <= 0 || surface.height <= 0) {
-                return@drawIntoCanvas
-            }
-
-            canvas.withSave {
-                canvas.translate(backgroundOffset.x, backgroundOffset.y)
-
-                canvas.scale(backgroundSize.width / surface.width, backgroundSize.height / surface.height)
-
-                surface.draw(canvas.nativeCanvas, 0, 0, SkPaint().apply {
-                    imageFilter = ImageFilter.makeBlur(
-                        sigmaX = background.sigma, sigmaY = background.sigma, mode = FilterTileMode.CLAMP
-                    )
-                })
-            }
+    DisposableEffect(backgroundPaint) {
+        onDispose {
+            backgroundPaint?.close()
         }
     }
-}
 
-private fun DrawScope.drawForeground(
-    foregroundSize: Size,
-    foregroundOffset: Offset,
-    surface: Surface,
-) {
-    drawIntoCanvas { canvas ->
-        if (surface.isClosed || canvas.nativeCanvas.isClosed || surface.width <= 0 || surface.height <= 0) {
-            return@drawIntoCanvas
-        }
+    Box(modifier = modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
+        when {
+            drawsNothing -> placeholder()
 
-        canvas.withSave {
-            canvas.translate(foregroundOffset.x, foregroundOffset.y)
+            else -> key(generationId) {
+                Box(modifier = Modifier.fillMaxSize().drawWithCache {
+                    val dstSize = size
 
-            canvas.scale(foregroundSize.width / surface.width, foregroundSize.height / surface.height)
+                    val srcSize = Size(
+                        width = foreground.renderer.width.toFloat(), height = foreground.renderer.height.toFloat()
+                    )
 
-            surface.draw(canvas.nativeCanvas, 0, 0, null)
+                    val foregroundSize = foreground.imageScale.scale(srcSize, dstSize)
+
+                    val foregroundOffset = Offset(
+                        x = (dstSize.width - foregroundSize.width) / 2f,
+                        y = (dstSize.height - foregroundSize.height) / 2f
+                    )
+
+                    val foregroundRect = Rect.makeXYWH(
+                        l = foregroundOffset.x,
+                        t = foregroundOffset.y,
+                        w = foregroundSize.width,
+                        h = foregroundSize.height
+                    )
+
+                    val backgroundRect = when {
+                        background is Background.Blur -> {
+                            val backgroundSize = background.imageScale.scale(srcSize, dstSize)
+
+                            val backgroundOffset = Offset(
+                                x = (dstSize.width - backgroundSize.width) / 2f,
+                                y = (dstSize.height - backgroundSize.height) / 2f
+                            )
+
+                            Rect.makeXYWH(
+                                l = backgroundOffset.x,
+                                t = backgroundOffset.y,
+                                w = backgroundSize.width,
+                                h = backgroundSize.height
+                            )
+
+                        }
+
+                        else -> foregroundRect
+                    }
+
+                    onDrawBehind {
+                        drawIntoCanvas { canvas ->
+                            foreground.renderer.onRender(
+                                canvas = canvas.nativeCanvas,
+                                backgroundRect = backgroundRect,
+                                backgroundColorPaint = backgroundPaint.takeIf { background is Background.Color },
+                                backgroundBlurPaint = backgroundPaint.takeIf { background is Background.Blur },
+                                foregroundRect = foregroundRect
+                            )
+                        }
+                    }
+                })
+            }
         }
     }
 }

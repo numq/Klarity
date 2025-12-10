@@ -2,6 +2,9 @@ package io.github.numq.klarity.renderer
 
 import io.github.numq.klarity.frame.Frame
 import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.skia.Canvas
+import org.jetbrains.skia.Paint
+import org.jetbrains.skia.Rect
 import org.jetbrains.skia.Surface
 
 /**
@@ -32,11 +35,21 @@ sealed interface Renderer {
     val drawsNothing: StateFlow<Boolean>
 
     /**
-     * Draws directly to the Skia [Surface] using the provided callback.
+     * Renders the current frame to the target Skia [Canvas] with the specified background.
      *
-     * @param callback a function that receives the [Surface] for custom drawing
+     * @param canvas the Skia [Canvas] to render onto
+     * @param backgroundRect the rectangle area for background effects
+     * @param backgroundColorPaint the paint for background color drawing
+     * @param backgroundBlurPaint the paint for background blur drawing
+     * @param foregroundRect the rectangle area for the video frame
      */
-    fun draw(callback: (Surface) -> Unit)
+    fun onRender(
+        canvas: Canvas,
+        backgroundRect: Rect,
+        backgroundColorPaint: Paint?,
+        backgroundBlurPaint: Paint?,
+        foregroundRect: Rect
+    )
 
     /**
      * Requests rendering of the [Frame.Content.Video].
