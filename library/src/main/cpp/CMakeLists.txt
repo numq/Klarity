@@ -36,13 +36,9 @@ target_link_directories(klarity PRIVATE
 
 if (WIN32)
     target_link_options(klarity PRIVATE "/FORCE:MULTIPLE")
-endif ()
+endif()
 
 target_link_libraries(klarity PRIVATE
-        avformat
-        avcodec
-        swresample
-        swscale
-        avutil
+        ${FFMPEG_LIBRARIES}
         portaudio
 )
