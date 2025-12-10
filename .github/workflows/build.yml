@@ -16,9 +16,6 @@ jobs:
             triplet: x64-windows-static
             name: windows-x64
           - os: macos-latest
-            triplet: x64-osx
-            name: macos-x64
-          - os: macos-latest
             triplet: arm64-osx
             name: macos-arm64
           - os: ubuntu-latest
@@ -33,15 +30,11 @@ jobs:
         if: matrix.os != 'windows-latest'
         uses: ilammy/setup-nasm@v1
 
-      - name: Set up vcpkg and install dependencies
+      - name: Set up vcpkg
         shell: bash
         run: |
           git clone https://github.com/Microsoft/vcpkg.git
           ./vcpkg/bootstrap-vcpkg.sh
-          
-          ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
-          
-          ./vcpkg/vcpkg install portaudio:${{ matrix.triplet }}
 
       - name: Configure project (Windows)
         if: matrix.os == 'windows-latest'
@@ -56,16 +49,11 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          CMAKE_ARGS=""
-          if [ "${{ matrix.triplet }}" = "arm64-osx" ]; then
-            CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64"
-          fi
-          
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
-            $CMAKE_ARGS
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Configure project (Linux)
         if: matrix.os == 'ubuntu-latest'

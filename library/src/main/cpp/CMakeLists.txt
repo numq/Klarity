@@ -38,19 +38,6 @@ if (WIN32)
     target_link_options(klarity PRIVATE "/FORCE:MULTIPLE")
 endif ()
 
-if (APPLE)
-    target_link_libraries(klarity PRIVATE
-            "-framework VideoToolbox"
-            "-framework CoreMedia"
-            "-framework CoreFoundation"
-            "-framework CoreVideo"
-            "-framework Security"
-            "-framework CoreServices"
-            "-framework CoreAudio"
-            "-framework AudioToolbox"
-    )
-endif ()
-
 target_link_libraries(klarity PRIVATE
         avformat
         avcodec
