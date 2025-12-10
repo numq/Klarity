@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Size
  * An interface for defining image scaling operations.
  */
 interface ImageScale {
-
     /**
      * Scales the source image dimensions to match the destination image dimensions.
      *
@@ -31,6 +30,7 @@ interface ImageScale {
             dstSize: Size,
         ) {
             require(srcSize.width > 0f && srcSize.height > 0f) { "Source dimensions must be positive" }
+
             require(dstSize.width > 0f && dstSize.height > 0f) { "Destination dimensions must be positive" }
         }
 
@@ -43,7 +43,9 @@ interface ImageScale {
          */
         private fun scaleByFactor(srcSize: Size, scaleFactor: Float): Size {
             val scaledWidth = srcSize.width * scaleFactor
+
             val scaledHeight = srcSize.height * scaleFactor
+
             return Size(scaledWidth, scaledHeight)
         }
     }
@@ -63,6 +65,7 @@ interface ImageScale {
             validateDimensions(srcSize = srcSize, dstSize = dstSize)
 
             val scaleWidth = dstSize.width / srcSize.width
+
             val scaleHeight = dstSize.height / srcSize.height
 
             val scale = maxOf(scaleWidth, scaleHeight)
@@ -79,6 +82,7 @@ interface ImageScale {
             validateDimensions(srcSize = srcSize, dstSize = dstSize)
 
             val scaledWidth = dstSize.width
+
             val scaledHeight = dstSize.height
 
             return Size(scaledWidth, scaledHeight)
@@ -104,7 +108,9 @@ interface ImageScale {
     object FitWidth : ImageScale {
         override fun scale(srcSize: Size, dstSize: Size): Size {
             validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
             val scale = dstSize.width / srcSize.width
+
             return scaleByFactor(srcSize, scale)
         }
     }
@@ -115,7 +121,9 @@ interface ImageScale {
     object FitHeight : ImageScale {
         override fun scale(srcSize: Size, dstSize: Size): Size {
             validateDimensions(srcSize = srcSize, dstSize = dstSize)
+
             val scale = dstSize.height / srcSize.height
+
             return scaleByFactor(srcSize, scale)
         }
     }
