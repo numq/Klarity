@@ -44,6 +44,10 @@ if (APPLE)
             "-framework CoreMedia"
             "-framework CoreFoundation"
             "-framework CoreVideo"
+            "-framework Security"
+            "-framework CoreServices"
+            "-framework CoreAudio"
+            "-framework AudioToolbox"
     )
 endif ()
 
