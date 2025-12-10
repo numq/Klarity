@@ -49,7 +49,7 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
       - name: Configure project (macOS)
-        if: matrix.os == 'macos-15' || matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-14'
         shell: bash
         run: |
           CMAKE_ARGS=""
@@ -95,7 +95,7 @@ jobs:
           cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/klarity.dll
 
       - name: Copy binaries (macOS)
-        if: matrix.os == 'macos-15'
+        if: matrix.os == 'macos-14'
         shell: bash
         run: |
           cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/klarity.dylib
