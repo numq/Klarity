@@ -47,10 +47,10 @@ if (APPLE)
 endif ()
 
 target_link_libraries(klarity PRIVATE
-        avcodec
         avformat
-        avutil
-        swscale
+        avcodec
         swresample
+        swscale
+        avutil
         portaudio
 )
