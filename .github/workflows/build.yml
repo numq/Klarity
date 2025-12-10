@@ -15,6 +15,9 @@ jobs:
           - os: windows-latest
             triplet: x64-windows-static
             name: windows-x64
+          - os: macos-15-intel
+            triplet: x64-osx
+            name: macos-x64
           - os: macos-latest
             triplet: arm64-osx
             name: macos-arm64
