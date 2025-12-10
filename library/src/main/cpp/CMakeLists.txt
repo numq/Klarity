@@ -43,6 +43,7 @@ if (APPLE)
             "-framework VideoToolbox"
             "-framework CoreMedia"
             "-framework CoreFoundation"
+            "-framework CoreVideo"
     )
 endif ()
 
