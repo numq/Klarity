@@ -15,12 +15,12 @@ jobs:
           - os: windows-latest
             triplet: x64-windows-static
             name: windows-x64
-          - os: macos-15-intel
-            triplet: x64-osx
-            name: macos-x64
           - os: macos-latest
             triplet: arm64-osx
             name: macos-arm64
+          - os: macos-15-intel
+            triplet: x64-osx
+            name: macos-x64
           - os: ubuntu-latest
             triplet: x64-linux
             name: linux-x64
@@ -48,13 +48,22 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
-      - name: Configure project (macOS)
+      - name: Configure project (macOS ARM64)
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
           cmake -B library/src/main/cpp/build -S library/src/main/cpp \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+
+      - name: Configure project (macOS Intel)
+        if: matrix.os == 'macos-15-intel'
+        shell: bash
+        run: |
+          cmake -B library/src/main/cpp/build -S library/src/main/cpp \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
 
@@ -90,7 +99,7 @@ jobs:
           cp library/src/main/cpp/build/Release/klarity.dll library/src/main/resources/bin/klarity.dll
 
       - name: Copy binaries (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' || matrix.os == 'macos-15-intel'
         shell: bash
         run: |
           cp library/src/main/cpp/build/libklarity.dylib library/src/main/resources/bin/klarity.dylib
